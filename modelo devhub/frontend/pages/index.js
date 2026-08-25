@@ -1,395 +1,326 @@
-import Head from 'next/head';
-import Link from 'next/link';
-import Image from 'next/image';
-import { 
-  Brain, 
-  Bot, 
-  Zap, 
-  Sparkles, 
-  Workflow, 
-  Shield, 
-  ArrowRight,
-  MessageCircle,
-  Users,
-  BarChart3,
-  Target,
-  Link as LinkIcon,
-  TrendingUp,
-  RotateCcw,
-  Settings,
-  Smartphone,
-  Clock,
-  CheckCircle,
-  UserCheck,
-  FileText,
-  Database,
-  Globe,
-  Headphones
-} from 'lucide-react';
-import styles from '../styles/index.module.css';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import Head from "next/head";
+import DevHubLogo from "../components/Logo";
 
-export default function Home() {
+export default function HomeLogin() {
+  const router = useRouter();
+
+  // Estado do Tema (sincronizado com localStorage)
+  const [theme, setTheme] = useState("dark"); // 'dark' | 'light'
+
+  // Estados do formulário
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+
+  // Estados de controle da interface
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState("");
+  const [sucessoToast, setSucessoToast] = useState("");
+
+  // Sincronizar tema com localStorage na inicialização
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("theme") || "dark";
+      setTheme(savedTheme);
+      document.documentElement.setAttribute("data-theme", savedTheme);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErro("");
+    setSucessoToast("");
+
+    if (!email || !senha) {
+      setErro("Por favor, preencha todos os campos.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+      const response = await fetch(`${apiUrl}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, senha }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "E-mail ou senha incorretos.");
+      }
+
+      // Armazena Token JWT e dados do Usuário no localStorage
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userData", JSON.stringify(data.user));
+
+      // Exibe a notificação Toast flutuante na lateral
+      setSucessoToast(`Login concluído! Bem-vindo(a), ${data.user.nome}.`);
+
+      // Redireciona todos os usuários para a página inicial (Dashboard)
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 800);
+
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cores adaptativas conforme o Modo Claro / Escuro
+  const isDark = theme === "dark";
+  const colors = {
+    bgPage: isDark ? "#0B0F19" : "#F4F6F9",
+    bgCard: isDark ? "rgba(15, 23, 42, 0.75)" : "#FFFFFF",
+    borderCard: isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0",
+    textPrimary: isDark ? "#F1F5F9" : "#1E293B",
+    textSecondary: isDark ? "#94A3B8" : "#64748B",
+    inputBg: isDark ? "rgba(30, 41, 59, 0.6)" : "#FFFFFF",
+    inputBorder: isDark ? "rgba(255, 255, 255, 0.12)" : "#CBD5E1",
+    boxShadow: isDark ? "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(59, 130, 246, 0.25)" : "0 20px 40px rgba(0, 0, 0, 0.08)"
+  };
+
   return (
-    <div>
+    <>
       <Head>
-        <title>Plataforma — Assistentes Inteligentes para Operações</title>
-        <meta name="description" content="Plataforma de automação de atendimento e processos com IA generativa e adaptativa." />
+        <title>DevHub — Login</title>
       </Head>
 
-      <div className={styles.app}>
-        {/* Header */}
-        <header className={styles.header}>
-          <div className={styles.container}>
-            <div className={styles.nav}>
-              <div className={styles.logo}>
-                <Image
-                  src="/img/logo.png"
-                  alt="Logo"
-                  width={140}
-                  height={32}
-                  className={styles.logoImage}
-                  priority
-                />
-              </div>
-              <nav className={styles.navMenu}>
-                <a href="#sobre" className={styles.navLink}>Sobre</a>
-                <a href="#beneficios" className={styles.navLink}>Benefícios</a>
-                <a href="#tecnologia" className={styles.navLink}>Tecnologia</a>
-                <a href="#contato" className={styles.navLink}>Contato</a>
-              </nav>
-              <Link href="/login">
-                <button className={styles.ctaButton}>Login</button>
-              </Link>
-            </div>
+      {/* Notificação Toast Flutuante na Lateral Superior Direita */}
+      {sucessoToast && (
+        <div style={{
+          position: "fixed",
+          top: "24px",
+          right: "24px",
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          backgroundColor: "#10B981",
+          color: "#FFFFFF",
+          padding: "14px 22px",
+          borderRadius: "12px",
+          boxShadow: "0 10px 30px rgba(16, 185, 129, 0.4)",
+          fontWeight: "600",
+          fontSize: "14px",
+          backdropFilter: "blur(12px)"
+        }}>
+          <span style={{ fontSize: "18px" }}>🎉</span>
+          <span>{sucessoToast}</span>
+        </div>
+      )}
+
+      {/* Container Principal */}
+      <div style={{
+        minHeight: "100vh",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: colors.bgPage,
+        color: colors.textPrimary,
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        padding: "20px",
+        transition: "all 0.3s ease"
+      }}>
+        
+        {/* Botão de Alternar Tema no Topo Direito */}
+        <div style={{ position: "absolute", top: "24px", right: "24px", zIndex: 100 }}>
+          <button
+            onClick={toggleTheme}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "12px",
+              backgroundColor: isDark ? "rgba(255, 255, 255, 0.1)" : "#FFFFFF",
+              color: colors.textPrimary,
+              border: `1px solid ${colors.borderCard}`,
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "600",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              transition: "all 0.2s ease"
+            }}
+          >
+            {isDark ? "☀️ Modo Claro" : "🌙 Modo Escuro"}
+          </button>
+        </div>
+
+        {/* Luzes Neons de Fundo no Modo Escuro */}
+        {isDark && (
+          <>
+            <div style={{
+              position: "absolute",
+              top: "-10%",
+              left: "15%",
+              width: "450px",
+              height: "450px",
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(59, 130, 246, 0.35) 0%, transparent 80%)",
+              filter: "blur(60px)",
+              pointerEvents: "none"
+            }} />
+
+            <div style={{
+              position: "absolute",
+              bottom: "-10%",
+              right: "15%",
+              width: "500px",
+              height: "500px",
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 80%)",
+              filter: "blur(70px)",
+              pointerEvents: "none"
+            }} />
+          </>
+        )}
+
+        {/* Card do Formulário de Login (Adaptativo com Glassmorphism Vivo) */}
+        <div style={{
+          position: "relative",
+          zIndex: 10,
+          width: "100%",
+          maxWidth: "440px",
+          backgroundColor: colors.bgCard,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          padding: "48px 40px",
+          borderRadius: "28px",
+          boxShadow: isDark 
+            ? "0 25px 60px -10px rgba(0, 0, 0, 0.8), 0 0 40px rgba(59, 130, 246, 0.3)" 
+            : "0 20px 40px rgba(0, 0, 0, 0.08)",
+          border: isDark ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid #E2E8F0",
+          textAlign: "center",
+          transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+        }}>
+          {/* Logo do DevHub */}
+          <div style={{ marginBottom: "28px" }}>
+            <DevHubLogo size="large" />
           </div>
-        </header>
 
-
-        <main>
-          {/* Hero Section */}
-          <section className={styles.hero}>
-            <div className={styles.container}>
-              <div className={styles.heroContent}>
-                <div className={styles.heroText}>
-                  <h1 className={styles.heroTitle}>
-                    Automatize seu escritório contábil com 
-                    <span className={styles.gradientText}> Inteligência Artificial</span>
-                  </h1>
-                  <p className={styles.heroDescription}>
-                    Nossa plataforma de assistentes inteligentes automatiza 
-                    atendimento e processos operacionais, substituindo tarefas repetitivas 
-                    por interações inteligentes e eficientes.
-                  </p>
-                  <div className={styles.heroButtons}>
-                    <Link href="/login">
-                      <button className={styles.primaryButton}>Experimentar Grátis</button>
-                    </Link>
-                    <Link href="/login">
-                      <button className={styles.secondaryButton}>Ver Demonstração</button>
-                    </Link>
-                  </div>
-                  <div className={styles.heroStats}>
-                    <div className={styles.stat}>
-                      <span className={styles.statNumber}>80%</span>
-                      <span className={styles.statLabel}>Redução em tarefas manuais</span>
-                    </div>
-                    <div className={styles.stat}>
-                      <span className={styles.statNumber}>24h</span>
-                      <span className={styles.statLabel}>Atendimento disponível</span>
-                    </div>
-                    <div className={styles.stat}>
-                      <span className={styles.statNumber}>100+</span>
-                      <span className={styles.statLabel}>Escritórios atendidos</span>
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.heroVisual}>
-                  <div className={styles.floatingCards}>
-                    <div className={`${styles.card} ${styles.card1}`}>
-                      <div className={styles.cardIcon}>
-                        <MessageCircle size={24} />
-                      </div>
-                      <h3>Conversas Centralizadas</h3>
-                      <p>Gerencie todos os canais em um só lugar</p>
-                    </div>
-                    <div className={`${styles.card} ${styles.card2}`}>
-                      <div className={styles.cardIcon}>
-                        <Users size={24} />
-                      </div>
-                      <h3>Gestão de Equipes</h3>
-                      <p>Organize e monitore sua equipe eficientemente</p>
-                    </div>
-                    <div className={`${styles.card} ${styles.card3}`}>
-                      <div className={styles.cardIcon}>
-                        <BarChart3 size={24} />
-                      </div>
-                      <h3>Relatórios Detalhados</h3>
-                      <p>Insights completos sobre seu atendimento</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Benefits Section */}
-          <section id="beneficios" className={styles.benefits}>
-            <div className={styles.container}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Por que escolher nossa plataforma?</h2>
-                <p className={styles.sectionDescription}>
-                  Revolucione seu escritório contábil com inteligência artificial que realmente entende suas necessidades
-                </p>
-              </div>
-              <div className={styles.benefitsGrid}>
-                <div className={styles.benefitCard}>
-                  <div className={styles.benefitIcon}>
-                    <Zap size={32} />
-                  </div>
-                  <h3 className={styles.benefitTitle}>Automação Inteligente</h3>
-                  <p className={styles.benefitDescription}>
-                    Substitua tarefas repetitivas por automação inteligente que aprende 
-                    com seus processos e se adapta às necessidades do seu escritório.
-                  </p>
-                </div>
-                <div className={styles.benefitCard}>
-                  <div className={styles.benefitIcon}>
-                    <Smartphone size={32} />
-                  </div>
-                  <h3 className={styles.benefitTitle}>WhatsApp Integrado</h3>
-                  <p className={styles.benefitDescription}>
-                    Gerencie múltiplas instâncias do WhatsApp Business em uma única plataforma, 
-                    com suporte a mensagens, áudios, imagens e documentos.
-                  </p>
-                </div>
-                <div className={styles.benefitCard}>
-                  <div className={styles.benefitIcon}>
-                    <Users size={32} />
-                  </div>
-                  <h3 className={styles.benefitTitle}>Gestão de Equipes</h3>
-                  <p className={styles.benefitDescription}>
-                    Organize equipes, atribua conversas, monitore performance e 
-                    distribua automaticamente o atendimento entre seus colaboradores.
-                  </p>
-                </div>
-                <div className={styles.benefitCard}>
-                  <div className={styles.benefitIcon}>
-                    <MessageCircle size={32} />
-                  </div>
-                  <h3 className={styles.benefitTitle}>Chat Centralizado</h3>
-                  <p className={styles.benefitDescription}>
-                    Interface unificada para gerenciar todas as conversas, com 
-                    transferência entre equipes, histórico completo e notificações em tempo real.
-                  </p>
-                </div>
-                <div className={styles.benefitCard}>
-                  <div className={styles.benefitIcon}>
-                    <UserCheck size={32} />
-                  </div>
-                  <h3 className={styles.benefitTitle}>Gestão de Contatos</h3>
-                  <p className={styles.benefitDescription}>
-                    Base de contatos inteligente que se integra automaticamente às conversas, 
-                    mantendo histórico completo de interações por cliente.
-                  </p>
-                </div>
-                <div className={styles.benefitCard}>
-                  <div className={styles.benefitIcon}>
-                    <BarChart3 size={32} />
-                  </div>
-                  <h3 className={styles.benefitTitle}>Relatórios Detalhados</h3>
-                  <p className={styles.benefitDescription}>
-                    Métricas completas de atendimento, tempo de resposta, 
-                    produtividade das equipes e satisfação dos clientes.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-
-          {/* Technology Section */}
-          <section id="tecnologia" className={styles.technology}>
-            <div className={styles.container}>
-              <div className={styles.technologyContent}>
-                <div className={styles.technologyText}>
-                  <h2 className={styles.sectionTitle}>Tecnologia de Ponta</h2>
-                  <p className={styles.sectionDescription}>
-                    IA generativa, adaptativa e personalizada que evolui com seu negócio
-                  </p>
-                  <div className={styles.techFeatures}>
-                    <div className={styles.techFeature}>
-                      <div className={styles.techIcon}>
-                        <Brain size={24} />
-                      </div>
-                      <div className={styles.techContent}>
-                        <h4>IA Generativa</h4>
-                        <p>Cria respostas contextualizadas e naturais para cada situação</p>
-                      </div>
-                    </div>
-                    <div className={styles.techFeature}>
-                      <div className={styles.techIcon}>
-                        <RotateCcw size={24} />
-                      </div>
-                      <div className={styles.techContent}>
-                        <h4>Aprendizado Contínuo</h4>
-                        <p>Aprende com cada interação e melhora constantemente</p>
-                      </div>
-                    </div>
-                    <div className={styles.techFeature}>
-                      <div className={styles.techIcon}>
-                        <Settings size={24} />
-                      </div>
-                      <div className={styles.techContent}>
-                        <h4>Personalização Avançada</h4>
-                        <p>Adapta-se ao estilo e necessidades específicas do seu escritório</p>
-                      </div>
-                    </div>
-                  </div>
-                  <Link href="/login">
-                  <button className={styles.primaryButton}>Conhecer a Tecnologia</button>
-                </Link>
-                </div>
-                <div className={styles.technologyVisual}>
-                  <div className={styles.techDashboard}>
-                    <div className={styles.dashboardHeader}>
-                      <div className={styles.dashboardTitle}>Dashboard</div>
-                      <div className={styles.dashboardStatus}>
-                        <span className={styles.statusDot}></span>
-                        Online
-                      </div>
-                    </div>
-                    <div className={styles.dashboardMetrics}>
-                      <div className={styles.metric}>
-                        <span className={styles.metricValue}>94%</span>
-                        <span className={styles.metricLabel}>Automação</span>
-                      </div>
-                      <div className={styles.metric}>
-                        <span className={styles.metricValue}>2.3s</span>
-                        <span className={styles.metricLabel}>Tempo Resposta</span>
-                      </div>
-                      <div className={styles.metric}>
-                        <span className={styles.metricValue}>847</span>
-                        <span className={styles.metricLabel}>Interações Hoje</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Process Section */}
-          <section className={styles.process}>
-            <div className={styles.container}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Como funciona a plataforma</h2>
-                <p className={styles.sectionDescription}>
-                  Processo simples e eficiente para transformar seu atendimento
-                </p>
-              </div>
-              <div className={styles.processSteps}>
-                <div className={styles.step}>
-                  <div className={styles.stepNumber}>1</div>
-                  <h3 className={styles.stepTitle}>Conexão</h3>
-                  <p className={styles.stepDescription}>
-                    Conectamos a plataforma aos seus sistemas internos e canais de atendimento
-                  </p>
-                </div>
-                <div className={styles.step}>
-                  <div className={styles.stepNumber}>2</div>
-                  <h3 className={styles.stepTitle}>Aprendizado</h3>
-                  <p className={styles.stepDescription}>
-                    A IA aprende seus processos, linguagem e estilo de atendimento específicos
-                  </p>
-                </div>
-                <div className={styles.step}>
-                  <div className={styles.stepNumber}>3</div>
-                  <h3 className={styles.stepTitle}>Automação</h3>
-                  <p className={styles.stepDescription}>
-                    Tarefas repetitivas são automatizadas mantendo a qualidade do atendimento
-                  </p>
-                </div>
-                <div className={styles.step}>
-                  <div className={styles.stepNumber}>4</div>
-                  <h3 className={styles.stepTitle}>Evolução</h3>
-                  <p className={styles.stepDescription}>
-                    O sistema evolui continuamente, melhorando sua eficiência operacional
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* CTA Section */}
-          <section className={styles.ctaSection}>
-            <div className={styles.container}>
-              <div className={styles.ctaContent}>
-                <h2 className={styles.ctaTitle}>
-                  Pronto para revolucionar seu escritório contábil?
-                </h2>
-                <p className={styles.ctaDescription}>
-                  Comece hoje mesmo a automatizar seus processos e aumentar a produtividade 
-                  da sua equipe com nossa plataforma.
-                </p>
-                <div className={styles.ctaButtons}>
-                  <Link href="/login">
-                    <button className={`${styles.primaryButton} ${styles.large}`}>Experimentar Grátis</button>
-                  </Link>
-                  <Link href="/login">
-                    <button className={`${styles.secondaryButton} ${styles.large}`}>Agendar Demonstração</button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </section>
-        </main>
-
-        {/* Footer */}
-        <footer className={styles.footer}>
-          <div className={styles.container}>
-            <div className={styles.footerContent}>
-              <div className={styles.footerBrand}>
-                <div className={styles.logo}>
-                  <Image
-                    src="/img/logo.png"
-                    alt="Logo"
-                    width={140}
-                    height={32}
-                    className={styles.logoImage}
-                    priority
-                  />
-                </div>
-                <p className={styles.footerDescription}>
-                  Plataforma de assistentes inteligentes para escritórios contábeis
-                </p>
-              </div>
-              <div className={styles.footerLinks}>
-                <div className={styles.footerColumn}>
-                  <h4 className={styles.footerTitle}>Produto</h4>
-                  <a href="#" className={styles.footerLink}>Funcionalidades</a>
-                  <a href="#" className={styles.footerLink}>Integrações</a>
-                  <a href="#" className={styles.footerLink}>Preços</a>
-                </div>
-                <div className={styles.footerColumn}>
-                  <h4 className={styles.footerTitle}>Suporte</h4>
-                  <a href="#" className={styles.footerLink}>Central de Ajuda</a>
-                  <a href="#" className={styles.footerLink}>Documentação</a>
-                  <a href="#" className={styles.footerLink}>Contato</a>
-                </div>
-                <div className={styles.footerColumn}>
-                  <h4 className={styles.footerTitle}>Empresa</h4>
-                  <a href="#" className={styles.footerLink}>Sobre Nós</a>
-                  <a href="#" className={styles.footerLink}>Blog</a>
-                  <a href="#" className={styles.footerLink}>Carreiras</a>
-                </div>
-              </div>
-            </div>
-            <div className={styles.footerBottom}>
-              <p>&copy; 2025 Todos os direitos reservados.</p>
-            </div>
+          {/* Cabeçalho */}
+          <div style={{ marginBottom: "32px" }}>
+            <h1 style={{ fontSize: "26px", fontWeight: "800", marginBottom: "8px", letterSpacing: "-0.02em" }}>
+              Bem-vindo(a) de volta! 👋
+            </h1>
+            <p style={{ color: colors.textSecondary, fontSize: "14px", lineHeight: "1.5" }}>
+              Informe suas credenciais para acessar sua conta.
+            </p>
           </div>
-        </footer>
+
+          {/* Mensagem de Erro */}
+          {erro && (
+            <div style={{
+              backgroundColor: "rgba(239, 68, 68, 0.15)",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+              color: isDark ? "#FCA5A5" : "#DC2626",
+              padding: "14px 16px",
+              borderRadius: "14px",
+              fontSize: "14px",
+              marginBottom: "24px",
+              textAlign: "left",
+              fontWeight: "600"
+            }}>
+              ⚠️ {erro}
+            </div>
+          )}
+
+          {/* Formulário de Login */}
+          <form onSubmit={handleSubmit} style={{ textAlign: "left" }}>
+            <div style={{ marginBottom: "22px" }}>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: "700", marginBottom: "8px", color: colors.textPrimary }}>
+                E-mail
+              </label>
+              <input
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "16px 20px",
+                  borderRadius: "14px",
+                  border: `1px solid ${colors.inputBorder}`,
+                  backgroundColor: colors.inputBg,
+                  color: colors.textPrimary,
+                  fontSize: "15px",
+                  outline: "none",
+                  transition: "all 0.2s ease"
+                }}
+                required
+              />
+            </div>
+
+            <div style={{ marginBottom: "32px" }}>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: "700", marginBottom: "8px", color: colors.textPrimary }}>
+                Senha
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "16px 20px",
+                  borderRadius: "14px",
+                  border: `1px solid ${colors.inputBorder}`,
+                  backgroundColor: colors.inputBg,
+                  color: colors.textPrimary,
+                  fontSize: "15px",
+                  outline: "none",
+                  transition: "all 0.2s ease"
+                }}
+                required
+              />
+            </div>
+
+            {/* Botão Entrar */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-vibrant"
+              style={{
+                width: "100%",
+                padding: "16px",
+                borderRadius: "14px",
+                fontSize: "16px",
+                fontWeight: "800",
+                letterSpacing: "0.02em"
+              }}
+            >
+              {loading ? "Entrando..." : "Entrar 🚀"}
+            </button>
+          </form>
+
+          {/* Rodapé com Link para Cadastro Padrão */}
+          <div style={{ textAlign: "center", marginTop: "30px", fontSize: "14px", color: colors.textSecondary }}>
+            Não tem uma conta ainda?{" "}
+            <Link href="/cadastro" style={{ color: "#3B82F6", fontWeight: "700", textDecoration: "none" }}>
+              Cadastre-se
+            </Link>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
