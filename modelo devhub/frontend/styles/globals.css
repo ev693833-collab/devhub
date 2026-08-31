@@ -247,3 +247,39 @@ button, input, a, div {
   transition-property: background-color, border-color, color, box-shadow, transform;
 }
 
+/* ===== INPUTS, SELECTS E TEXTAREAS — FIX DE TEXTO/FUNDO ===== */
+input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+textarea,
+select {
+  color: var(--color-text-primary);
+  background-color: var(--color-form-bg);
+  border-color: var(--color-form-border);
+  caret-color: var(--color-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 0;
+}
+
+/* Fix para selects no modo escuro */
+[data-theme="dark"] select option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}

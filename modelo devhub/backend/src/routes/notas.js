@@ -30,6 +30,17 @@ const db = require("../config/database");
 router.get("/", async (req, res) => {
   try {
     const [notas] = await db.query("SELECT * FROM notas_provas ORDER BY id DESC");
+    // Normaliza status antigos para os novos labels
+    const normalizarStatus = (status, mediaFinal) => {
+      if (!status || status.includes("Aprovado") || status.includes("Recuperação") || status.includes("Pendente")) {
+        const media = parseFloat(mediaFinal) || 0;
+        if (media >= 9.5) return "Excelente 🌟";
+        if (media >= 7.0) return "Bom 👍";
+        return "Ruim ❌";
+      }
+      return status;
+    };
+
     const notasFormatadas = notas.map(n => ({
       id: n.id,
       userId: n.user_id,
@@ -39,7 +50,7 @@ router.get("/", async (req, res) => {
       prova2: parseFloat(n.prova2),
       projetoFinal: parseFloat(n.projeto_final),
       mediaFinal: parseFloat(n.media_final),
-      status: n.status,
+      status: normalizarStatus(n.status, n.media_final),
       destaque: Boolean(n.destaque)
     }));
     res.json(notasFormatadas);
