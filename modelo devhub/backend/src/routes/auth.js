@@ -154,6 +154,112 @@ router.put("/users/:id", async (req, res) => {
   }
 });
 
+// 6. Promover / Rebaixar Cargo de Usuário (Super Admin exclusivo)
+router.post("/users/:id/promover", async (req, res) => {
+  const { id } = req.params;
+  const { cargo } = req.body;
+
+  const cargosPermitidos = ["usuario", "admin", "super_admin"];
+  if (!cargosPermitidos.includes(cargo)) {
+    return res.status(400).json({ error: "Cargo inválido. Use: usuario, admin ou super_admin." });
+  }
+
+  try {
+    await pool.query("UPDATE users SET cargo = ? WHERE id = ?", [cargo, id]);
+    res.status(200).json({ message: `Cargo atualizado para '${cargo}' com sucesso!` });
+  } catch (error) {
+    console.error("Erro ao promover usuário:", error);
+    res.status(500).json({ error: "Erro ao promover usuário." });
+  }
+});
+
+// 7. Reset de Senha (Super Admin pode redefinir senha de qualquer usuário)
+router.post("/users/:id/reset-senha", async (req, res) => {
+  const { id } = req.params;
+  const { novaSenha } = req.body;
+
+  if (!novaSenha || novaSenha.length < 4) {
+    return res.status(400).json({ error: "A nova senha deve ter pelo menos 4 caracteres." });
+  }
+
+  try {
+    const senhaHash = await bcrypt.hash(novaSenha, 10);
+    await pool.query("UPDATE users SET senha = ? WHERE id = ?", [senhaHash, id]);
+    res.status(200).json({ message: "Senha redefinida com sucesso!" });
+  } catch (error) {
+    console.error("Erro ao resetar senha:", error);
+    res.status(500).json({ error: "Erro ao resetar senha." });
+  }
+});
+
+// 8. Suspender / Reativar Usuário (Super Admin)
+router.post("/users/:id/suspender", async (req, res) => {
+  const { id } = req.params;
+  const { suspender, motivo } = req.body; // suspender: true | false
+
+  try {
+    // Garantir coluna suspenso existe
+    try {
+      await pool.query("ALTER TABLE users ADD COLUMN suspenso TINYINT(1) DEFAULT 0");
+      await pool.query("ALTER TABLE users ADD COLUMN motivo_suspensao TEXT DEFAULT NULL");
+    } catch (e) { /* já existe */ }
+
+    const suspensoVal = suspender ? 1 : 0;
+    const motivoVal = suspender ? (motivo || "Sem motivo informado.") : null;
+
+    await pool.query(
+      "UPDATE users SET suspenso = ?, motivo_suspensao = ? WHERE id = ?",
+      [suspensoVal, motivoVal, id]
+    );
+
+    res.status(200).json({
+      message: suspender ? `Usuário suspenso: ${motivo}` : "Usuário reativado com sucesso!"
+    });
+  } catch (error) {
+    console.error("Erro ao suspender usuário:", error);
+    res.status(500).json({ error: "Erro ao suspender usuário." });
+  }
+});
+
+// 9. Listar usuários com status de suspensão incluído
+router.get("/users/detalhes", async (req, res) => {
+  try {
+    // Garantir colunas existem
+    try {
+      await pool.query("ALTER TABLE users ADD COLUMN suspenso TINYINT(1) DEFAULT 0");
+      await pool.query("ALTER TABLE users ADD COLUMN motivo_suspensao TEXT DEFAULT NULL");
+    } catch (e) { /* já existe */ }
+
+    const [usuarios] = await pool.query(
+      "SELECT id, nome, email, cargo, suspenso, motivo_suspensao, created_at FROM users ORDER BY id DESC"
+    );
+    res.status(200).json(usuarios);
+  } catch (error) {
+    console.error("Erro ao buscar usuários detalhados:", error);
+    res.status(500).json({ error: "Erro ao buscar usuários." });
+  }
+});
+
+// Verificar se usuário suspenso no login (middleware de checagem)
+router.post("/check-suspensao", async (req, res) => {
+  const { email } = req.body;
+  try {
+    try {
+      await pool.query("ALTER TABLE users ADD COLUMN suspenso TINYINT(1) DEFAULT 0");
+    } catch (e) {}
+    const [rows] = await pool.query(
+      "SELECT suspenso, motivo_suspensao FROM users WHERE email = ?", [email]
+    );
+    if (rows.length > 0 && rows[0].suspenso) {
+      return res.json({ suspenso: true, motivo: rows[0].motivo_suspensao });
+    }
+    return res.json({ suspenso: false });
+  } catch (e) {
+    return res.json({ suspenso: false });
+  }
+});
+
 module.exports = router;
+
 
 

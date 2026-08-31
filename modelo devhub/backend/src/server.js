@@ -15,8 +15,8 @@ const port = process.env.PORT || 3000;
 
 // Iniciar o servidor apenas se rodando localmente
 if (require.main === module) {
-    const server = app.listen(port, () => {
-        console.log(`Servidor rodando na porta ${port}`);
+    const server = app.listen(port, "0.0.0.0", () => {
+        console.log(`Servidor rodando em 0.0.0.0:${port}`);
     });
 
     server.on('error', (err) => {

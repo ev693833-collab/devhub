@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 
-// Auto-criação das tabelas "provas" e "provas_questoes" no MySQL
+// Auto-criação e migração das tabelas "provas" e "provas_questoes" no MySQL
 (async () => {
   try {
     await db.query(`
@@ -14,9 +14,23 @@ const db = require("../config/database");
         horario_limite VARCHAR(20) NOT NULL,
         duracao_minutos INT DEFAULT 45,
         criado_por VARCHAR(255) NOT NULL,
+        tipo VARCHAR(20) DEFAULT 'questoes',
+        pdf_data LONGTEXT,
+        pdf_nome VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migração: adicionar colunas novas se não existirem (para bancos já existentes)
+    try {
+      await db.query(`ALTER TABLE provas ADD COLUMN tipo VARCHAR(20) DEFAULT 'questoes'`);
+    } catch (e) { /* coluna já existe */ }
+    try {
+      await db.query(`ALTER TABLE provas ADD COLUMN pdf_data LONGTEXT`);
+    } catch (e) { /* coluna já existe */ }
+    try {
+      await db.query(`ALTER TABLE provas ADD COLUMN pdf_nome VARCHAR(255)`);
+    } catch (e) { /* coluna já existe */ }
 
     await db.query(`
       CREATE TABLE IF NOT EXISTS provas_questoes (
@@ -59,6 +73,9 @@ router.get("/", async (req, res) => {
         horarioLimite: p.horario_limite,
         duracaoMinutos: p.duracao_minutos,
         criadoPor: p.criado_por,
+        tipo: p.tipo || "questoes",
+        pdfData: p.pdf_data || null,
+        pdfNome: p.pdf_nome || null,
         questoes: qProva
       };
     });
@@ -70,23 +87,40 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST - Criar nova prova temporária com perguntas
+// POST - Criar nova prova temporária (com questões ou com PDF)
 router.post("/", async (req, res) => {
-  const { titulo, descricao, dataLimite, horarioLimite, duracaoMinutos, criadoPor, questoes } = req.body;
+  const {
+    titulo, descricao, dataLimite, horarioLimite,
+    duracaoMinutos, criadoPor, questoes,
+    tipo, pdfData, pdfNome
+  } = req.body;
 
   if (!titulo || !descricao) {
     return res.status(400).json({ message: "Título e descrição são obrigatórios." });
   }
 
+  const tipoProva = tipo || "questoes";
+
   try {
     const [result] = await db.query(
-      "INSERT INTO provas (titulo, descricao, data_limite, horario_limite, duracao_minutos, criado_por) VALUES (?, ?, ?, ?, ?, ?)",
-      [titulo, descricao, dataLimite || "30/09/2026", horarioLimite || "23:59", duracaoMinutos || 45, criadoPor || "Admin DevHub"]
+      "INSERT INTO provas (titulo, descricao, data_limite, horario_limite, duracao_minutos, criado_por, tipo, pdf_data, pdf_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        titulo,
+        descricao,
+        dataLimite || "30/09/2026",
+        horarioLimite || "23:59",
+        duracaoMinutos || 45,
+        criadoPor || "Admin DevHub",
+        tipoProva,
+        tipoProva === "pdf" ? (pdfData || null) : null,
+        tipoProva === "pdf" ? (pdfNome || null) : null
+      ]
     );
 
     const provaId = result.insertId;
 
-    if (Array.isArray(questoes) && questoes.length > 0) {
+    // Inserir questões apenas se for do tipo "questoes"
+    if (tipoProva === "questoes" && Array.isArray(questoes) && questoes.length > 0) {
       for (const q of questoes) {
         await db.query(
           "INSERT INTO provas_questoes (prova_id, pergunta, opcao_1, opcao_2, opcao_3, opcao_4, resposta_correta) VALUES (?, ?, ?, ?, ?, ?, ?)",
