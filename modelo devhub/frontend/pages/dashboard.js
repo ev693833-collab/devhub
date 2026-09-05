@@ -5,12 +5,16 @@ import DevHubLogo from "../components/Logo";
 import DevIaModule from "../components/DevIaModule";
 import PerfilModal from "../components/PerfilModal";
 import StudentGamificationHeader from "../components/StudentGamificationHeader";
-import BatalhaCodigoModule from "../components/BatalhaCodigoModule";
 import SuperAdminModule from "../components/SuperAdminModule";
+import HallDaFamaModule from "../components/HallDaFamaModule";
+import EvolucaoTimelineModule from "../components/EvolucaoTimelineModule";
+import GameCatalogModule from "../components/GameCatalogModule";
+import MiniSistemasModule from "../components/MiniSistemasModule";
+import CadernoEstudosModule from "../components/CadernoEstudosModule";
 import { 
   BookOpen, Calendar, Trophy, FileText, CheckSquare, 
   Sparkles, ChevronLeft, ChevronRight, ChevronDown, User, Shield, Layers, Swords, Crown,
-  LogOut, Moon, Sun, Settings, Bell, Zap, Check
+  LogOut, Moon, Sun, Settings, Bell, Zap, Check, BookMarked
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -85,6 +89,9 @@ export default function Dashboard() {
     "Pedro Henrique (Administrador 🛡️)"
   ]);
 
+  // Estado do Tema Ativo
+  const [temaEquipado, setTemaEquipado] = useState("padrao");
+
   // Sistema de Provas Online (Persistido no localStorage)
   const [provasSistema, setProvasSistema] = useState([]);
   const [provasConcluidas, setProvasConcluidas] = useState([]);
@@ -113,135 +120,301 @@ export default function Dashboard() {
   const [pdfUploadData, setPdfUploadData] = useState(null);   // base64 do PDF
   const [pdfUploadNome, setPdfUploadNome] = useState("");     // nome do arquivo
 
-  // ===== PROVAS ROTATIVAS POR DIA DA SEMANA (hardcoded) =====
-  const PROVAS_DIARIAS = [
-    {
-      id: "diaria-0", // Domingo
-      diaSemana: 0,
-      emoji: "⚡",
-      tema: "JavaScript Avançado",
-      titulo: "Prova do Dia — JavaScript Avançado",
-      descricao: "Teste seus conhecimentos sobre closures, promises, async/await, destructuring e conceitos avançados de JS.",
-      duracaoMinutos: 30,
-      criadoPor: "DevHub Sistema 🤖",
-      tipo: "questoes",
-      questoes: [
-        { id: "d0q1", pergunta: "O que é um closure em JavaScript?", opcoes: ["Uma função que lembra o escopo onde foi criada", "Um loop infinito", "Um tipo de variável global", "Uma classe abstrata"], respostaCorreta: 0 },
-        { id: "d0q2", pergunta: "Qual é a saída de: console.log(typeof null)?", opcoes: ["null", "undefined", "object", "string"], respostaCorreta: 2 },
-        { id: "d0q3", pergunta: "O que faz o método Array.prototype.reduce()?", opcoes: ["Remove elementos do array", "Acumula valores e retorna um único resultado", "Filtra elementos do array", "Mapeia elementos para novos valores"], respostaCorreta: 1 },
-        { id: "d0q4", pergunta: "Qual palavra-chave cria uma variável com escopo de bloco?", opcoes: ["var", "let", "function", "global"], respostaCorreta: 1 },
-        { id: "d0q5", pergunta: "O que é Promise.all()?", opcoes: ["Executa promises em sequência", "Executa todas as promises em paralelo e aguarda todas resolverem", "Cancela todas as promises", "Retorna a primeira promise resolvida"], respostaCorreta: 1 },
+  // ===== GERADOR DE PROVAS DIÁRIAS (2 PROVAS POR DIA + ROTAÇÃO SEMANAL) =====
+  const obterProvasDiarias = () => {
+    // Calcula o número da semana atual no ano para rotacionar as variações e perguntas semanalmente
+    const agora = new Date();
+    const inicioAno = new Date(agora.getFullYear(), 0, 1);
+    const numeroSemana = Math.ceil((((agora - inicioAno) / 86400000) + inicioAno.getDay() + 1) / 7);
+
+    // Banco de Dados com Variações de Provas (2 Variações por dia da semana)
+    const BANCO_VARIANCE = {
+      0: [ // Domingo (JS & Lógica)
+        {
+          id: `diaria-0-v1-w${numeroSemana}`,
+          diaSemana: 0,
+          emoji: "⚡",
+          tema: "JavaScript Avançado (Módulos & Async)",
+          titulo: "Prova 1 do Dia — JS Avançado & Async",
+          descricao: "Avaliação sobre closures, Promises, Async/Await, Event Loop e desestruturação em JS.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d0v1q1", pergunta: "O que é um closure em JavaScript?", opcoes: ["Uma função que lembra o escopo onde foi criada", "Um loop infinito no Event Loop", "Uma variável global imutável", "Uma função construtora legada"], respostaCorreta: 0 },
+            { id: "d0v1q2", pergunta: "Qual é a saída de typeof null em JS?", opcoes: ["null", "undefined", "object", "string"], respostaCorreta: 2 },
+            { id: "d0v1q3", pergunta: "O que faz a função Promise.all()?", opcoes: ["Executa em sequência", "Aguarda todas as Promises resolverem em paralelo", "Cancela requisições lentas", "Retorna apenas o primeiro resultado"], respostaCorreta: 1 },
+            { id: "d0v1q4", pergunta: "Qual a diferença de 'let' e 'var' quanto ao escopo?", opcoes: ["'var' tem escopo de bloco e 'let' de função", "'let' possui escopo de bloco e 'var' tem escopo de função", "Não há diferença", "'let' é usado apenas em objetos"], respostaCorreta: 1 },
+            { id: "d0v1q5", pergunta: "O que faz o método Array.prototype.reduce()?", opcoes: ["Remove itens duplicados", "Reduz a lista a um único valor acumulado", "Filtra apenas valores pares", "Ordena o array em ordem alfabética"], respostaCorreta: 1 }
+          ]
+        },
+        {
+          id: `diaria-0-v2-w${numeroSemana}`,
+          diaSemana: 0,
+          emoji: "🧩",
+          tema: "Lógica & Algoritmos Avançados",
+          titulo: "Prova 2 do Dia — Lógica & Algoritmos",
+          descricao: "Desafios de complexidade de algoritmos (Big-O), recursão e estruturas de dados.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d0v2q1", pergunta: "Qual a complexidade de tempo de uma busca binária em um array ordenado?", opcoes: ["O(n)", "O(log n)", "O(n²)", "O(1)"], respostaCorreta: 1 },
+            { id: "d0v2q2", pergunta: "O que caracteriza a estrutura de dados Pilha (Stack)?", opcoes: ["FIFO (Primeiro a entrar, primeiro a sair)", "LIFO (Último a entrar, primeiro a sair)", "Acesso aleatório por índice", "Chave-Valor associativa"], respostaCorreta: 1 },
+            { id: "d0v2q3", pergunta: "O que é recursão em programação?", opcoes: ["Um loop while sem condição de parada", "Uma função que chama a si mesma até atingir o caso base", "Um erro de estouro de memória", "Um método de ordenação de strings"], respostaCorreta: 1 },
+            { id: "d0v2q4", pergunta: "Na estrutura Fila (Queue), onde novos elementos são inseridos?", opcoes: ["No início", "No final (tail/rear)", "No meio", "Em qualquer posição aleatória"], respostaCorreta: 1 },
+            { id: "d0v2q5", pergunta: "Qual estrutura de dados utiliza tabelas Hash para busca rápida O(1)?", opcoes: ["Lista Encadeada", "Dicionário / Map", "Árvore Binária", "Matriz tridimensional"], respostaCorreta: 1 }
+          ]
+        }
+      ],
+      1: [ // Segunda (Backend & Arquitetura)
+        {
+          id: `diaria-1-v1-w${numeroSemana}`,
+          diaSemana: 1,
+          emoji: "🟢",
+          tema: "Backend com Node.js & Express",
+          titulo: "Prova 1 do Dia — Node.js & Express",
+          descricao: "Avaliação sobre rotas REST, middlewares, requisições HTTP e manipulação do req/res.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d1v1q1", pergunta: "Qual método HTTP é utilizado para criação de novos recursos?", opcoes: ["GET", "POST", "PUT", "DELETE"], respostaCorreta: 1 },
+            { id: "d1v1q2", pergunta: "O que faz uma função Middleware no Express.js?", opcoes: ["Conecta diretamente com o MySQL", "Intercepta e processa requisições HTTP antes de responder", "Compila o código JS para C++", "Renderiza o HTML no cliente"], respostaCorreta: 1 },
+            { id: "d1v1q3", pergunta: "O que é o arquivo package.json em um projeto Node?", opcoes: ["Onde fica o banco de dados", "Manifesto do projeto com metadados e dependências", "Um script de inicialização do sistema", "Arquivo de estilos globais"], respostaCorreta: 1 },
+            { id: "d1v1q4", pergunta: "Qual status HTTP indica que o recurso foi criado com sucesso?", opcoes: ["200 OK", "201 Created", "204 No Content", "404 Not Found"], respostaCorreta: 1 },
+            { id: "d1v1q5", pergunta: "O que faz o comando npm install express?", opcoes: ["Baixa e salva o pacote Express nas dependências do projeto", "Inicia o servidor em modo de desenvolvimento", "Cria o arquivo index.js", "Atualiza a versão do Node"], respostaCorreta: 0 }
+          ]
+        },
+        {
+          id: `diaria-1-v2-w${numeroSemana}`,
+          diaSemana: 1,
+          emoji: "🛡️",
+          tema: "Autenticação & Segurança em APIs",
+          titulo: "Prova 2 do Dia — Segurança & JWT",
+          descricao: "Conceitos de autenticação com JSON Web Tokens (JWT), criptografia com bcrypt e CORS.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d1v2q1", pergunta: "Quais são as três partes que compõem um token JWT?", opcoes: ["Header, Payload e Signature", "User, Pass e Key", "Issuer, Audience e Scope", "Token, Hash e Secret"], respostaCorreta: 0 },
+            { id: "d1v2q2", pergunta: "Para que serve a biblioteca bcrypt em sistemas de login?", opcoes: ["Gerar tokens de sessão", "Criptografar/hashear senhas antes de salvar no banco", "Validar o e-mail do usuário", "Bloquear ataques de DDoS"], respostaCorreta: 1 },
+            { id: "d1v2q3", pergunta: "O que é a política CORS no navegador?", opcoes: ["Mecanismo de segurança para restringir requisições de origens diferentes", "Formato de compactação de arquivos", "Gerenciador de rotas no cliente", "Protocolo de banco de dados"], respostaCorreta: 0 },
+            { id: "d1v2q4", pergunta: "Em qual header da requisição HTTP o JWT geralmente é transmitido?", opcoes: ["Content-Type", "Authorization (Bearer)", "User-Agent", "Accept-Language"], respostaCorreta: 1 },
+            { id: "d1v2q5", pergunta: "Qual status HTTP indica falta de autenticação (Token inválido/ausente)?", opcoes: ["400 Bad Request", "401 Unauthorized", "403 Forbidden", "500 Internal Error"], respostaCorreta: 1 }
+          ]
+        }
+      ],
+      2: [ // Terça (Banco de Dados)
+        {
+          id: `diaria-2-v1-w${numeroSemana}`,
+          diaSemana: 2,
+          emoji: "🗄️",
+          tema: "Banco de Dados & SQL Relacional",
+          titulo: "Prova 1 do Dia — SQL Relacional & Consultas",
+          descricao: "Testes sobre SELECT, JOINs, WHERE, GROUP BY e subconsultas SQL.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d2v1q1", pergunta: "Qual cláusula SQL é utilizada para filtrar registros em uma consulta?", opcoes: ["ORDER BY", "GROUP BY", "WHERE", "HAVING"], respostaCorreta: 2 },
+            { id: "d2v1q2", pergunta: "O que faz um INNER JOIN em uma consulta SQL?", opcoes: ["Retorna todos os dados das duas tabelas", "Retorna apenas os registros que possuem correspondência em ambas as tabelas", "Remove valores nulos", "Cria uma nova tabela temporária"], respostaCorreta: 1 },
+            { id: "d2v1q3", pergunta: "O que é uma PRIMARY KEY?", opcoes: ["Uma senha do banco de dados", "Um identificador único exclusivo para cada registro na tabela", "Uma chave estrangeira de relacionamento", "Uma coluna com dados duplicados"], respostaCorreta: 1 },
+            { id: "d2v1q4", pergunta: "Qual comando SQL apaga completamente uma tabela e sua estrutura?", opcoes: ["DELETE TABLE", "DROP TABLE", "TRUNCATE TABLE", "CLEAR TABLE"], respostaCorreta: 1 },
+            { id: "d2v1q5", pergunta: "Para ordenar o resultado de uma busca de forma decrescente usamos:", opcoes: ["ORDER BY coluna DESC", "SORT BY coluna DOWN", "GROUP BY coluna DESC", "ALIGN BY coluna MINUS"], respostaCorreta: 0 }
+          ]
+        },
+        {
+          id: `diaria-2-v2-w${numeroSemana}`,
+          diaSemana: 2,
+          emoji: "🍃",
+          tema: "Modelagem de Dados & NoSQL",
+          titulo: "Prova 2 do Dia — Modelagem & NoSQL",
+          descricao: "Normalização de dados, conceitos de bancos NoSQL (MongoDB), Índices e ACID.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d2v2q1", pergunta: "O que significa a sigla ACID em gerenciadores de banco de dados?", opcoes: ["Atomicity, Consistency, Isolation, Durability", "Agility, Control, Integrity, Data", "Access, Code, Index, Distribution", "Authentication, Concurrency, Isolation, Design"], respostaCorreta: 0 },
+            { id: "d2v2q2", pergunta: "Qual a principal diferença entre bancos SQL e NoSQL?", opcoes: ["SQL guarda arquivos e NoSQL apenas textos", "SQL é baseado em tabelas relacionais com esquema rígido e NoSQL em documentos/chave-valor flexíveis", "NoSQL não suporta consultas", "SQL não funciona na nuvem"], respostaCorreta: 1 },
+            { id: "d2v2q3", pergunta: "Para que serve a criação de Índices em um banco de dados?", opcoes: ["Aumentar o espaço em disco", "Acelerar a busca e leitura de dados em colunas consultadas com frequência", "Garantir backup automático", "Ocultar dados confidenciais"], respostaCorreta: 1 },
+            { id: "d2v2q4", pergunta: "No MongoDB, como são armazenados os documentos principais?", opcoes: ["Em planilhas Excel", "No formato BSON (JSON binário)", "Em tabelas de chave primária estrita", "Em arquivos XML"], respostaCorreta: 1 },
+            { id: "d2v2q5", pergunta: "O que visa a Primeira Forma Normal (1FN) na normalização?", opcoes: ["Garantir que a tabela não tenha grupos repetidos nem atributos multivalorados", "Eliminar chaves estrangeiras", "Dividir a tabela em duas metades", "Criar restrições de verificação em triggers"], respostaCorreta: 0 }
+          ]
+        }
+      ],
+      3: [ // Quarta (Git & Devops)
+        {
+          id: `diaria-3-v1-w${numeroSemana}`,
+          diaSemana: 3,
+          emoji: "🔀",
+          tema: "Git & Fluxos de Versionamento",
+          titulo: "Prova 1 do Dia — Git & Versionamento",
+          descricao: "Comandos Git, estratégias de branch (Git Flow), merge e resolução de conflitos.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d3v1q1", pergunta: "Qual comando cria uma nova branch e alterna imediatamente para ela?", opcoes: ["git branch nova", "git checkout -b nova", "git switch -c nova", "git create branch nova"], respostaCorreta: 1 },
+            { id: "d3v1q2", pergunta: "O que faz o comando 'git stash'?", opcoes: ["Descarta todas as alterações locais definitivamente", "Guarda temporariamente o trabalho não commitado no repositório", "Publica os commits no GitHub", "Cria uma nova tag de versão"], respostaCorreta: 1 },
+            { id: "d3v1q3", pergunta: "Qual a diferença entre git merge e git rebase?", opcoes: ["Não há diferença", "Merge junta histórico criando um commit de junção; Rebase aplica os commits sobre a base de maneira linear", "Rebase apaga as alterações e Merge adiciona", "Merge altera apenas repositórios remotos"], respostaCorreta: 1 },
+            { id: "d3v1q4", pergunta: "Qual comando desfaria o último commit local sem perder as alterações feitas no código?", opcoes: ["git reset --hard HEAD~1", "git reset --soft HEAD~1", "git clean -f", "git revert HEAD"], respostaCorreta: 1 },
+            { id: "d3v1q5", pergunta: "Para atualizar seu repositório local com as alterações do servidor remoto trazendo e aplicando commits usamos:", opcoes: ["git push", "git pull", "git commit", "git status"], respostaCorreta: 1 }
+          ]
+        },
+        {
+          id: `diaria-3-v2-w${numeroSemana}`,
+          diaSemana: 3,
+          emoji: "🐳",
+          tema: "Docker & Containerização",
+          titulo: "Prova 2 do Dia — Docker & CI/CD",
+          descricao: "Containers, Dockerfile, Docker Compose, imagens e integração contínua.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d3v2q1", pergunta: "O que é um Container Docker?", opcoes: ["Uma máquina virtual inteira com sistema operacional completo", "Um ambiente isolado e leve para rodar aplicações com suas dependências", "Um servidor de hospedagem física", "Um gerenciador de banco de dados"], respostaCorreta: 1 },
+            { id: "d3v2q2", pergunta: "Qual o arquivo responsável por definir a receita de construção de uma Imagem Docker?", opcoes: ["docker-compose.yml", "Dockerfile", "package.json", "index.html"], respostaCorreta: 1 },
+            { id: "d3v2q3", pergunta: "Qual comando sobe e executa todos os serviços mapeados em um arquivo docker-compose.yml?", opcoes: ["docker build .", "docker-compose up -d", "docker run container", "docker start all"], respostaCorreta: 1 },
+            { id: "d3v2q4", pergunta: "O que é uma Imagem Docker?", opcoes: ["Um print da tela da aplicação", "Um modelo estático somente-leitura com código e dependências para criar containers", "Um arquivo de banco de dados", "Um certificado de segurança SSL"], respostaCorreta: 1 },
+            { id: "d3v2q5", pergunta: "No Docker, qual instrução no Dockerfile define o comando padrão ao iniciar o container?", opcoes: ["FROM", "WORKDIR", "CMD", "COPY"], respostaCorreta: 2 }
+          ]
+        }
+      ],
+      4: [ // Quinta (CSS & Frontend UI)
+        {
+          id: `diaria-4-v1-w${numeroSemana}`,
+          diaSemana: 4,
+          emoji: "🎨",
+          tema: "UI/UX & CSS Layouts",
+          titulo: "Prova 1 do Dia — Flexbox, Grid & Responsividade",
+          descricao: "Alinhamento, layouts responsivos, unidades dinâmicas e Media Queries.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d4v1q1", pergunta: "Qual combinação Flexbox alinha elementos perfeitamente no centro horizontal e vertical?", opcoes: ["align-items: center + justify-content: center", "text-align: center + margin: auto", "float: center", "display: inline-block"], respostaCorreta: 0 },
+            { id: "d4v1q2", pergunta: "Qual a diferença entre a unidade 'em' e 'rem' no CSS?", opcoes: ["São idênticas", "'em' é relativo ao tamanho da fonte do elemento pai; 'rem' é relativo à raiz (html)", "'rem' só funciona em telas grandes", "'em' é usado apenas para largura de div"], respostaCorreta: 1 },
+            { id: "d4v1q3", pergunta: "O que faz a propriedade CSS 'position: sticky'?", opcoes: ["Fixa o elemento na tela o tempo todo", "Comporta-se como relativo até atingir o limite de rolagem definido e então fica fixo", "Remove o elemento da tela", "Alinha o elemento ao fundo do rodapé"], respostaCorreta: 1 },
+            { id: "d4v1q4", pergunta: "O que caracteriza a abordagem 'Mobile First' no desenvolvimento de layouts?", opcoes: ["Criar código apenas para celulares", "Desenvolver primeiro o CSS para dispositivos móveis e depois aplicar Media Queries para telas maiores", "Bloquear acesso via computador", "Usar apenas imagens pequenas"], respostaCorreta: 1 },
+            { id: "d4v1q5", pergunta: "Qual propriedade CSS Grid define o número e o tamanho das colunas?", opcoes: ["grid-template-columns", "grid-column-gap", "display-columns", "flex-grid"], respostaCorreta: 0 }
+          ]
+        },
+        {
+          id: `diaria-4-v2-w${numeroSemana}`,
+          diaSemana: 4,
+          emoji: "✨",
+          tema: "Animações CSS & Design Systems",
+          titulo: "Prova 2 do Dia — CSS Avançado & Animações",
+          descricao: "Keyframes, transformações 2D/3D, variáveis CSS e conceitos de Design Systems.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d4v2q1", pergunta: "Como declaramos uma variável customizada em CSS global?", opcoes: ["$primary-color: #000;", "--primary-color: #000;", "var primary = #000;", "@color-primary: #000;"], respostaCorreta: 1 },
+            { id: "d4v2q2", pergunta: "Qual propriedade é usada para mover, rotacionar ou escalar um elemento em CSS sem afetar o layout dos vizinhos?", opcoes: ["transition", "transform", "animation", "position"], respostaCorreta: 1 },
+            { id: "d4v2q3", pergunta: "Qual regra CSS permite criar etapas com porcentagens para animações complexas?", opcoes: ["@keyframes", "@keyframes-set", "@media", "@import"], respostaCorreta: 0 },
+            { id: "d4v2q4", pergunta: "Para que serve a propriedade CSS 'backdrop-filter: blur(...)'?", opcoes: ["Desfoca o texto interno", "Aplica efeito de vidro (glassmorphism) desfocando os elementos atrás do contêiner", "Aumenta o contraste da página", "Cria sombra na borda"], respostaCorreta: 1 },
+            { id: "d4v2q5", pergunta: "O que é a propriedade CSS 'pointer-events: none'?", opcoes: ["Desabilita cliques e eventos de ponteiro do mouse no elemento", "Esconde o cursor do mouse", "Acelera a animação", "Desativa o touch screen"], respostaCorreta: 0 }
+          ]
+        }
+      ],
+      5: [ // Sexta (APIs & Engenharia)
+        {
+          id: `diaria-5-v1-w${numeroSemana}`,
+          diaSemana: 5,
+          emoji: "🌐",
+          tema: "APIs RESTful & Protocolo HTTP",
+          titulo: "Prova 1 do Dia — APIs & HTTP",
+          descricao: "Status codes, verbos HTTP, payloads JSON e arquitetura de comunicação.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d5v1q1", pergunta: "O que significa a sigla REST em desenvolvimento de APIs?", opcoes: ["Remote Execution Service Transfer", "Representational State Transfer", "Resource Endpoint Standard Type", "Routing Express Socket Technology"], respostaCorreta: 1 },
+            { id: "d5v1q2", pergunta: "Qual status HTTP representa erro de servidor interno indisponível?", opcoes: ["400 Bad Request", "404 Not Found", "500 Internal Server Error", "503 Unauthorized"], respostaCorreta: 2 },
+            { id: "d5v1q3", pergunta: "O que caracteriza uma operação idempotente no protocolo HTTP?", opcoes: ["Fazer a mesma requisição múltiplas vezes produz o mesmo efeito no servidor que fazer uma única vez", "Executa apenas em servidores de teste", "Altera a senha do banco de dados", "Retorna dados criptografados em 256 bits"], respostaCorreta: 0 },
+            { id: "d5v1q4", pergunta: "Qual verbo HTTP é recomendado para atualizações parciais de um recurso?", opcoes: ["PUT", "PATCH", "POST", "UPDATE"], respostaCorreta: 1 },
+            { id: "d5v1q5", pergunta: "Para que serve o cabeçalho 'Content-Type: application/json'?", opcoes: ["Indica que a mensagem enviada/recebida está no formato JSON", "Protege a requisição contra vírus", "Autentica o usuário no banco", "Força a conexão via HTTPS"], respostaCorreta: 0 }
+          ]
+        },
+        {
+          id: `diaria-5-v2-w${numeroSemana}`,
+          diaSemana: 5,
+          emoji: "🏗️",
+          tema: "Arquitetura & Clean Code",
+          titulo: "Prova 2 do Dia — Clean Code & Princípios SOLID",
+          descricao: "Boas práticas de código, refatoração, padrões de projeto e SOLID.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d5v2q1", pergunta: "O que dita o 'Single Responsibility Principle' (SRP) do SOLID?", opcoes: ["Uma classe/módulo deve ter apenas uma única razão para mudar", "Toda classe deve ser estática", "O projeto deve ter apenas um arquivo principal", "Funções só podem aceitar um parâmetro"], respostaCorreta: 0 },
+            { id: "d5v2q2", pergunta: "O que é 'Clean Code'?", opcoes: ["Código sem comentários", "Código legível, simples, direto e de fácil manutenção por outros desenvolvedores", "Código compilado para binário", "Código escrito sem usar bibliotecas externas"], respostaCorreta: 1 },
+            { id: "d5v2q3", pergunta: "O princípio Open/Closed (OCP) estabelece que entidades de software devem ser:", opcoes: ["Abertas para modificação e fechadas para extensão", "Abertas para extensão, mas fechadas para modificação", "Fechadas para acesso externo", "Abertas apenas para leitura de dados"], respostaCorreta: 1 },
+            { id: "d5v2q4", pergunta: "O que é 'DRY' em Engenharia de Software?", opcoes: ["Don't Repeat Yourself (Não se repita)", "Do Read Yourself", "Data Recovery Yield", "Dynamic Rendering Yield"], respostaCorreta: 0 },
+            { id: "d5v2q5", pergunta: "Qual a vantagem da Injeção de Dependências?", opcoes: ["Reduzir o acoplamento entre classes tornando-as mais fáceis de testar e manter", "Aumentar a velocidade do processador", "Substituir o banco de dados SQL por arquivos de texto", "Eliminar o uso de interfaces"], respostaCorreta: 0 }
+          ]
+        }
+      ],
+      6: [ // Sábado (React & Frameworks)
+        {
+          id: `diaria-6-v1-w${numeroSemana}`,
+          diaSemana: 6,
+          emoji: "⚛️",
+          tema: "React & Hooks Essenciais",
+          titulo: "Prova 1 do Dia — React & Hooks",
+          descricao: "Gerenciamento de estado (useState), efeitos colaterais (useEffect), props e ciclo de vida.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d6v1q1", pergunta: "Qual hook do React é utilizado para declarar e gerenciar estado local em componentes funcionais?", opcoes: ["useEffect", "useState", "useContext", "useRef"], respostaCorreta: 1 },
+            { id: "d6v1q2", pergunta: "Quando o hook useEffect com o array de dependências vazio [] é executado?", opcoes: ["A cada nova renderização do componente", "Apenas uma vez, logo após a montagem inicial do componente", "Sempre que uma prop muda", "Nunca é executado"], respostaCorreta: 1 },
+            { id: "d6v1q3", pergunta: "O que é o Virtual DOM no React?", opcoes: ["Uma cópia exata do HTML real sincronizada de forma eficiente para minimizar edições diretas no DOM do navegador", "Uma biblioteca para criar servidores web", "Um plugin de animação 3D", "Um banco de dados local no navegador"], respostaCorreta: 0 },
+            { id: "d6v1q4", pergunta: "Por que a propriedade 'key' é obrigatória ao renderizar listas no React com .map()?", opcoes: ["Para aplicar estilos CSS automáticos", "Para ajudar o algoritmo do React a identificar de forma única quais itens mudaram, foram adicionados ou removidos", "Para criar links entre páginas", "Para armazenar o índice da lista no localStorage"], respostaCorreta: 1 },
+            { id: "d6v1q5", pergunta: "Qual hook permite manter uma referência mutável que não dispara renderização ao ser alterada?", opcoes: ["useMemo", "useCallback", "useRef", "useState"], respostaCorreta: 2 }
+          ]
+        },
+        {
+          id: `diaria-6-v2-w${numeroSemana}`,
+          diaSemana: 6,
+          emoji: "🚀",
+          tema: "Next.js & Server-Side Rendering",
+          titulo: "Prova 2 do Dia — Next.js & Performance",
+          descricao: "SSR, SSG, rotas no Next.js, otimização de imagens e hidratação.",
+          duracaoMinutos: 30,
+          criadoPor: "DevHub Sistema 🤖",
+          tipo: "questoes",
+          questoes: [
+            { id: "d6v2q1", pergunta: "O que significa SSR em Next.js?", opcoes: ["Server-Side Rendering (Renderização no lado do servidor)", "Static Site Restoration", "Single State React", "System Server Redirection"], respostaCorreta: 0 },
+            { id: "d6v2q2", pergunta: "Qual a vantagem do SSG (Static Site Generation)?", opcoes: ["Pré-gerar as páginas HTML durante o build, garantindo carregamento ultrarrápido e ótimo SEO", "Permitir editar o código sem salvar", "Rodar o React sem JavaScript", "Eliminar o uso de CSS"], respostaCorreta: 0 },
+            { id: "d6v2q3", pergunta: "No Next.js (App Router / Pages Router), como são criadas as rotas de página?", opcoes: ["Declarando rotas manualmente em um arquivo XML", "Baseado na estrutura de arquivos e pastas no diretório pages ou app", "Usando o comando npx create-route", "Com tags <Route> no HTML main"], respostaCorreta: 1 },
+            { id: "d6v2q4", pergunta: "Para que serve o componente <Image /> nativo do Next.js?", opcoes: ["Otimizar imagens automaticamente em tamanho, formato moderno (WebP) e lazy loading", "Converter imagens em texto", "Criar desenhos vetoriais dinâmicos", "Filtrar imagens impróprias"], respostaCorreta: 0 },
+            { id: "d6v2q5", pergunta: "O que é 'Hidratação' em aplicações SSR React?", opcoes: ["O processo onde o JavaScript do React se anexa ao HTML pré-renderizado pelo servidor, tornando a página interativa", "Limpeza de memória RAM no cliente", "Download dos arquivos CSS da página", "Compressão Gzip dos arquivos de fonte"], respostaCorreta: 0 }
+          ]
+        }
       ]
-    },
-    {
-      id: "diaria-1", // Segunda
-      diaSemana: 1,
-      emoji: "🟢",
-      tema: "Backend com Node.js",
-      titulo: "Prova do Dia — Backend com Node.js",
-      descricao: "Avaliação sobre Express.js, rotas REST, middlewares, autenticação JWT e boas práticas de API.",
-      duracaoMinutos: 30,
-      criadoPor: "DevHub Sistema 🤖",
-      tipo: "questoes",
-      questoes: [
-        { id: "d1q1", pergunta: "Qual método HTTP é usado para criar um novo recurso no padrão REST?", opcoes: ["GET", "POST", "PUT", "DELETE"], respostaCorreta: 1 },
-        { id: "d1q2", pergunta: "O que é um middleware no Express.js?", opcoes: ["Um banco de dados embutido", "Uma função que tem acesso ao req, res e next", "Um tipo de rota protegida", "Um servidor de arquivos estáticos"], respostaCorreta: 1 },
-        { id: "d1q3", pergunta: "Qual comando instala as dependências de um projeto Node.js?", opcoes: ["node install", "npm init", "npm install", "node start"], respostaCorreta: 2 },
-        { id: "d1q4", pergunta: "O que significa JWT?", opcoes: ["JavaScript Web Transfer", "JSON Web Token", "Java Web Template", "JavaScript Worker Thread"], respostaCorreta: 1 },
-        { id: "d1q5", pergunta: "Qual status HTTP indica que um recurso foi criado com sucesso?", opcoes: ["200 OK", "201 Created", "204 No Content", "202 Accepted"], respostaCorreta: 1 },
-      ]
-    },
-    {
-      id: "diaria-2", // Terça
-      diaSemana: 2,
-      emoji: "🗄️",
-      tema: "Banco de Dados & SQL",
-      titulo: "Prova do Dia — Banco de Dados & SQL",
-      descricao: "Teste seus conhecimentos em consultas SQL, JOINs, índices, normalização e modelagem de dados.",
-      duracaoMinutos: 30,
-      criadoPor: "DevHub Sistema 🤖",
-      tipo: "questoes",
-      questoes: [
-        { id: "d2q1", pergunta: "Qual cláusula SQL é usada para filtrar resultados?", opcoes: ["ORDER BY", "GROUP BY", "WHERE", "HAVING"], respostaCorreta: 2 },
-        { id: "d2q2", pergunta: "O que faz um INNER JOIN?", opcoes: ["Retorna todos os registros das duas tabelas", "Retorna apenas registros com correspondência nas duas tabelas", "Retorna registros somente da tabela esquerda", "Remove duplicatas da consulta"], respostaCorreta: 1 },
-        { id: "d2q3", pergunta: "O que é uma chave primária (PRIMARY KEY)?", opcoes: ["Uma senha de acesso ao banco", "Um índice que identifica unicamente cada registro", "Uma coluna que aceita valores nulos", "Um relacionamento entre tabelas"], respostaCorreta: 1 },
-        { id: "d2q4", pergunta: "Qual comando SQL remove todos os dados de uma tabela sem apagar a estrutura?", opcoes: ["DROP TABLE", "DELETE FROM", "TRUNCATE TABLE", "REMOVE ALL"], respostaCorreta: 2 },
-        { id: "d2q5", pergunta: "O que significa a sigla ACID em banco de dados?", opcoes: ["Agility, Consistency, Integrity, Durability", "Atomicity, Consistency, Isolation, Durability", "Availability, Concurrency, Integrity, Distribution", "Atomicity, Concurrency, Isolation, Data"], respostaCorreta: 1 },
-      ]
-    },
-    {
-      id: "diaria-3", // Quarta
-      diaSemana: 3,
-      emoji: "🔀",
-      tema: "Git & Versionamento",
-      titulo: "Prova do Dia — Git & Versionamento",
-      descricao: "Avaliação sobre comandos Git, branching, merging, rebase, pull requests e fluxo de trabalho em equipe.",
-      duracaoMinutos: 30,
-      criadoPor: "DevHub Sistema 🤖",
-      tipo: "questoes",
-      questoes: [
-        { id: "d3q1", pergunta: "Qual comando cria uma nova branch e já muda para ela?", opcoes: ["git branch nova", "git checkout -b nova", "git switch nova", "git create nova"], respostaCorreta: 1 },
-        { id: "d3q2", pergunta: "O que faz o comando 'git stash'?", opcoes: ["Apaga o histórico de commits", "Salva temporariamente alterações não commitadas", "Cria uma nova tag de versão", "Faz merge de duas branches"], respostaCorreta: 1 },
-        { id: "d3q3", pergunta: "Qual a diferença entre 'git merge' e 'git rebase'?", opcoes: ["São idênticos", "Merge cria um commit de junção; rebase reaplica commits linearmente", "Rebase apaga o histórico; merge mantém", "Merge é para branches locais; rebase é para remotas"], respostaCorreta: 1 },
-        { id: "d3q4", pergunta: "O que é um 'pull request'?", opcoes: ["Um comando para baixar código do servidor", "Uma solicitação para mesclar uma branch em outra, geralmente com revisão", "Um tipo de commit especial", "Uma branch protegida no repositório"], respostaCorreta: 1 },
-        { id: "d3q5", pergunta: "Qual comando desfaz o último commit mas mantém as alterações?", opcoes: ["git reset --hard HEAD~1", "git reset --soft HEAD~1", "git revert HEAD", "git checkout HEAD~1"], respostaCorreta: 1 },
-      ]
-    },
-    {
-      id: "diaria-4", // Quinta
-      diaSemana: 4,
-      emoji: "🎨",
-      tema: "UI/UX e CSS Avançado",
-      titulo: "Prova do Dia — UI/UX e CSS Avançado",
-      descricao: "Teste seus conhecimentos sobre design responsivo, Flexbox, Grid, animações CSS e boas práticas de UX.",
-      duracaoMinutos: 30,
-      criadoPor: "DevHub Sistema 🤖",
-      tipo: "questoes",
-      questoes: [
-        { id: "d4q1", pergunta: "Qual propriedade CSS centraliza elementos com Flexbox?", opcoes: ["align-items: center + justify-content: center", "text-align: center", "margin: 0 auto", "position: center"], respostaCorreta: 0 },
-        { id: "d4q2", pergunta: "O que faz 'position: sticky'?", opcoes: ["Fixo na tela sempre", "Segue o scroll até atingir um limite e então fica fixo", "Remove o elemento do fluxo normal", "Posiciona relativo ao pai"], respostaCorreta: 1 },
-        { id: "d4q3", pergunta: "Qual a diferença entre 'em' e 'rem' em CSS?", opcoes: ["São iguais", "'em' é relativo ao elemento pai; 'rem' é relativo ao elemento raiz (html)", "'rem' é maior que 'em' sempre", "'em' é para telas grandes; 'rem' para mobile"], respostaCorreta: 1 },
-        { id: "d4q4", pergunta: "O que é 'mobile first' no design responsivo?", opcoes: ["Criar o app apenas para mobile", "Desenvolver a versão mobile primeiro e escalar para telas maiores", "Usar frameworks mobile", "Desabilitar features em desktop"], respostaCorreta: 1 },
-        { id: "d4q5", pergunta: "Qual propriedade CSS cria uma transição suave?", opcoes: ["animation", "transition", "transform", "keyframes"], respostaCorreta: 1 },
-      ]
-    },
-    {
-      id: "diaria-5", // Sexta
-      diaSemana: 5,
-      emoji: "🌐",
-      tema: "APIs & REST",
-      titulo: "Prova do Dia — APIs & REST",
-      descricao: "Avaliação sobre design de APIs RESTful, autenticação, versionamento, documentação e boas práticas.",
-      duracaoMinutos: 30,
-      criadoPor: "DevHub Sistema 🤖",
-      tipo: "questoes",
-      questoes: [
-        { id: "d5q1", pergunta: "O que significa a sigla REST?", opcoes: ["Remote Execution State Transfer", "Representational State Transfer", "Resource Endpoint Structure Type", "Routing Express State Technology"], respostaCorreta: 1 },
-        { id: "d5q2", pergunta: "Qual status HTTP indica 'Não Autorizado'?", opcoes: ["403 Forbidden", "401 Unauthorized", "404 Not Found", "500 Server Error"], respostaCorreta: 1 },
-        { id: "d5q3", pergunta: "O que é CORS?", opcoes: ["Um tipo de banco de dados", "Cross-Origin Resource Sharing — política que controla acesso entre origens diferentes", "Um protocolo de segurança SSL", "Um framework de API REST"], respostaCorreta: 1 },
-        { id: "d5q4", pergunta: "Qual método HTTP é idempotente por natureza?", opcoes: ["POST", "PATCH", "GET", "Nenhum"], respostaCorreta: 2 },
-        { id: "d5q5", pergunta: "O que é paginação em APIs?", opcoes: ["Dividir a resposta em partes menores para não sobrecarregar", "Criar múltiplas versões da API", "Cachear respostas no cliente", "Compressão dos dados JSON"], respostaCorreta: 0 },
-      ]
-    },
-    {
-      id: "diaria-6", // Sábado
-      diaSemana: 6,
-      emoji: "⚛️",
-      tema: "React & Frontend Moderno",
-      titulo: "Prova do Dia — React & Frontend Moderno",
-      descricao: "Teste seus conhecimentos sobre React, hooks, gerenciamento de estado, performance e Next.js.",
-      duracaoMinutos: 30,
-      criadoPor: "DevHub Sistema 🤖",
-      tipo: "questoes",
-      questoes: [
-        { id: "d6q1", pergunta: "Qual hook é usado para gerenciar estado local em React?", opcoes: ["useEffect", "useState", "useContext", "useRef"], respostaCorreta: 1 },
-        { id: "d6q2", pergunta: "O que faz o hook useEffect com array de dependências vazio []?", opcoes: ["Executa a cada render", "Executa apenas uma vez após a montagem do componente", "Executa antes do componente montar", "Nunca executa"], respostaCorreta: 1 },
-        { id: "d6q3", pergunta: "O que é o Virtual DOM no React?", opcoes: ["O HTML real do navegador", "Uma representação em memória do DOM real para otimizar atualizações", "Um banco de dados de componentes", "O servidor de renderização SSR"], respostaCorreta: 1 },
-        { id: "d6q4", pergunta: "Qual é o propósito de 'key' em listas React?", opcoes: ["Estilização de elementos", "Ajudar o React a identificar quais itens mudaram para otimizar renders", "Criar IDs únicos no HTML", "Ordenar automaticamente a lista"], respostaCorreta: 1 },
-        { id: "d6q5", pergunta: "O que é Server Side Rendering (SSR) no Next.js?", opcoes: ["Renderizar componentes apenas no cliente", "Gerar o HTML no servidor a cada requisição para melhor SEO e performance", "Um tipo de cache do servidor", "Renderização estática de páginas"], respostaCorreta: 1 },
-      ]
-    },
-  ];
+    };
+
+    // Retorna as 2 provas configuradas para cada dia da semana
+    const listaFinal = [];
+    Object.keys(BANCO_VARIANCE).forEach(diaKey => {
+      const diaNum = parseInt(diaKey, 10);
+      const provasDoDia = BANCO_VARIANCE[diaNum] || [];
+      // Se por algum motivo o número da semana for par/ímpar, podemos até alternar a ordem para renovar a experiência
+      if (numeroSemana % 2 === 0) {
+        listaFinal.push(...provasDoDia);
+      } else {
+        listaFinal.push(...[...provasDoDia].reverse());
+      }
+    });
+
+    return listaFinal;
+  };
+
+  const PROVAS_DIARIAS = obterProvasDiarias();
+
 
   const salvarRelatorioAlunosLS = (lista, itemParaSalvar = null) => {
     setRelatorioAlunos(lista);
@@ -331,6 +504,23 @@ export default function Dashboard() {
     const savedConcluidas = localStorage.getItem("devhub_provas_concluidas");
     if (savedConcluidas) {
       try { setProvasConcluidas(JSON.parse(savedConcluidas)); } catch (e) {}
+    }
+
+    // 6. Carregar Tema Ativo do Backend
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetch(`${apiUrl}/gamificacao/carteira`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.economia) {
+          if (data.economia.tema_ativo && data.economia.tema_ativo !== "padrao") {
+            setTemaEquipado(data.economia.tema_ativo);
+          }
+        }
+      })
+      .catch(() => {});
     }
   }, []);
 
@@ -816,6 +1006,7 @@ export default function Dashboard() {
               });
             }
           })
+          .catch(() => {});
         // Buscar notas das provas no backend (Banco de Dados MySQL)
         fetch(`${apiUrl}/notas`)
           .then(res => res.ok ? res.json() : [])
@@ -1132,14 +1323,75 @@ export default function Dashboard() {
   const cargoInfo = user ? getCargoInfo(user.cargo) : getCargoInfo("usuario");
 
   const isDark = theme === "dark";
+
+  // Sistema de Acento por Tema: muda apenas bordas, highlights e elementos de destaque
+  // Sem alterar o fundo da página para não destruir o layout
+  const ESTILOS_TEMAS = {
+    "tema-cyberpunk": {
+      accent: "#C084FC",
+      accentSecondary: "#818CF8",
+      glow: "0 0 14px rgba(192,132,252,0.35)",
+      borderHighlight: "1px solid rgba(192,132,252,0.4)",
+      badgeBg: "rgba(192,132,252,0.12)",
+      label: "Cyberpunk Neon 🌌"
+    },
+    "tema-matrix": {
+      accent: "#4ADE80",
+      accentSecondary: "#22C55E",
+      glow: "0 0 14px rgba(74,222,128,0.35)",
+      borderHighlight: "1px solid rgba(74,222,128,0.4)",
+      badgeBg: "rgba(74,222,128,0.12)",
+      label: "Matrix Code 🟢"
+    },
+    "tema-gold-luxury": {
+      accent: "#F59E0B",
+      accentSecondary: "#FBBF24",
+      glow: "0 0 14px rgba(245,158,11,0.4)",
+      borderHighlight: "1px solid rgba(245,158,11,0.45)",
+      badgeBg: "rgba(245,158,11,0.12)",
+      label: "Gold Luxury 👑"
+    },
+    "tema-synthwave": {
+      accent: "#F472B6",
+      accentSecondary: "#EC4899",
+      glow: "0 0 14px rgba(244,114,182,0.35)",
+      borderHighlight: "1px solid rgba(244,114,182,0.4)",
+      badgeBg: "rgba(244,114,182,0.12)",
+      label: "Synthwave Sunset 🌅"
+    },
+    "tema-raro-dragon": {
+      accent: "#EF4444",
+      accentSecondary: "#F97316",
+      glow: "0 0 16px rgba(239,68,68,0.45)",
+      borderHighlight: "1px solid rgba(239,68,68,0.5)",
+      badgeBg: "rgba(239,68,68,0.12)",
+      label: "Chama Dracônica 🐉🔥"
+    },
+    "tema-raro-quantum": {
+      accent: "#38BDF8",
+      accentSecondary: "#0EA5E9",
+      glow: "0 0 18px rgba(56,189,248,0.45)",
+      borderHighlight: "1px solid rgba(56,189,248,0.5)",
+      badgeBg: "rgba(56,189,248,0.12)",
+      label: "Núcleo Quântico ⚛️"
+    }
+  };
+
+  const tema = ESTILOS_TEMAS[temaEquipado] || null;
+
+  // Cores base do layout — sempre limpas e profissionais
   const colors = {
     bgPage: isDark ? "#0B0F19" : "#F8FAFC",
     bgSidebar: isDark ? "#111827" : "#FFFFFF",
     bgCard: isDark ? "#111827" : "#FFFFFF",
-    borderCard: isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0",
+    borderCard: tema ? tema.accent + "55" : (isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"),
     textPrimary: isDark ? "#F8FAFC" : "#0F172A",
     textSecondary: isDark ? "#94A3B8" : "#64748B",
-    inputBg: isDark ? "#1E293B" : "#FFFFFF",
+    inputBg: isDark ? "rgba(0,0,0,0.3)" : "#FFFFFF",
+    // Accent dinâmico pelo tema equipado
+    accent: tema ? tema.accent : (isDark ? "#3B82F6" : "#2563EB"),
+    accentGlow: tema ? tema.glow : "none",
+    accentBadgeBg: tema ? tema.badgeBg : "rgba(59,130,246,0.12)",
   };
 
   if (loading) {
@@ -1435,7 +1687,7 @@ export default function Dashboard() {
                         {/* Ir para Arena Batalhas */}
                         <button
                           onClick={() => {
-                            setAbaAtiva("batalhas");
+                            setAbaAtiva("games");
                             setUserDropdownOpen(false);
                           }}
                           style={{
@@ -1585,8 +1837,11 @@ export default function Dashboard() {
                 ] : []),
                 { id: "aulas", label: "Aulas & Guia", sublabel: "Full Stack", icon: BookOpen, color: "#3B82F6", badge: `${categorias[0]?.slides?.length || 0}` },
                 { id: "agenda", label: "Calendário & Agenda", sublabel: "Aulas & Reuniões", icon: Calendar, color: "#EF4444", badge: "Ao Vivo 🔴" },
-                { id: "batalhas", label: "Batalha de Código", sublabel: "Arena 1v1 PvP", icon: Swords, color: "#EF4444", badge: "1v1 ⚔️" },
-                { id: "frequencia", label: "Ranking de Devs", sublabel: "Frequência", icon: Trophy, color: "#F59E0B" },
+                { id: "games", label: "Jogos DevHub", sublabel: "Catálogo de Jogos", icon: Swords, color: "#6366F1", badge: "2 Jogos 🎮" },
+                { id: "caderno", label: "Caderno de Estudos", sublabel: "Anotações Dev", icon: BookMarked, color: "#818CF8", badge: "Notas 📝" },
+                { id: "mini_sistemas", label: "Mini-Sistemas", sublabel: "Laboratório Prático", icon: Layers, color: "#10B981", badge: "Prático 🧪" },
+                { id: "ranking", label: "Hall da Fama", sublabel: "Top Alunos", icon: Trophy, color: "#F59E0B", badge: "TOP 🏆" },
+                { id: "evolucao", label: "Sua Evolução", sublabel: "Timeline", icon: Zap, color: "#EC4899", badge: "Trilha 📈" },
                 { id: "notas", label: "Notas das Provas", sublabel: "Boletim", icon: FileText, color: "#A855F7" },
                 { id: "provas-online", label: "Realizar Provas", sublabel: "Avaliações", icon: CheckSquare, color: "#EC4899" },
                 { id: "dev_ia", label: "Dev IA Tutor", sublabel: "Assistente 24/7", icon: Sparkles, color: "#6366F1", badge: "IA ⚡" }
@@ -1631,8 +1886,11 @@ export default function Dashboard() {
                     <button
                       onClick={() => {
                         setAbaAtiva(item.id);
+                        setSidebarRecolhida(true);
                         if (isAulasItem) {
                           setMenuAulasAberto(prev => !prev);
+                        } else {
+                          setMenuAulasAberto(false);
                         }
                       }}
                       style={{
@@ -1793,99 +2051,102 @@ export default function Dashboard() {
           {/* ===== ÁREA DE CONTEÚDO PRINCIPAL ===== */}
           <main style={{ minWidth: 0 }}>
             
-            {/* Banner de Topo Inteligente com Estatísticas Rápidas */}
-            <div style={{
-              background: isDark 
-                ? "linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%)" 
-                : "linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)",
-              border: `1px solid ${colors.borderCard}`,
-              borderRadius: "24px",
-              padding: "24px 28px",
-              marginBottom: "24px",
-              boxShadow: isDark ? "0 12px 30px rgba(0,0,0,0.3)" : "0 8px 24px rgba(0,0,0,0.05)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "20px"
-            }}>
-              {/* Parte Superior do Hero */}
+            {/* Banner de Topo Inteligente com Estatísticas Rápidas (Apenas no Dashboard / Aulas) */}
+            {abaAtiva === "aulas" && (
               <div style={{
+                background: isDark 
+                  ? "linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%)" 
+                  : "linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)",
+                border: `1px solid ${colors.borderCard}`,
+                borderRadius: "24px",
+                padding: "24px 28px",
+                marginBottom: "24px",
+                boxShadow: isDark ? "0 12px 30px rgba(0,0,0,0.3)" : "0 8px 24px rgba(0,0,0,0.05)",
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "16px"
+                flexDirection: "column",
+                gap: "20px"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                  <div style={{
-                    width: "52px", height: "52px", borderRadius: "16px",
-                    background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#FFF", fontSize: "24px", fontWeight: "800",
-                    boxShadow: "0 8px 20px rgba(59, 130, 246, 0.35)",
-                    flexShrink: 0
-                  }}>
-                    {(user?.avatar_url || user?.avatar) ? (
-                      <img src={user.avatar_url || user.avatar} alt="Foto" style={{ width: "100%", height: "100%", borderRadius: "16px", objectFit: "cover" }} />
-                    ) : (
-                      user?.nome ? user.nome.charAt(0).toUpperCase() : "👋"
-                    )}
-                  </div>
-                  <div>
-                    <h1 style={{ fontSize: "22px", fontWeight: "800", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                      Bem-vindo, {user ? user.nome : "Estudante"}! <span style={{ animation: "pulse 2s infinite" }}>🚀</span>
-                    </h1>
-                    <p style={{ color: colors.textSecondary, fontSize: "13.5px", margin: "4px 0 0 0" }}>
-                      Plataforma interativa DevHub — Escolha um módulo abaixo para começar os estudos.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Cards de Métricas Rápidas no Meio */}
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  <div style={{
-                    padding: "8px 14px",
-                    borderRadius: "14px",
-                    backgroundColor: isDark ? "rgba(59, 130, 246, 0.12)" : "#EFF6FF",
-                    border: `1px solid ${isDark ? "rgba(59, 130, 246, 0.25)" : "#BFDBFE"}`,
-                    display: "flex", alignItems: "center", gap: "8px"
-                  }}>
-                    <BookOpen size={16} style={{ color: "#3B82F6" }} />
+                {/* Parte Superior do Hero */}
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "16px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <div style={{
+                      width: "52px", height: "52px", borderRadius: "16px",
+                      background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#FFF", fontSize: "24px", fontWeight: "800",
+                      boxShadow: "0 8px 20px rgba(59, 130, 246, 0.35)",
+                      flexShrink: 0
+                    }}>
+                      {(user?.avatar_url || user?.avatar) ? (
+                        <img src={user.avatar_url || user.avatar} alt="Foto" style={{ width: "100%", height: "100%", borderRadius: "16px", objectFit: "cover" }} />
+                      ) : (
+                        user?.nome ? user.nome.charAt(0).toUpperCase() : "👋"
+                      )}
+                    </div>
                     <div>
-                      <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Módulos</div>
-                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#3B82F6" }}>{categorias[0]?.slides?.length || 6} Tópicos</div>
+                      <h1 style={{ fontSize: "22px", fontWeight: "800", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                        Bem-vindo, {user ? user.nome : "Estudante"}! <span style={{ animation: "pulse 2s infinite" }}>🚀</span>
+                      </h1>
+                      <p style={{ color: colors.textSecondary, fontSize: "13.5px", margin: "4px 0 0 0" }}>
+                        Plataforma interativa DevHub — Escolha um módulo abaixo para começar os estudos.
+                      </p>
                     </div>
                   </div>
 
-                  <div style={{
-                    padding: "8px 14px",
-                    borderRadius: "14px",
-                    backgroundColor: isDark ? "rgba(16, 185, 129, 0.12)" : "#ECFDF5",
-                    border: `1px solid ${isDark ? "rgba(16, 185, 129, 0.25)" : "#A7F3D0"}`,
-                    display: "flex", alignItems: "center", gap: "8px"
-                  }}>
-                    <Zap size={16} style={{ color: "#10B981" }} />
-                    <div>
-                      <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Status</div>
-                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#10B981" }}>Ativo 🟢</div>
-                    </div>
-                  </div>
+                  {/* Cards de Métricas Rápidas no Meio */}
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
 
-                  <div style={{
-                    padding: "8px 14px",
-                    borderRadius: "14px",
-                    backgroundColor: isDark ? "rgba(168, 85, 247, 0.12)" : "#F3E8FF",
-                    border: `1px solid ${isDark ? "rgba(168, 85, 247, 0.25)" : "#DDD6FE"}`,
-                    display: "flex", alignItems: "center", gap: "8px"
-                  }}>
-                    <Crown size={16} style={{ color: "#A855F7" }} />
-                    <div>
-                      <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Trilha</div>
-                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#A855F7" }}>Full Stack</div>
+                    <div style={{
+                      padding: "8px 14px",
+                      borderRadius: "14px",
+                      backgroundColor: isDark ? "rgba(59, 130, 246, 0.12)" : "#EFF6FF",
+                      border: `1px solid ${isDark ? "rgba(59, 130, 246, 0.25)" : "#BFDBFE"}`,
+                      display: "flex", alignItems: "center", gap: "8px"
+                    }}>
+                      <BookOpen size={16} style={{ color: "#3B82F6" }} />
+                      <div>
+                        <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Módulos</div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#3B82F6" }}>{categorias[0]?.slides?.length || 6} Tópicos</div>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      padding: "8px 14px",
+                      borderRadius: "14px",
+                      backgroundColor: isDark ? "rgba(16, 185, 129, 0.12)" : "#ECFDF5",
+                      border: `1px solid ${isDark ? "rgba(16, 185, 129, 0.25)" : "#A7F3D0"}`,
+                      display: "flex", alignItems: "center", gap: "8px"
+                    }}>
+                      <Zap size={16} style={{ color: "#10B981" }} />
+                      <div>
+                        <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Status</div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#10B981" }}>Ativo 🟢</div>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      padding: "8px 14px",
+                      borderRadius: "14px",
+                      backgroundColor: isDark ? "rgba(168, 85, 247, 0.12)" : "#F3E8FF",
+                      border: `1px solid ${isDark ? "rgba(168, 85, 247, 0.25)" : "#DDD6FE"}`,
+                      display: "flex", alignItems: "center", gap: "8px"
+                    }}>
+                      <Crown size={16} style={{ color: "#A855F7" }} />
+                      <div>
+                        <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Trilha</div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#A855F7" }}>Full Stack</div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* ABA 1: AULAS DE ESTUDO */}
             {abaAtiva === "aulas" && (() => {
@@ -2437,246 +2698,30 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* ABA 3: RANKING DE DEVS */}
-            {abaAtiva === "frequencia" && (() => {
+            {/* ABA: CATÁLOGO DE JOGOS (Batalha de Código + Programar em Dupla) */}
+            {abaAtiva === "games" && (
+              <GameCatalogModule user={user} isDark={isDark} colors={colors} relatorioAlunos={relatorioAlunos} />
+            )}
 
-              // ===== Calcular XP baseado nas NOTAS DAS PROVAS =====
-              // Agrupa todas as provas por aluno (por nome ou email)
-              const xpPorAluno = {};
-              notasProvas.forEach(nota => {
-                const chave = (nota.email || nota.alunoNome || "").toLowerCase().trim();
-                if (!chave) return;
+            {/* ABA: CADERNO DE ESTUDOS */}
+            {abaAtiva === "caderno" && (
+              <CadernoEstudosModule user={user} isDark={isDark} colors={colors} />
+            )}
 
-                // Pega o melhor valor de nota disponível
-                const valorNota = parseFloat(
-                  nota.mediaFinal ?? nota.nota ?? nota.prova1 ?? 0
-                ) || 0;
+            {/* ABA: LABORATÓRIO DE MINI-SISTEMAS PRÁTICOS */}
+            {abaAtiva === "mini_sistemas" && (
+              <MiniSistemasModule user={user} isDark={isDark} colors={colors} />
+            )}
 
-                // Converte nota (0-10) para XP (0-1000) por prova
-                const xpProva = Math.round((valorNota / 10) * 100);
+            {/* ABA 3: HALL DA FAMA / RANKING DE DEVS */}
+            {abaAtiva === "ranking" && (
+              <HallDaFamaModule isDark={isDark} colors={colors} />
+            )}
 
-                if (!xpPorAluno[chave]) {
-                  xpPorAluno[chave] = {
-                    nome: nota.alunoNome || "Desconhecido",
-                    email: nota.email || chave,
-                    totalXP: 0,
-                    provasFeitas: 0,
-                    somaNota: 0
-                  };
-                }
-                xpPorAluno[chave].totalXP += xpProva;
-                xpPorAluno[chave].provasFeitas += 1;
-                xpPorAluno[chave].somaNota += valorNota;
-              });
-
-              // Determina nível pelo XP total acumulado
-              const calcularNivel = (xpTotal) => {
-                if (xpTotal >= 800) return { label: "Principal", emoji: "💎", cor: "#A855F7" };
-                if (xpTotal >= 500) return { label: "Sênior",    emoji: "🔥", cor: "#EF4444" };
-                if (xpTotal >= 250) return { label: "Pleno",     emoji: "🚀", cor: "#3B82F6" };
-                if (xpTotal > 0)    return { label: "Júnior",    emoji: "🌱", cor: "#10B981" };
-                return                     { label: "Iniciante", emoji: "🐣", cor: "#64748B" };
-              };
-
-              // Mescla com relatorioAlunos (para ter avatar) e filtra pela busca
-              const rankingOrdenado = Object.values(xpPorAluno)
-                .map(dev => {
-                  const alunoMatch = relatorioAlunos.find(a =>
-                    (a.email && a.email.toLowerCase() === dev.email.toLowerCase()) ||
-                    (a.nome && a.nome.toLowerCase() === dev.nome.toLowerCase())
-                  );
-                  const mediaGeral = dev.provasFeitas > 0
-                    ? (dev.somaNota / dev.provasFeitas).toFixed(1)
-                    : "0.0";
-
-                  return {
-                    ...dev,
-                    avatar: alunoMatch?.avatar || "🎓",
-                    mediaGeral,
-                    nivel: calcularNivel(dev.totalXP)
-                  };
-                })
-                .filter(dev => {
-                  if (!buscaAluno) return true;
-                  const q = buscaAluno.toLowerCase();
-                  return dev.nome.toLowerCase().includes(q) || dev.email.toLowerCase().includes(q);
-                })
-                .sort((a, b) => b.totalXP - a.totalXP);
-
-              const medalhas = ["🥇", "🥈", "🥉"];
-
-
-
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-
-                  {/* Header */}
-                  <div>
-                    <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "4px" }}>
-                      🏆 Ranking de Devs
-                    </h2>
-                    <p style={{ color: colors.textSecondary, fontSize: "14px" }}>
-                      Classificação dos estudantes baseada na frequência e dedicação às aulas.
-                    </p>
-                  </div>
-
-                  {/* Busca */}
-                  <input
-                    type="text"
-                    placeholder="🔍 Buscar dev por nome ou e-mail..."
-                    value={buscaAluno}
-                    onChange={(e) => setBuscaAluno(e.target.value)}
-                    style={{
-                      width: "100%", padding: "11px 16px",
-                      borderRadius: "12px",
-                      border: `1px solid ${colors.borderCard}`,
-                      backgroundColor: colors.inputBg,
-                      color: colors.textPrimary, fontSize: "14px"
-                    }}
-                  />
-
-                  {/* Pódio Top 3 */}
-                  {rankingOrdenado.length >= 3 && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-                      {rankingOrdenado.slice(0, 3).map((dev, i) => (
-                        <div key={dev.id} style={{
-                          backgroundColor: colors.bgCard,
-                          border: `2px solid ${i === 0 ? "#F59E0B" : i === 1 ? "#94A3B8" : "#CD7C2F"}`,
-                          borderRadius: "20px",
-                          padding: "20px",
-                          textAlign: "center",
-                          position: "relative",
-                          background: i === 0
-                            ? `linear-gradient(135deg, rgba(245,158,11,0.12), ${colors.bgCard})`
-                            : i === 1
-                            ? `linear-gradient(135deg, rgba(148,163,184,0.10), ${colors.bgCard})`
-                            : `linear-gradient(135deg, rgba(205,124,47,0.10), ${colors.bgCard})`
-                        }}>
-                          <div style={{ fontSize: "32px", marginBottom: "4px" }}>{medalhas[i]}</div>
-                          <div style={{
-                            fontSize: "22px", marginBottom: "8px",
-                            width: "48px", height: "48px",
-                            backgroundColor: `${dev.nivel.cor}22`,
-                            border: `2px solid ${dev.nivel.cor}55`,
-                            borderRadius: "50%",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            margin: "0 auto 8px"
-                          }}>{dev.avatar}</div>
-                          <strong style={{ display: "block", fontSize: "14px", marginBottom: "2px" }}>{dev.nome}</strong>
-                          <span style={{
-                            fontSize: "11px", fontWeight: "800",
-                            padding: "2px 10px", borderRadius: "20px",
-                            backgroundColor: `${dev.nivel.cor}22`,
-                            color: dev.nivel.cor,
-                            border: `1px solid ${dev.nivel.cor}44`
-                          }}>{dev.nivel.emoji} {dev.nivel.label}</span>
-                          <div style={{ marginTop: "10px", fontSize: "18px", fontWeight: "900", color: dev.nivel.cor }}>
-                            {dev.totalXP} <span style={{ fontSize: "11px", fontWeight: "600", color: colors.textSecondary }}>XP</span>
-                          </div>
-                          <div style={{ fontSize: "11px", color: colors.textSecondary, marginTop: "2px" }}>
-                            Média: <strong style={{ color: dev.nivel.cor }}>{dev.mediaGeral}</strong> · {dev.provasFeitas} prova{dev.provasFeitas !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Lista completa */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {rankingOrdenado.map((dev, idx) => (
-                      <div
-                        key={dev.email}
-                        style={{
-                          backgroundColor: colors.bgCard,
-                          border: `1px solid ${idx < 3 ? dev.nivel.cor + "44" : colors.borderCard}`,
-                          borderRadius: "14px",
-                          padding: "14px 18px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "14px"
-                        }}
-                      >
-                        {/* Posição */}
-                        <div style={{
-                          width: "32px", height: "32px", flexShrink: 0,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: idx < 3 ? "20px" : "13px",
-                          fontWeight: "800",
-                          color: idx < 3 ? undefined : colors.textSecondary
-                        }}>
-                          {idx < 3 ? medalhas[idx] : `#${idx + 1}`}
-                        </div>
-
-                        {/* Avatar */}
-                        <div style={{
-                          width: "40px", height: "40px", flexShrink: 0,
-                          backgroundColor: `${dev.nivel.cor}22`,
-                          border: `2px solid ${dev.nivel.cor}44`,
-                          borderRadius: "50%",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "18px"
-                        }}>{dev.avatar}</div>
-
-                        {/* Info */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                            <strong style={{ fontSize: "14px" }}>{dev.nome}</strong>
-                            <span style={{
-                              fontSize: "10px", fontWeight: "800",
-                              padding: "2px 8px", borderRadius: "20px",
-                              backgroundColor: `${dev.nivel.cor}18`,
-                              color: dev.nivel.cor,
-                              border: `1px solid ${dev.nivel.cor}33`
-                            }}>{dev.nivel.emoji} {dev.nivel.label}</span>
-                          </div>
-                          <span style={{ fontSize: "11px", color: colors.textSecondary }}>{dev.email}</span>
-
-                          {/* Barra de XP */}
-                          <div style={{ marginTop: "6px", height: "4px", backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0", borderRadius: "4px", overflow: "hidden" }}>
-                            <div style={{
-                              height: "100%",
-                              width: `${Math.min((dev.totalXP / 1000) * 100, 100)}%`,
-                              backgroundColor: dev.nivel.cor,
-                              borderRadius: "4px",
-                              transition: "width 0.8s ease"
-                            }} />
-                          </div>
-                        </div>
-
-                        {/* XP + Média */}
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontSize: "16px", fontWeight: "900", color: dev.nivel.cor }}>
-                            {dev.totalXP} XP
-                          </div>
-                          <div style={{ fontSize: "11px", color: colors.textSecondary, fontWeight: "600" }}>
-                            Média: {dev.mediaGeral}
-                          </div>
-                          <div style={{ fontSize: "10px", color: colors.textSecondary }}>
-                            {dev.provasFeitas} prova{dev.provasFeitas !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {rankingOrdenado.length === 0 && (
-                      <div style={{
-                        backgroundColor: colors.bgCard,
-                        border: `1px solid ${colors.borderCard}`,
-                        borderRadius: "18px", padding: "48px 20px",
-                        textAlign: "center", color: colors.textSecondary
-                      }}>
-                        <span style={{ fontSize: "40px", display: "block", marginBottom: "12px" }}>🏆</span>
-                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: colors.textPrimary, marginBottom: "4px" }}>
-                          Ranking vazio por enquanto!
-                        </h3>
-                        <p style={{ fontSize: "13px" }}>Nenhum dev encontrado com esses critérios.</p>
-                      </div>
-                    )}
-                  </div>
-
-                </div>
-              );
-            })()}
+            {/* ABA 5: EVOLUÇÃO / TIMELINE */}
+            {abaAtiva === "evolucao" && (
+              <EvolucaoTimelineModule isDark={isDark} colors={colors} />
+            )}
 
             {/* ABA 4: NOTAS DAS PROVAS COM LANÇAMENTO ADMIN */}
             {abaAtiva === "notas" && (
@@ -2909,6 +2954,7 @@ export default function Dashboard() {
                   ? new Date(`${partesData[2]}-${partesData[1]}-${partesData[0]}T23:59:59`)
                   : new Date("2099-12-31");
                 const expirada = new Date() > dataExp;
+                const isFutura = isDiaria && (typeof prova.diaSemana === "number") && (prova.diaSemana > diaSemanaHoje);
                 const provaJaRealizada = user && provasConcluidas.some(c =>
                   c.provaId === prova.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
                 );
@@ -2928,14 +2974,17 @@ export default function Dashboard() {
                       flexDirection: "column",
                       justifyContent: "space-between",
                       position: "relative",
-                      overflow: "hidden"
+                      overflow: "hidden",
+                      opacity: isFutura ? 0.85 : 1
                     }}
                   >
                     {/* Glow sutil para provas diárias */}
                     {isDiaria && (
                       <div style={{
                         position: "absolute", top: 0, left: 0, right: 0, height: "3px",
-                        background: "linear-gradient(90deg, #a855f7, #ec4899, #a855f7)",
+                        background: isFutura
+                          ? "linear-gradient(90deg, #eab308, #a855f7)"
+                          : "linear-gradient(90deg, #a855f7, #ec4899, #a855f7)",
                         borderRadius: "18px 18px 0 0"
                       }} />
                     )}
@@ -2944,7 +2993,9 @@ export default function Dashboard() {
                       {/* Header do card */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                          {expirada ? (
+                          {isFutura ? (
+                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(234,179,8,0.15)", color: "#EAB308", border: "1px solid rgba(234,179,8,0.4)" }}>🔒 Agendada ({diasSemana[prova.diaSemana]})</span>
+                          ) : expirada ? (
                             <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)" }}>⌛ Encerrada</span>
                           ) : provaJaRealizada ? (
                             <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7", border: "1px solid rgba(168,85,247,0.4)" }}>🔒 Realizada & Trancada</span>
@@ -2996,17 +3047,23 @@ export default function Dashboard() {
                         </button>
                       ) : (
                         <button
-                          disabled={expirada || provaJaRealizada}
+                          disabled={expirada || provaJaRealizada || isFutura}
                           onClick={() => handleIniciarProvaOnline(prova)}
                           style={{
                             flex: 1, padding: "12px", borderRadius: "10px",
-                            backgroundColor: (expirada || provaJaRealizada) ? (isDark ? "rgba(255,255,255,0.06)" : "#CBD5E1") : "#EC4899",
-                            color: (expirada || provaJaRealizada) ? colors.textSecondary : "#FFFFFF",
+                            backgroundColor: (expirada || provaJaRealizada || isFutura) ? (isDark ? "rgba(255,255,255,0.06)" : "#CBD5E1") : "#EC4899",
+                            color: (expirada || provaJaRealizada || isFutura) ? colors.textSecondary : "#FFFFFF",
                             border: "none", fontWeight: "700", fontSize: "13px",
-                            cursor: (expirada || provaJaRealizada) ? "not-allowed" : "pointer"
+                            cursor: (expirada || provaJaRealizada || isFutura) ? "not-allowed" : "pointer"
                           }}
                         >
-                          {expirada ? "🔒 Prova Expirada" : provaJaRealizada ? `🔒 Concluída (Nota: ${registroConclusao ? registroConclusao.nota : "?"})` : "✍️ Realizar Prova Agora"}
+                          {isFutura
+                            ? `🔒 Agendada para ${diasSemana[prova.diaSemana]}`
+                            : expirada
+                            ? "🔒 Prova Expirada"
+                            : provaJaRealizada
+                            ? `🔒 Concluída (Nota: ${registroConclusao ? registroConclusao.nota : "?"})`
+                            : "✍️ Realizar Prova Agora"}
                         </button>
                       )}
 
@@ -3066,9 +3123,9 @@ export default function Dashboard() {
                       }}>HOJE</span>
                     </div>
 
-                    {/* Calendário semanal */}
+                    {/* Calendário semanal (Disponível a partir de Hoje) */}
                     <div style={{ display: "flex", gap: "8px", marginBottom: "20px", overflowX: "auto", paddingBottom: "4px" }}>
-                      {PROVAS_DIARIAS.map((p) => {
+                      {PROVAS_DIARIAS.filter(p => p.diaSemana >= diaSemanaHoje).map((p) => {
                         const isHoje = p.diaSemana === diaSemanaHoje;
                         return (
                           <div
@@ -3086,100 +3143,106 @@ export default function Dashboard() {
                             }}
                           >
                             <div style={{ fontSize: "18px", marginBottom: "4px" }}>{p.emoji}</div>
-                            <div style={{ fontSize: "11px", fontWeight: "800", color: isHoje ? "#A855F7" : colors.textSecondary }}>{diasSemana[p.diaSemana]}</div>
+                            <div style={{ fontSize: "11px", fontWeight: "800", color: isHoje ? "#A855F7" : colors.textSecondary }}>
+                              {diasSemana[p.diaSemana]} <span style={{ fontSize: "9.5px", opacity: 0.85, fontWeight: "900" }}>{p.id.includes("-v2-") ? "P2" : "P1"}</span>
+                            </div>
                             <div style={{ fontSize: "10px", color: isHoje ? "#A855F7" : colors.textSecondary, marginTop: "2px", lineHeight: "1.2" }}>{p.tema.split(" ").slice(0, 2).join(" ")}</div>
                           </div>
                         );
                       })}
                     </div>
 
-                    {/* Card destaque da prova de hoje */}
-                    {provaDoDia && (
-                      <div style={{
-                        background: isDark
-                          ? "linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(236,72,153,0.10) 100%)"
-                          : "linear-gradient(135deg, rgba(168,85,247,0.08) 0%, rgba(236,72,153,0.05) 100%)",
-                        border: "1.5px solid rgba(168,85,247,0.35)",
-                        borderRadius: "20px",
-                        padding: "28px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "20px",
-                        position: "relative",
-                        overflow: "hidden"
-                      }}>
-                        {/* Barra de gradiente no topo */}
-                        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #a855f7, #ec4899, #a855f7)" }} />
+                    {/* Provas em Destaque do Dia (2 Provas por dia) */}
+                    {(() => {
+                      const provasHoje = PROVAS_DIARIAS.filter(p => p.diaSemana === diaSemanaHoje);
+                      if (provasHoje.length === 0) return null;
+                      return (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+                          {provasHoje.map((pHoje) => (
+                            <div key={pHoje.id} style={{
+                              background: isDark
+                                ? "linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(236,72,153,0.10) 100%)"
+                                : "linear-gradient(135deg, rgba(168,85,247,0.08) 0%, rgba(236,72,153,0.05) 100%)",
+                              border: "1.5px solid rgba(168,85,247,0.35)",
+                              borderRadius: "20px",
+                              padding: "24px",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "space-between",
+                              gap: "16px",
+                              position: "relative",
+                              overflow: "hidden"
+                            }}>
+                              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #a855f7, #ec4899, #a855f7)" }} />
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+                                <div style={{
+                                  width: "56px", height: "56px", flexShrink: 0,
+                                  background: "linear-gradient(135deg, rgba(168,85,247,0.25), rgba(236,72,153,0.15))",
+                                  border: "2px solid rgba(168,85,247,0.4)",
+                                  borderRadius: "16px",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: "28px"
+                                }}>
+                                  {pHoje.emoji}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
+                                    <span style={{
+                                      fontSize: "10px", fontWeight: "900", padding: "2px 8px", borderRadius: "12px",
+                                      background: "linear-gradient(135deg,#a855f7,#ec4899)", color: "#FFF", letterSpacing: "0.5px"
+                                    }}>✨ PROVA DO DIA</span>
+                                    <span style={{ fontSize: "11px", color: colors.textSecondary }}>⏱️ {pHoje.duracaoMinutos} min</span>
+                                    <span style={{ fontSize: "11px", color: colors.textSecondary }}>❓ {pHoje.questoes.length} q.</span>
+                                  </div>
+                                  <h3 style={{ fontSize: "17px", fontWeight: "900", marginBottom: "6px" }}>{pHoje.titulo}</h3>
+                                  <p style={{ fontSize: "12px", color: colors.textSecondary, lineHeight: "1.5" }}>{pHoje.descricao}</p>
+                                </div>
+                              </div>
 
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", flexWrap: "wrap" }}>
-                          {/* Ícone grande */}
-                          <div style={{
-                            width: "72px", height: "72px", flexShrink: 0,
-                            background: "linear-gradient(135deg, rgba(168,85,247,0.25), rgba(236,72,153,0.15))",
-                            border: "2px solid rgba(168,85,247,0.4)",
-                            borderRadius: "20px",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "36px"
-                          }}>
-                            {provaDoDia.emoji}
-                          </div>
-
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px", flexWrap: "wrap" }}>
-                              <span style={{
-                                fontSize: "11px", fontWeight: "900", padding: "3px 12px", borderRadius: "20px",
-                                background: "linear-gradient(135deg,#a855f7,#ec4899)", color: "#FFF", letterSpacing: "0.5px"
-                              }}>✨ PROVA DO DIA</span>
-                              <span style={{ fontSize: "12px", color: colors.textSecondary }}>⏱️ {provaDoDia.duracaoMinutos} min</span>
-                              <span style={{ fontSize: "12px", color: colors.textSecondary }}>❓ {provaDoDia.questoes.length} questões</span>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                {(() => {
+                                  const jaFezHoje = user && provasConcluidas.some(c =>
+                                    c.provaId === pHoje.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
+                                  );
+                                  const regHoje = user ? provasConcluidas.find(c =>
+                                    c.provaId === pHoje.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
+                                  ) : null;
+                                  return (
+                                    <button
+                                      disabled={jaFezHoje}
+                                      onClick={() => handleIniciarProvaOnline(pHoje)}
+                                      style={{
+                                        padding: "11px 20px",
+                                        borderRadius: "12px",
+                                        background: jaFezHoje ? (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0") : "linear-gradient(135deg,#EC4899,#a855f7)",
+                                        color: jaFezHoje ? colors.textSecondary : "#FFF",
+                                        border: "none", fontWeight: "800", fontSize: "13px",
+                                        cursor: jaFezHoje ? "not-allowed" : "pointer",
+                                        boxShadow: jaFezHoje ? "none" : "0 4px 14px rgba(236,72,153,0.35)",
+                                        transition: "all 0.2s"
+                                      }}
+                                    >
+                                      {jaFezHoje ? `🔒 Concluída hoje! (Nota: ${regHoje ? regHoje.nota : "?"})` : "🚀 Realizar Prova do Dia"}
+                                    </button>
+                                  );
+                                })()}
+                              </div>
                             </div>
-                            <h3 style={{ fontSize: "20px", fontWeight: "900", marginBottom: "8px" }}>{provaDoDia.titulo}</h3>
-                            <p style={{ fontSize: "14px", color: colors.textSecondary, lineHeight: "1.6", maxWidth: "600px" }}>{provaDoDia.descricao}</p>
-                          </div>
+                          ))}
                         </div>
-
-                        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                          {(() => {
-                            const jaFezHoje = user && provasConcluidas.some(c =>
-                              c.provaId === provaDoDia.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
-                            );
-                            const regHoje = user ? provasConcluidas.find(c =>
-                              c.provaId === provaDoDia.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
-                            ) : null;
-                            return (
-                              <button
-                                disabled={jaFezHoje}
-                                onClick={() => handleIniciarProvaOnline(provaDoDia)}
-                                style={{
-                                  padding: "13px 32px",
-                                  borderRadius: "12px",
-                                  background: jaFezHoje ? (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0") : "linear-gradient(135deg,#EC4899,#a855f7)",
-                                  color: jaFezHoje ? colors.textSecondary : "#FFF",
-                                  border: "none", fontWeight: "800", fontSize: "14px",
-                                  cursor: jaFezHoje ? "not-allowed" : "pointer",
-                                  boxShadow: jaFezHoje ? "none" : "0 6px 20px rgba(236,72,153,0.4)",
-                                  transition: "all 0.2s"
-                                }}
-                              >
-                                {jaFezHoje ? `🔒 Concluída hoje! (Nota: ${regHoje ? regHoje.nota : "?"})` : "🚀 Fazer a Prova do Dia"}
-                              </button>
-                            );
-                          })()}
-                          <span style={{ fontSize: "12px", color: colors.textSecondary }}>🤖 Gerada automaticamente pelo sistema DevHub</span>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
 
-                  {/* ===== SEÇÃO: PRÓXIMAS PROVAS DO SISTEMA ===== */}
+                  {/* ===== SEÇÃO: PROVAS A PARTIR DE HOJE ===== */}
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                       <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg,#10B981,#3B82F6)", borderRadius: "4px" }} />
-                      <h3 style={{ fontSize: "17px", fontWeight: "800" }}>📅 Provas da Semana</h3>
-                      <span style={{ fontSize: "12px", color: colors.textSecondary }}>— temas por dia</span>
+                      <h3 style={{ fontSize: "17px", fontWeight: "800" }}>📅 Próximas Provas da Semana</h3>
+                      <span style={{ fontSize: "12px", color: colors.textSecondary }}>— agendadas para os próximos dias</span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
-                      {PROVAS_DIARIAS.filter(p => p.diaSemana !== diaSemanaHoje).map(prova => renderCardProva(prova, true))}
+                      {PROVAS_DIARIAS.filter(p => p.diaSemana > diaSemanaHoje).map(prova => renderCardProva(prova, true))}
                     </div>
                   </div>
 
@@ -3222,10 +3285,7 @@ export default function Dashboard() {
               <SuperAdminModule isDark={isDark} colors={colors} currentUser={user} />
             )}
 
-            {/* ABA: BATALHA DE CÓDIGO 1v1 */}
-            {abaAtiva === "batalhas" && (
-              <BatalhaCodigoModule user={user} relatorioAlunos={relatorioAlunos} />
-            )}
+
 
             {/* ABA: DEV IA — ASSISTENTE DE ESTUDOS DE PROGRAMAÇÃO */}
             {abaAtiva === "dev_ia" && (
@@ -3242,6 +3302,7 @@ export default function Dashboard() {
           user={user}
           onUpdateUser={(updatedUser) => setUser(updatedUser)}
           onLogout={handleLogout}
+          onTemaEquipado={(temaId) => setTemaEquipado(temaId)}
         />
 
         {/* MODAL DE AGENDAMENTO (ADMIN ONLY) */}
@@ -4407,8 +4468,8 @@ export default function Dashboard() {
           </div>
         )}
 
-      </div>
+
+        </div>
     </>
   );
 }
-

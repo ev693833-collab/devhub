@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Swords, Trophy, Clock, Play, CheckCircle, Send, XCircle, Check, X, Shield, Sparkles, PlusCircle, Inbox, Users, Code, GraduationCap, AlertTriangle, HelpCircle } from "lucide-react";
+import { Swords, Trophy, Clock, Play, CheckCircle, Send, XCircle, Check, X, Shield, Sparkles, PlusCircle, Inbox, Users, Code, GraduationCap, AlertTriangle, HelpCircle, Terminal } from "lucide-react";
 import styles from "./BatalhaCodigoModule.module.css";
 
 // 10 Desafios Únicos e Diversificados para as Batalhas 1v1
@@ -7,272 +7,370 @@ const listaDesafiosPadrao = [
   {
     id: 1,
     titulo: "Sistema de Cadastro & Filtro de Usuários",
+    tecnologia: "🟨 JavaScript ES6 (Filter & Array Methods)",
     categoria: "JavaScript ES6 / Array Filter",
     dificuldade: "Médio",
     enunciado: "Filtre uma lista de objetos de usuários e retorne apenas os usuários ativos com idade >= 18.",
-    codigoInicial: ""
+    codigoInicial: "// Escreva uma função ou atribua à variável 'resultado' a lista filtrada:\n// Exemplo: const resultado = usuarios.filter(u => u.idade >= 18 && u.ativo);\n\nconsole.log('Iniciando filtro de usuários...');"
   },
   {
     id: 2,
     titulo: "Validação de Parênteses Balanceados",
+    tecnologia: "💙 TypeScript & Data Structure (Pilha)",
     categoria: "Estrutura de Dados / Pilha",
     dificuldade: "Difícil",
-    enunciado: "Crie um algoritmo para verificar se uma string de parênteses como '({[]})' está balanceada.",
-    codigoInicial: ""
+    enunciado: "Crie uma função 'validarParenteses(str)' para verificar se uma string de parênteses como '({[]})' está balanceada.",
+    codigoInicial: "function validarParenteses(str) {\n  console.log('Validando parênteses para:', str);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 3,
     titulo: "Cálculo do Fatorial de um Número",
+    tecnologia: "🟨 JavaScript (Lógica & Math)",
     categoria: "Matemática & Lógica",
     dificuldade: "Fácil",
-    enunciado: "Crie uma função que receba um número inteiro positivo n e retorne o seu fatorial (ex: 5! = 120).",
-    codigoInicial: ""
+    enunciado: "Crie uma função 'fatorial(n)' que receba um inteiro n >= 0 e retorne seu fatorial (ex: 5! = 120, 0! = 1).",
+    codigoInicial: "function fatorial(n) {\n  console.log('Calculando fatorial de:', n);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 4,
     titulo: "Verificação de Palíndromo",
+    tecnologia: "🟨 JavaScript (Strings & Regex)",
     categoria: "String & Manipulação de Texto",
     dificuldade: "Fácil",
-    enunciado: "Escreva um algoritmo para verificar se uma palavra é um palíndromo (lê-se da mesma forma de trás para frente).",
-    codigoInicial: ""
+    enunciado: "Escreva uma função 'ehPalindromo(str)' para verificar se uma palavra lida da mesma forma de trás para frente.",
+    codigoInicial: "function ehPalindromo(str) {\n  console.log('Verificando palavra:', str);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 5,
     titulo: "Encontrar o Maior Número em um Array",
+    tecnologia: "🟨 JavaScript (Arrays & Vetores)",
     categoria: "Arrays / Vetores",
     dificuldade: "Fácil",
-    enunciado: "Crie uma função que receba uma lista de números inteiros e retorne o maior número contido nela.",
-    codigoInicial: ""
+    enunciado: "Crie uma função 'maiorNumero(arr)' que receba uma lista de números inteiros e retorne o maior deles.",
+    codigoInicial: "function maiorNumero(arr) {\n  console.log('Buscando maior número na lista:', arr);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 6,
     titulo: "Contagem de Vogais em uma Frase",
+    tecnologia: "🟨 JavaScript (Strings & RegEx)",
     categoria: "Strings & RegEx",
     dificuldade: "Fácil",
-    enunciado: "Crie um algoritmo que receba um texto e conte quantas vogais (a, e, i, o, u) ele possui.",
-    codigoInicial: ""
+    enunciado: "Crie uma função 'contarVogais(txt)' que receba um texto e retorne o total de vogais (a, e, i, o, u).",
+    codigoInicial: "function contarVogais(txt) {\n  console.log('Contando vogais em:', txt);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 7,
     titulo: "Remoção de Duplicados de uma Lista",
+    tecnologia: "🟨 JavaScript (ES6 Set & Arrays)",
     categoria: "ES6 Sets / Arrays",
     dificuldade: "Médio",
-    enunciado: "Crie uma função que receba um array com elementos repetidos e retorne apenas os valores únicos.",
-    codigoInicial: ""
+    enunciado: "Crie uma função 'removerDuplicados(arr)' que receba um array com elementos repetidos e retorne apenas os valores únicos.",
+    codigoInicial: "function removerDuplicados(arr) {\n  console.log('Removendo duplicados do array:', arr);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 8,
     titulo: "Soma de Números Pares",
+    tecnologia: "🟨 JavaScript (Lógica de Programação)",
     categoria: "Lógica de Programação",
     dificuldade: "Fácil",
-    enunciado: "Escreva uma função que receba um array de inteiros e retorne a soma de todos os números pares.",
-    codigoInicial: ""
+    enunciado: "Escreva uma função 'somarPares(arr)' que receba um array de inteiros e retorne a soma de todos os números pares.",
+    codigoInicial: "function somarPares(arr) {\n  console.log('Somando números pares da lista:', arr);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 9,
     titulo: "Algoritmo FizzBuzz Clássico",
+    tecnologia: "🟨 JavaScript (Estruturas Condicionais)",
     categoria: "Estruturas Condicionais",
     dificuldade: "Médio",
-    enunciado: "Retorne 'Fizz' para múltiplos de 3, 'Buzz' para múltiplos de 5 e 'FizzBuzz' para múltiplos de ambos.",
-    codigoInicial: ""
+    enunciado: "Crie uma função 'fizzBuzz(n)' que retorne 'FizzBuzz' se n for múltiplo de 3 e 5, 'Fizz' se só de 3, 'Buzz' se só de 5 ou n.",
+    codigoInicial: "function fizzBuzz(n) {\n  console.log('Rodando FizzBuzz para:', n);\n  // Digite seu algoritmo aqui...\n}"
   },
   {
     id: 10,
     titulo: "Implementação de Debounce em JS",
+    tecnologia: "⚡ JavaScript Avançado (Timers & Async)",
     categoria: "JavaScript Avançado / Async",
     dificuldade: "Desafiador",
-    enunciado: "Implemente uma função debounce(fn, delay) que atrase a execução da função até que o tempo expire.",
-    codigoInicial: ""
+    enunciado: "Implemente uma função debounce(fn, delay) utilizando setTimeout e clearTimeout para adiar a execução.",
+    codigoInicial: "function debounce(fn, delay) {\n  console.log('Iniciando timer de Debounce...');\n  // Utilizar setTimeout e clearTimeout...\n}"
   }
 ];
 
-// Avaliador Inteligente & Flexível que aceita QUALQUER formato de código JS (Função, Arrow Function ou Variável Direta)
+// Avaliador Rigoroso Anti-Cheat com Múltiplos Testes Dinâmicos
 function executarTestesBatalha(desafioId, codigo) {
   try {
-    if (!codigo || codigo.trim() === "" || codigo.startsWith("// Escreva")) {
+    if (!codigo || codigo.trim() === "" || codigo.startsWith("// Escreva") || codigo.startsWith("// Digite")) {
       return {
         sucesso: false,
-        erro: "O código está em branco ou com o comentário padrão. Escreva a sua solução para submeter!"
+        erro: "⚠️ O código está em branco ou contém apenas o modelo inicial. Escreva a sua solução antes de submeter!"
       };
     }
 
-    // 1. DESAFIO 1: Filtro de Usuários (Aceita qualquer nome de variável ou função)
-    if (desafioId === 1) {
-      const inputTest = [
-        { usuario: 'Andre', nome: 'Andre', idade: 27, ativo: true },
-        { usuario: 'Enzo', nome: 'Enzo', idade: 17, ativo: true },
-        { usuario: 'Breno', nome: 'Breno', idade: 17, ativo: false },
-        { usuario: 'Carlos', nome: 'Carlos', idade: 25, ativo: true }
-      ];
-
-      const scriptEvaluator = new Function('inputData', `
-        const usuarios = inputData;
-        const listaUsuarios = inputData;
+    // Auxiliar para compilar a função do usuário dinamicamente
+    const criarAvaliador = (paramNames, nomeFuncao) => {
+      const paramsStr = Array.isArray(paramNames) ? paramNames.join(",") : paramNames;
+      return new Function(paramsStr, `
         ${codigo}
-        if (typeof filtrarUsuarios === 'function') return filtrarUsuarios(inputData);
-        if (typeof usuariosValidos !== 'undefined') return usuariosValidos;
+        if (typeof ${nomeFuncao} === 'function') return ${nomeFuncao}(${paramsStr});
+        if (typeof resultado === 'function') return resultado(${paramsStr});
         if (typeof resultado !== 'undefined') return resultado;
         if (typeof res !== 'undefined') return res;
-        if (typeof output !== 'undefined') return output;
         return null;
       `);
+    };
 
-      const res = scriptEvaluator(inputTest);
+    // 1. DESAFIO 1: Filtro de Usuários (3 Testes Dinâmicos)
+    if (desafioId === 1) {
+      const testCases = [
+        [
+          { nome: 'Andre', idade: 27, ativo: true },
+          { nome: 'Enzo', idade: 17, ativo: true },
+          { nome: 'Breno', idade: 17, ativo: false },
+          { nome: 'Carlos', idade: 25, ativo: true }
+        ],
+        [
+          { nome: 'Lucas', idade: 16, ativo: true },
+          { nome: 'Maria', idade: 15, ativo: false }
+        ],
+        [
+          { nome: 'Felipe', idade: 30, ativo: true },
+          { nome: 'Amanda', idade: 22, ativo: true },
+          { nome: 'Vitor', idade: 19, ativo: false }
+        ]
+      ];
 
-      if (!res || !Array.isArray(res)) {
-        return { sucesso: false, erro: "O código precisa atribuir ou retornar o array filtrado!" };
+      const expectedLengths = [2, 0, 2];
+
+      for (let i = 0; i < testCases.length; i++) {
+        const input = testCases[i];
+        const evaluator = new Function('usuarios', `
+          const listaUsuarios = usuarios;
+          ${codigo}
+          if (typeof filtrarUsuarios === 'function') return filtrarUsuarios(usuarios);
+          if (typeof usuariosValidos !== 'undefined') return usuariosValidos;
+          if (typeof resultado === 'function') return resultado(usuarios);
+          if (typeof resultado !== 'undefined') return resultado;
+          return null;
+        `);
+
+        const res = evaluator(input);
+        if (!res || !Array.isArray(res)) {
+          return { sucesso: false, erro: `❌ Teste #${i + 1} falhou: O seu código precisa retornar um Array com a lista filtrada!` };
+        }
+
+        const validos = res.filter(u => u && u.idade >= 18 && u.ativo === true);
+        if (res.length !== expectedLengths[i] || validos.length !== expectedLengths[i]) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para a entrada fornecida de ${input.length} usuário(s), esperava-se ${expectedLengths[i]} usuário(s) ativos com idade >= 18, mas sua função retornou ${res.length}.`
+          };
+        }
       }
 
-      const aprovados = res.filter(u => (u.idade >= 18) && (u.ativo === true));
-      if (res.length !== 2 || aprovados.length !== 2) {
-        return {
-          sucesso: false,
-          erro: `Resultado incorreto! Esperava-se 2 usuários com idade >= 18 e ativo: true. Sua solução retornou ${res.length} elemento(s).`
-        };
-      }
-
-      return { sucesso: true, mensagem: "✅ Filtro de usuários aprovado com sucesso!" };
+      return { sucesso: true, mensagem: "✅ Filtro de usuários validado com sucesso em 3 testes dinâmicos!" };
     }
 
-    // 2. DESAFIO 2: Parênteses Balanceados
+    // 2. DESAFIO 2: Parênteses Balanceados (5 Testes)
     if (desafioId === 2) {
-      const scriptEvaluator = new Function('str', `
-        ${codigo}
-        if (typeof validarParenteses === 'function') return validarParenteses(str);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("str", "validarParenteses");
+      const tests = [
+        { input: "({[]})", expected: true },
+        { input: "({[})", expected: false },
+        { input: "((()))", expected: true },
+        { input: ")()(", expected: false },
+        { input: "[]{}", expected: true }
+      ];
 
-      const t1 = scriptEvaluator("({[]})");
-      const t2 = scriptEvaluator("({[})");
-
-      if (t1 === true && t2 === false) {
-        return { sucesso: true, mensagem: "✅ Algoritmo de validação de parênteses aprovado!" };
+      for (let i = 0; i < tests.length; i++) {
+        const res = Boolean(evaluator(tests[i].input));
+        if (res !== tests[i].expected) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para a entrada '${tests[i].input}', esperava-se ${tests[i].expected}, mas sua solução retornou ${res}.`
+          };
+        }
       }
-      return { sucesso: false, erro: "Casos de teste falharam. Exemplo: '({[]})' deve retornar true e '({[})' false." };
+      return { sucesso: true, mensagem: "✅ Validação de parênteses aprovada em 5 casos de teste!" };
     }
 
-    // 3. DESAFIO 3: Fatorial
+    // 3. DESAFIO 3: Fatorial (5 Testes)
     if (desafioId === 3) {
-      const scriptEvaluator = new Function('n', `
-        ${codigo}
-        if (typeof fatorial === 'function') return fatorial(n);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("n", "fatorial");
+      const tests = [
+        { input: 5, expected: 120 },
+        { input: 3, expected: 6 },
+        { input: 0, expected: 1 },
+        { input: 1, expected: 1 },
+        { input: 6, expected: 720 }
+      ];
 
-      if (scriptEvaluator(5) === 120 && scriptEvaluator(3) === 6) {
-        return { sucesso: true, mensagem: "✅ Cálculo de fatorial correto! (5! = 120)." };
+      for (let i = 0; i < tests.length; i++) {
+        const res = evaluator(tests[i].input);
+        if (res !== tests[i].expected) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Fatorial de ${tests[i].input}: esperava-se ${tests[i].expected}, mas retornou ${res}.`
+          };
+        }
       }
-      return { sucesso: false, erro: "Cálculo de fatorial incorreto. Esperado para 5: 120." };
+      return { sucesso: true, mensagem: "✅ Cálculo de fatorial validado em 5 entradas dinâmicas!" };
     }
 
-    // 4. DESAFIO 4: Palíndromo
+    // 4. DESAFIO 4: Palíndromo (5 Testes)
     if (desafioId === 4) {
-      const scriptEvaluator = new Function('str', `
-        ${codigo}
-        if (typeof ehPalindromo === 'function') return ehPalindromo(str);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("str", "ehPalindromo");
+      const tests = [
+        { input: "arara", expected: true },
+        { input: "estudo", expected: false },
+        { input: "Amanama", expected: true },
+        { input: "12321", expected: true },
+        { input: "devhub", expected: false }
+      ];
 
-      if (scriptEvaluator("arara") === true && scriptEvaluator("estudo") === false) {
-        return { sucesso: true, mensagem: "✅ Verificação de palíndromo aprovada!" };
+      for (let i = 0; i < tests.length; i++) {
+        const rawRes = evaluator(tests[i].input);
+        const res = Boolean(rawRes);
+        if (res !== tests[i].expected) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para a palavra '${tests[i].input}', esperava-se ${tests[i].expected}, mas retornou ${res}.`
+          };
+        }
       }
-      return { sucesso: false, erro: "Verificação de palíndromo falhou. Ex: 'arara' -> true, 'estudo' -> false." };
+      return { sucesso: true, mensagem: "✅ Algoritmo de palíndromo aprovado em todos os testes!" };
     }
 
-    // 5. DESAFIO 5: Maior Número
+    // 5. DESAFIO 5: Maior Número (4 Testes Dinâmicos)
     if (desafioId === 5) {
-      const scriptEvaluator = new Function('arr', `
-        ${codigo}
-        if (typeof maiorNumero === 'function') return maiorNumero(arr);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("arr", "maiorNumero");
+      const tests = [
+        { input: [10, 45, 3, 99, 23], expected: 99 },
+        { input: [-10, -50, -3, -20], expected: -3 },
+        { input: [100, 500, 20, 899, 45], expected: 899 },
+        { input: [7], expected: 7 }
+      ];
 
-      if (scriptEvaluator([10, 45, 3, 99, 23]) === 99) {
-        return { sucesso: true, mensagem: "✅ Algoritmo do maior número aprovado!" };
+      for (let i = 0; i < tests.length; i++) {
+        const res = evaluator(tests[i].input);
+        if (res !== tests[i].expected) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para a lista [${tests[i].input.join(", ")}], o maior número esperado era ${tests[i].expected}, mas retornou ${res}.`
+          };
+        }
       }
-      return { sucesso: false, erro: "Maior número incorreto. Esperado para [10, 45, 3, 99, 23]: 99." };
+      return { sucesso: true, mensagem: "✅ Algoritmo do maior número aprovado em 4 testes dinâmicos!" };
     }
 
-    // 6. DESAFIO 6: Contar Vogais
+    // 6. DESAFIO 6: Contar Vogais (4 Testes)
     if (desafioId === 6) {
-      const scriptEvaluator = new Function('txt', `
-        ${codigo}
-        if (typeof contarVogais === 'function') return contarVogais(txt);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("txt", "contarVogais");
+      const tests = [
+        { input: "DevHub Tecnologia", expected: 8 },
+        { input: "Javascript", expected: 3 },
+        { input: "Rhythms", expected: 0 },
+        { input: "AEIOU", expected: 5 }
+      ];
 
-      if (scriptEvaluator("DevHub Tecnologia") === 8) {
-        return { sucesso: true, mensagem: "✅ Contagem de vogais correta!" };
+      for (let i = 0; i < tests.length; i++) {
+        const res = evaluator(tests[i].input);
+        if (res !== tests[i].expected) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para o texto '${tests[i].input}', esperavam-se ${tests[i].expected} vogais, mas retornou ${res}.`
+          };
+        }
       }
-      return { sucesso: false, erro: "Contagem de vogais incorreta. Esperado para 'DevHub Tecnologia': 8." };
+      return { sucesso: true, mensagem: "✅ Contagem de vogais validada com sucesso!" };
     }
 
-    // 7. DESAFIO 7: Remover Duplicados
+    // 7. DESAFIO 7: Remover Duplicados (3 Testes)
     if (desafioId === 7) {
-      const scriptEvaluator = new Function('arr', `
-        ${codigo}
-        if (typeof removerDuplicados === 'function') return removerDuplicados(arr);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("arr", "removerDuplicados");
+      const tests = [
+        { input: [1, 2, 2, 3, 4, 4, 5], expected: [1, 2, 3, 4, 5] },
+        { input: ["a", "b", "a", "c", "b"], expected: ["a", "b", "c"] },
+        { input: [9, 9, 9, 9], expected: [9] }
+      ];
 
-      const res = scriptEvaluator([1, 2, 2, 3, 4, 4, 5]);
-      if (Array.isArray(res) && res.length === 5) {
-        return { sucesso: true, mensagem: "✅ Remoção de elementos duplicados aprovada!" };
+      for (let i = 0; i < tests.length; i++) {
+        const res = evaluator(tests[i].input);
+        if (!Array.isArray(res) || JSON.stringify(res.sort()) !== JSON.stringify(tests[i].expected.sort())) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para a entrada [${tests[i].input.join(",")}], esperava-se [${tests[i].expected.join(",")}], mas sua solução retornou ${JSON.stringify(res)}.`
+          };
+        }
       }
-      return { sucesso: false, erro: "Remoção de duplicados falhou. Esperado para [1,2,2,3,4,4,5]: [1,2,3,4,5]." };
+      return { sucesso: true, mensagem: "✅ Remoção de elementos duplicados aprovada em todos os testes!" };
     }
 
-    // 8. DESAFIO 8: Soma dos Pares
+    // 8. DESAFIO 8: Soma dos Pares (4 Testes)
     if (desafioId === 8) {
-      const scriptEvaluator = new Function('arr', `
-        ${codigo}
-        if (typeof somarPares === 'function') return somarPares(arr);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("arr", "somarPares");
+      const tests = [
+        { input: [1, 2, 3, 4, 5, 6], expected: 12 },
+        { input: [1, 3, 5, 7], expected: 0 },
+        { input: [2, 4, 8, 10], expected: 24 },
+        { input: [-2, -4, 5, 6], expected: 4 }
+      ];
 
-      if (scriptEvaluator([1, 2, 3, 4, 5, 6]) === 12) {
-        return { sucesso: true, mensagem: "✅ Soma de números pares correta!" };
+      for (let i = 0; i < tests.length; i++) {
+        const res = evaluator(tests[i].input);
+        if (res !== tests[i].expected) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para a lista [${tests[i].input.join(",")}], a soma dos pares esperada era ${tests[i].expected}, mas sua solução retornou ${res}.`
+          };
+        }
       }
-      return { sucesso: false, erro: "Soma de pares incorreta. Esperado para [1, 2, 3, 4, 5, 6]: 12." };
+      return { sucesso: true, mensagem: "✅ Algoritmo de soma de pares aprovado em 4 testes!" };
     }
 
-    // 9. DESAFIO 9: FizzBuzz
+    // 9. DESAFIO 9: FizzBuzz (4 Testes)
     if (desafioId === 9) {
-      const scriptEvaluator = new Function('n', `
-        ${codigo}
-        if (typeof fizzBuzz === 'function') return fizzBuzz(n);
-        if (typeof resultado !== 'undefined') return resultado;
-        return null;
-      `);
+      const evaluator = criarAvaliador("n", "fizzBuzz");
+      const tests = [
+        { input: 15, expected: "FizzBuzz" },
+        { input: 9, expected: "Fizz" },
+        { input: 10, expected: "Buzz" },
+        { input: 7, expected: 7 }
+      ];
 
-      if (scriptEvaluator(15) === "FizzBuzz" && scriptEvaluator(9) === "Fizz" && scriptEvaluator(10) === "Buzz") {
-        return { sucesso: true, mensagem: "✅ Algoritmo FizzBuzz aprovado!" };
+      for (let i = 0; i < tests.length; i++) {
+        const res = evaluator(tests[i].input);
+        if (String(res) !== String(tests[i].expected)) {
+          return {
+            sucesso: false,
+            erro: `❌ Teste #${i + 1} falhou! Para n=${tests[i].input}, esperava-se '${tests[i].expected}', mas retornou '${res}'.`
+          };
+        }
       }
-      return { sucesso: false, erro: "FizzBuzz falhou. 15 -> 'FizzBuzz', 9 -> 'Fizz', 10 -> 'Buzz'." };
+      return { sucesso: true, mensagem: "✅ Algoritmo FizzBuzz testado e aprovado com sucesso!" };
     }
 
     // 10. DESAFIO 10: Debounce
     if (desafioId === 10) {
-      if (codigo.includes("setTimeout") || codigo.includes("clearTimeout")) {
-        return { sucesso: true, mensagem: "✅ Implementação de Debounce validada com sucesso!" };
+      if (!codigo.includes("setTimeout") || !codigo.includes("clearTimeout")) {
+        return { sucesso: false, erro: "❌ A implementação de Debounce exige a utilização correta de setTimeout e clearTimeout." };
       }
-      return { sucesso: false, erro: "Utilize setTimeout / clearTimeout para a implementação do Debounce." };
+      return { sucesso: true, mensagem: "✅ Implementação de Debounce validada com sucesso!" };
     }
 
     return { sucesso: true, mensagem: "✅ Solução aprovada com sucesso!" };
   } catch (err) {
     return {
       sucesso: false,
-      erro: `Erro na execução do código: ${err.message}`
+      erro: `❌ Erro de Sintaxe ou Execução no Código: ${err.message}`
     };
   }
+}
+
+// Sorteia um desafio verdadeiramente aleatório
+function sortearDesafioAleatorio(listaDesafios) {
+  if (!listaDesafios || listaDesafios.length === 0) return listaDesafiosPadrao[0];
+  const idx = Math.floor(Math.random() * listaDesafios.length);
+  return listaDesafios[idx];
 }
 
 export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
@@ -317,7 +415,7 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
     return () => clearInterval(intervalCd);
   }, [convites]);
 
-  // Arena de Batalha em Andamento
+  // Arena de Batalha em Andamento & Console de Logs da Batalha
   const [emBatalha, setEmBatalha] = useState(false);
   const [desafioAtual, setDesafioAtual] = useState(null);
   const [codigoSolucao, setCodigoSolucao] = useState("");
@@ -325,6 +423,7 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
   const [oponenteDuelo, setOponenteDuelo] = useState("");
   const [resultadoBatalha, setResultadoBatalha] = useState(null);
   const [erroValidacaoCodigo, setErroValidacaoCodigo] = useState(null);
+  const [logsConsoleBatalha, setLogsConsoleBatalha] = useState([]);
 
   // Extrair Alunos Reais Cadastrados
   useEffect(() => {
@@ -406,7 +505,6 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
           if (data.convites && Array.isArray(data.convites)) {
             setConvites(data.convites);
 
-            // Checar se há novo convite para o usuário logado
             if (user?.nome) {
               const meuNomeLower = user.nome.toLowerCase().trim();
               const conviteNovo = data.convites.find(c =>
@@ -422,21 +520,20 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
             }
           }
 
-          // SE O CONVITE QUE O USUÁRIO ENVIOU FOI ACEITO PELO OPONENTE -> ENTRAR DIRETO NA ARENA!
           if (data.dueloAceito && user?.nome) {
             const meuNomeLower = user.nome.toLowerCase().trim();
             if (data.dueloAceito.remetenteNome?.toLowerCase().trim() === meuNomeLower && !emBatalha) {
-              const desafioEncontrado = listaDesafios.find(d => d.id === data.dueloAceito.desafioId) || listaDesafios[0];
+              const desafioEncontrado = listaDesafios.find(d => d.id === data.dueloAceito.desafioId) || sortearDesafioAleatorio(listaDesafios);
               setDesafioAtual(desafioEncontrado);
               setCodigoSolucao(desafioEncontrado?.codigoInicial || "");
               setOponenteDuelo(data.dueloAceito.destinatarioNome || "Oponente");
               setTempoSegundos(0);
               setResultadoBatalha(null);
               setErroValidacaoCodigo(null);
+              setLogsConsoleBatalha([]);
               setModalInboxOpen(false);
               setEmBatalha(true);
 
-              // Limpar duelo consumido no backend
               fetch(`${apiUrl}/batalhas/limpar-duelo-aceito`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -449,7 +546,6 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
       .catch(() => {});
   };
 
-  // Polling automático a cada 4 segundos para detectar convites novos e duelos aceitos
   useEffect(() => {
     carregarBatalhas();
     const interval = setInterval(() => {
@@ -471,7 +567,38 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
     return () => clearInterval(interval);
   }, [emBatalha]);
 
-  // Criar Sala & Enviar Convite (Com sorteio real de tema se escolhido "random")
+  // Executar e Testar Código no Console em Tempo Real na Batalha
+  const handleTestarNoConsoleBatalha = () => {
+    try {
+      let customLogs = [];
+      const customConsole = {
+        log: (...args) => customLogs.push(args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")),
+        error: (...args) => customLogs.push("Erro: " + args.join(" "))
+      };
+
+      // Executa o código e captura os logs
+      const runFn = new Function("console", codigoSolucao);
+      runFn(customConsole);
+
+      const avaliacao = executarTestesBatalha(desafioAtual?.id || 1, codigoSolucao);
+      
+      let logsFinais = [...customLogs];
+      if (avaliacao.sucesso) {
+        logsFinais.push(avaliacao.mensagem);
+        setErroValidacaoCodigo(null);
+      } else {
+        logsFinais.push(avaliacao.erro);
+        setErroValidacaoCodigo(avaliacao.erro);
+      }
+
+      setLogsConsoleBatalha(logsFinais);
+    } catch (err) {
+      setLogsConsoleBatalha([`❌ Erro na execução de JS: ${err.message}`]);
+      setErroValidacaoCodigo(`Erro de Sintaxe no código: ${err.message}`);
+    }
+  };
+
+  // Criar Sala & Enviar Convite (Com SORTEIO REAL DE TEMA ALEATÓRIO)
   const handleCriarSalaEEnviarConvite = (e) => {
     e.preventDefault();
     const meunome = user?.nome || "Estudante";
@@ -479,8 +606,10 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
 
     let finalDesafioId = desafioSelecionadoId;
     if (finalDesafioId === "random" || !finalDesafioId) {
-      const itemSorteado = desafios[Math.floor(Math.random() * desafios.length)];
-      finalDesafioId = itemSorteado ? itemSorteado.id : 1;
+      const desafioSorteado = sortearDesafioAleatorio(desafios);
+      finalDesafioId = desafioSorteado.id;
+    } else {
+      finalDesafioId = parseInt(finalDesafioId);
     }
 
     fetch(`${apiUrl}/batalhas/convites`, {
@@ -508,7 +637,6 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
 
   // Responder Convite (Aceitar / Recusar)
   const handleResponderConvite = (conviteId, resposta) => {
-    // Remover o convite do estado imediatamente na UI
     setConvites(prev => prev.filter(c => c.id !== conviteId && c.id !== parseInt(conviteId)));
     if (toastNotificacao?.id === conviteId || toastNotificacao?.id === parseInt(conviteId)) {
       setToastNotificacao(null);
@@ -525,50 +653,69 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
       .then(data => {
         if (resposta === "aceito") {
           const convite = convites.find(c => c.id === conviteId || c.id === parseInt(conviteId)) || convites[0];
-          const desafio = desafios.find(d => d.id === convite?.desafioId) || desafios[0];
+          let desafio = desafios.find(d => d.id === convite?.desafioId);
+          if (!desafio || convite?.desafioId === "random") {
+            desafio = sortearDesafioAleatorio(desafios);
+          }
+
           setDesafioAtual(desafio);
           setCodigoSolucao(desafio?.codigoInicial || "");
           setOponenteDuelo(convite?.remetenteNome || "Gabriel Costa");
           setTempoSegundos(0);
           setResultadoBatalha(null);
           setErroValidacaoCodigo(null);
+          setLogsConsoleBatalha([]);
           setModalInboxOpen(false);
           setEmBatalha(true);
         }
       })
       .catch(() => {
         if (resposta === "aceito") {
-          const desafio = desafios[0];
+          const desafio = sortearDesafioAleatorio(desafios);
           setDesafioAtual(desafio);
           setCodigoSolucao(desafio.codigoInicial);
           setOponenteDuelo("Gabriel Costa");
           setTempoSegundos(0);
           setResultadoBatalha(null);
           setErroValidacaoCodigo(null);
+          setLogsConsoleBatalha([]);
           setModalInboxOpen(false);
           setEmBatalha(true);
         }
       });
   };
 
-  // Submeter Solução do Código na Arena COM AVALIAÇÃO INTELIGENTE & GANHO DE XP
+  // Submeter Solução do Código na Arena:
+  // - SE ERRAR: A sala CONTINUA ABERTA e exibe o erro no console!
+  // - SE ACERTAR EM 1º LUGAR: Ganha o desafio, ganha os XPs e a sala É FECHADA!
   const handleSubmeterBatalha = () => {
     setErroValidacaoCodigo(null);
 
-    // 1. Executar os Testes Unitários Reais na Solução
+    // Roda testes e captura logs no console
+    handleTestarNoConsoleBatalha();
+
+    // 1. Executar os Testes Unitários Rígidos Anti-Cheat na Solução
     const avaliacao = executarTestesBatalha(desafioAtual?.id || 1, codigoSolucao);
 
     if (!avaliacao.sucesso) {
+      // ❌ SE ERRAR: A SALA CONTINUA ABERTA! Não fecha a arena para o aluno tentar consertar!
       setErroValidacaoCodigo(avaliacao.erro);
       return;
     }
 
-    // 2. Se a Solução Passou em Todos os Testes -> Concluir Batalha e Enviar Pontuação de XP!
+    // 🏆 SE ACERTAR: O USUÁRIO GANHA O DESAFIO E OS XPS E A SALA É FECHADA!
+    const usuarioNome = user?.nome || "Estudante";
+    const xpPremio = 350;
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("devhub_estudo_realizado"));
+      
+      try {
+        const savedXp = parseInt(localStorage.getItem("devhub_user_xp") || "0");
+        localStorage.setItem("devhub_user_xp", String(savedXp + xpPremio));
+      } catch (e) {}
     }
 
-    const usuarioNome = user?.nome || "Estudante";
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
     fetch(`${apiUrl}/batalhas/submeter`, {
@@ -585,21 +732,23 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
     })
       .then(res => res.json())
       .then(data => {
+        setEmBatalha(false);
         setResultadoBatalha({
           vencedor: usuarioNome,
-          xpGanho: 350,
+          xpGanho: xpPremio,
+          tempoTotal: formatarTempo(tempoSegundos),
           mensagem: `🏆 Vitória Épica de X1! ${avaliacao.mensagem}`
         });
-        setEmBatalha(false);
         carregarBatalhas();
       })
       .catch(() => {
+        setEmBatalha(false);
         setResultadoBatalha({
           vencedor: usuarioNome,
-          xpGanho: 350,
+          xpGanho: xpPremio,
+          tempoTotal: formatarTempo(tempoSegundos),
           mensagem: `🏆 Vitória Épica de X1! ${avaliacao.mensagem}`
         });
-        setEmBatalha(false);
       });
   };
 
@@ -624,7 +773,7 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
 
   return (
     <div className={styles.container}>
-      {/* BANNER DE NOTIFICAÇÃO FLUTUANTE TEMPORÁRIA DE X1 (TOAST GAME ESTILO POP-UP) */}
+      {/* BANNER DE NOTIFICAÇÃO FLUTUANTE TEMPORÁRIA DE X1 */}
       {toastNotificacao && (
         <div style={{
           position: "fixed", top: "24px", right: "24px", zIndex: 9999,
@@ -698,90 +847,98 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
               }}
             >
               <Inbox size={15} />
-              <span>Caixa</span>
+              <span>Ver Tudo ({convitesFiltrados.length})</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Topo do Módulo: Banner de Apresentação + Botão "Criar Sala de Duelo" + Ícone de Caixa de Entrada */}
-      <div className={styles.headerCard}>
-        <div className={styles.titleGroup}>
-          <h2>
+      {/* HEADER PRINCIPAL DE DESAFIOS X1 */}
+      <div className={styles.headerBox}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Swords size={28} color="#ef4444" />
-            <span>⚔️ Batalha de Código 1v1</span>
-          </h2>
-          <p>Crie uma sala, convide alunos cadastrados da plataforma e disputem quem resolve o desafio de programação primeiro!</p>
+            <h2 className={styles.title}>Batalha de Código 1v1 (Duelos de Devs)</h2>
+          </div>
+          <p className={styles.subtitle}>
+            Desafie alunos em tempo real, resolva algoritmos rigorosos e ganhe pontos de XP na plataforma!
+          </p>
         </div>
 
-        {!emBatalha && (
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* ÍCONE ELEGANTE DE CAIXA DE CORREIO / CORRESPONDÊNCIA DE X1 */}
-            <button
-              onClick={() => setModalInboxOpen(true)}
-              title="Caixa de Mensagens de Batalhas 1v1"
-              style={{
-                position: "relative",
-                background: temConvitesPendentes ? "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" : "rgba(255, 255, 255, 0.08)",
-                border: temConvitesPendentes ? "1px solid #818cf8" : "1px solid rgba(255, 255, 255, 0.15)",
-                color: "#FFF",
-                borderRadius: "14px",
-                padding: "12px 18px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                fontWeight: "700",
-                fontSize: "0.95rem",
-                cursor: "pointer",
-                boxShadow: temConvitesPendentes ? "0 4px 18px rgba(99, 102, 241, 0.4)" : "none",
-                transition: "all 0.2s ease"
-              }}
-            >
-              <Inbox size={22} color={temConvitesPendentes ? "#FFF" : "#818cf8"} />
-              <span>Caixa de Correio</span>
-              {convitesFiltrados.length > 0 && (
-                <span style={{
-                  background: "#ef4444",
-                  color: "#FFF",
-                  borderRadius: "20px",
-                  padding: "2px 8px",
-                  fontSize: "0.78rem",
-                  fontWeight: "900",
-                  boxShadow: "0 0 10px rgba(239, 68, 68, 0.6)"
-                }}>
-                  {convitesFiltrados.length}
-                </span>
-              )}
-            </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          {/* BOTÃO CAIXA DE ENTRADA / NOTIFICAÇÃO DE DUALS */}
+          <button
+            onClick={() => setModalInboxOpen(true)}
+            style={{
+              position: "relative",
+              padding: "12px 18px",
+              borderRadius: "14px",
+              border: "1px solid rgba(99, 102, 241, 0.4)",
+              background: "rgba(99, 102, 241, 0.15)",
+              color: "#818cf8",
+              fontWeight: "800",
+              fontSize: "0.9rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px"
+            }}
+          >
+            <Inbox size={18} />
+            <span>Caixa de Correio ({convitesFiltrados.length})</span>
+            {temConvitesPendentes && (
+              <span style={{
+                position: "absolute", top: "-5px", right: "-5px",
+                width: "12px", height: "12px", borderRadius: "50%",
+                backgroundColor: "#ef4444", border: "2px solid #171c2c"
+              }} />
+            )}
+          </button>
 
-            <button className={styles.newBattleBtn} onClick={() => setModalCriarSalaOpen(true)}>
-              <PlusCircle size={18} />
-              <span>Criar Sala de Duelo</span>
-            </button>
-          </div>
-        )}
+          {/* BOTÃO DE CRIAR SALA */}
+          <button
+            onClick={() => setModalCriarSalaOpen(true)}
+            style={{
+              padding: "12px 20px",
+              borderRadius: "14px",
+              border: "none",
+              background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+              color: "#FFF",
+              fontWeight: "800",
+              fontSize: "0.9rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              boxShadow: "0 4px 16px rgba(239, 68, 68, 0.35)"
+            }}
+          >
+            <PlusCircle size={18} />
+            <span>Criar Sala de Duelo</span>
+          </button>
+        </div>
       </div>
 
-      {/* Alerta de Convite Enviado */}
+      {/* FEEDBACK DE CONVITE ENVIADO */}
       {conviteEnviadoSucesso && (
         <div style={{
           backgroundColor: "rgba(16, 185, 129, 0.15)",
           border: "1px solid #10b981",
-          color: "#10b981",
-          padding: "16px 20px",
           borderRadius: "16px",
+          padding: "14px 18px",
+          color: "#34d399",
           fontWeight: "700",
-          fontSize: "0.95rem",
+          fontSize: "0.92rem",
           display: "flex",
           alignItems: "center",
           gap: "10px"
         }}>
-          <CheckCircle size={20} />
+          <CheckCircle size={20} color="#10b981" />
           <span>{conviteEnviadoSucesso}</span>
         </div>
       )}
 
-      {/* MODAL ELEGANTE: CAIXA DE MENSAGENS / SOLICITAÇÕES DE X1 */}
+      {/* MODAL / CAIXA DE CORREIO DE BATALHAS */}
       {modalInboxOpen && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
@@ -796,7 +953,7 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
             width: "100%", maxWidth: "560px",
             borderRadius: "24px", padding: "28px",
             border: "1px solid var(--border-color, rgba(255,255,255,0.15))",
-            boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
             position: "relative"
           }}>
             <button
@@ -863,7 +1020,6 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
                           <Swords size={20} />
                         </div>
                         <div style={{ flex: 1 }}>
-                          {/* TEXTO ATUALIZADO: "O usuário [X] te desafiou para um X1..." */}
                           <div style={{ fontSize: "0.95rem", color: "#f8fafc", lineHeight: "1.5", fontWeight: "600" }}>
                             {souDestinatario ? (
                               <>
@@ -1033,7 +1189,7 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
                   </option>
                   {desafios.map((d) => (
                     <option key={d.id} value={d.id} style={{ background: "#171c2c", color: "#ffffff", padding: "10px" }}>
-                      ⚡ Desafio #{d.id}: {d.titulo} ({d.dificuldade})
+                      ⚡ Desafio #{d.id}: {d.titulo} [{d.tecnologia || d.categoria}]
                     </option>
                   ))}
                 </select>
@@ -1060,25 +1216,51 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
         </div>
       )}
 
-      {/* Resultado da Última Batalha */}
+      {/* RESULTADO E FECHAMENTO DA SALA DE BATALHA APÓS A VITÓRIA */}
       {resultadoBatalha && (
         <div style={{
           backgroundColor: "rgba(16, 185, 129, 0.15)",
-          border: "1px solid #10b981",
+          border: "2px solid #10b981",
           borderRadius: "20px",
-          padding: "20px",
-          textAlign: "center"
+          padding: "24px",
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "12px",
+          boxShadow: "0 10px 30px rgba(16, 185, 129, 0.25)"
         }}>
-          <h3 style={{ fontSize: "1.2rem", fontWeight: "800", margin: "0 0 6px 0", color: "#FFF" }}>
+          <div style={{ fontSize: "2.5rem" }}>🏆</div>
+          <h3 style={{ fontSize: "1.4rem", fontWeight: "900", margin: 0, color: "#FFF" }}>
             {resultadoBatalha.mensagem}
           </h3>
-          <div style={{ fontSize: "0.9rem", color: "#818cf8", fontWeight: "700" }}>
-            Recompensa: +{resultadoBatalha.xpGanho} XP adicionados à sua conta!
+          <div style={{ fontSize: "1rem", color: "#34d399", fontWeight: "800" }}>
+            🔒 A Sala do Duelo foi concluída e fechada!
           </div>
+          <div style={{ fontSize: "0.95rem", color: "#818cf8", fontWeight: "800" }}>
+            Recompensa Resgatada: +{resultadoBatalha.xpGanho} XP | Tempo Total: {resultadoBatalha.tempoTotal || "0s"}
+          </div>
+
+          <button
+            onClick={() => setResultadoBatalha(null)}
+            style={{
+              marginTop: "8px",
+              padding: "10px 24px",
+              borderRadius: "12px",
+              border: "none",
+              background: "#10b981",
+              color: "#FFF",
+              fontWeight: "800",
+              fontSize: "0.9rem",
+              cursor: "pointer"
+            }}
+          >
+            🟢 Concluir & Voltar ao Lobby
+          </button>
         </div>
       )}
 
-      {/* Arena de Duelo em Tempo Real (FOCO APENAS NA PERGUNTA LIMPA E OBJETIVA) */}
+      {/* ARENA DE DUELO EM TEMPO REAL */}
       {emBatalha && desafioAtual && (
         <div className={styles.arenaCard}>
           <div className={styles.duelHeader}>
@@ -1094,7 +1276,21 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
             </div>
           </div>
 
-          {/* CARD DESTACADO COM APENAS A PERGUNTA DO DESAFIO */}
+          {/* CARD DESTACADO DA TECNOLOGIA EXIGIDA */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px",
+            backgroundColor: "rgba(168, 85, 247, 0.15)", border: "1px solid rgba(168, 85, 247, 0.4)",
+            borderRadius: "14px", padding: "12px 18px", marginBottom: "16px"
+          }}>
+            <span style={{ fontSize: "0.9rem", fontWeight: "900", color: "#c084fc", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Code size={18} /> Tecnologia Exigida: <strong>{desafioAtual.tecnologia || desafioAtual.categoria}</strong>
+            </span>
+            <span style={{ fontSize: "0.82rem", color: "#e2e8f0", fontWeight: "600" }}>
+              💡 Escreva o algoritmo utilizando a sintaxe e regras da linguagem acima.
+            </span>
+          </div>
+
+          {/* CARD DESTACADO COM A PERGUNTA DO DESAFIO */}
           <div style={{
             backgroundColor: "rgba(99, 102, 241, 0.12)",
             border: "1px solid rgba(99, 102, 241, 0.3)",
@@ -1128,12 +1324,16 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
             }}>
               <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: "2px" }} />
               <div>
-                <strong style={{ color: "#FFF", display: "block", marginBottom: "4px" }}>❌ Dica de Correção:</strong>
+                <strong style={{ color: "#FFF", display: "block", marginBottom: "4px" }}>❌ Resposta Incorreta / Testes Falharam:</strong>
                 <span>{erroValidacaoCodigo}</span>
+                <div style={{ marginTop: "6px", fontSize: "0.82rem", color: "#f87171" }}>
+                  💡 A sala continua aberta! Corrija o seu código e tente submeter novamente.
+                </div>
               </div>
             </div>
           )}
 
+          {/* EDITOR DE CÓDIGO DA BATALHA */}
           <textarea
             className={styles.codeEditor}
             value={codigoSolucao}
@@ -1144,15 +1344,67 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
             placeholder="// Digite sua solução de código aqui..."
           />
 
-          <div style={{ display: "flex", gap: "12px" }}>
+          {/* PAINEL DE CONSOLE INTEGRADO PERMANENTE DA BATALHA */}
+          <div style={{
+            backgroundColor: "#020617", borderRadius: "18px", padding: "18px 22px", marginTop: "16px", marginBottom: "20px",
+            border: `1.5px solid ${erroValidacaoCodigo ? "rgba(239,68,68,0.4)" : (logsConsoleBatalha.length > 0 ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.1)")}`
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "900", color: "#CBD5E1", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Terminal size={16} color="#10B981" /> 🖥️ Console da Batalha (Saída de `console.log` & Validação de Testes)
+              </span>
+              <span style={{
+                fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "6px",
+                background: erroValidacaoCodigo ? "rgba(239,68,68,0.2)" : (logsConsoleBatalha.length > 0 ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.05)"),
+                color: erroValidacaoCodigo ? "#F87171" : (logsConsoleBatalha.length > 0 ? "#34D399" : "#64748B")
+              }}>
+                {erroValidacaoCodigo ? "❌ Teste Falhou" : (logsConsoleBatalha.length > 0 ? "🟢 Executado" : "⚪ Aguardando Execução")}
+              </span>
+            </div>
+
+            {logsConsoleBatalha.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {logsConsoleBatalha.map((log, idx) => (
+                  <div key={idx} style={{
+                    color: log.startsWith("❌") ? "#F87171" : (log.startsWith("✅") ? "#34D399" : "#38BDF8"),
+                    fontFamily: "monospace", fontSize: "13.5px", lineHeight: "1.5"
+                  }}>
+                    {log}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: "#64748B", fontSize: "13px", fontStyle: "italic" }}>
+                💡 Clique no botão <strong>"▶️ Testar no Console"</strong> abaixo para rodar seu código e ver os logs e os testes unitários aqui!
+              </div>
+            )}
+          </div>
+
+          {/* BOTÕES DA BATALHA */}
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <button
+              onClick={handleTestarNoConsoleBatalha}
+              style={{
+                backgroundColor: "rgba(59, 130, 246, 0.2)", color: "#3B82F6",
+                border: "1px solid rgba(59, 130, 246, 0.4)", borderRadius: "12px",
+                padding: "12px 20px", fontWeight: "800", fontSize: "0.92rem", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: "8px"
+              }}
+            >
+              <Play size={16} />
+              <span>▶️ Testar no Console</span>
+            </button>
+
             <button className={styles.submitBattleBtn} onClick={handleSubmeterBatalha}>
               <CheckCircle size={18} />
-              <span>Submeter Solução da Batalha</span>
+              <span>🏆 Submeter Solução da Batalha</span>
             </button>
+
             <button
               onClick={() => {
                 setEmBatalha(false);
                 setErroValidacaoCodigo(null);
+                setLogsConsoleBatalha([]);
               }}
               style={{
                 background: "rgba(255, 255, 255, 0.08)",
