@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
-import { Flame, Award, Zap, Check, X, Code, Crown, AlertCircle } from "lucide-react";
+import { Flame, Award, Zap, Check, X, Code, Crown, AlertCircle, Sparkles, ArrowRight } from "lucide-react";
 import styles from "./StudentGamificationHeader.module.css";
 
 export default function StudentGamificationHeader({ user }) {
   const [stats, setStats] = useState({
     xp: 0,
     skills: [
-      { nome: "JavaScript", progresso: 0, cor: "#F7DF1E" },
-      { nome: "React", progresso: 0, cor: "#61DAFB" },
-      { nome: "Node.js", progresso: 0, cor: "#68A063" },
-      { nome: "SQL", progresso: 0, cor: "#00758F" },
-      { nome: "Git", progresso: 0, cor: "#F05032" }
+      { nome: "JavaScript", progresso: 0, cor: "#F7DF1E", icon: "🟨" },
+      { nome: "React", progresso: 0, cor: "#61DAFB", icon: "⚛️" },
+      { nome: "Node.js", progresso: 0, cor: "#68A063", icon: "🟢" },
+      { nome: "SQL", progresso: 0, cor: "#38BDF8", icon: "🗄️" },
+      { nome: "Git", progresso: 0, cor: "#F05032", icon: "🟠" }
     ]
   });
 
@@ -47,13 +47,13 @@ export default function StudentGamificationHeader({ user }) {
     const diaHojeIndex = new Date().getDay(); // 0 = Dom, 1 = Seg...
 
     const historicoAtualizado = [
-      { dia: "Seg", concluido: false },
-      { dia: "Ter", concluido: false },
-      { dia: "Qua", concluido: false },
-      { dia: "Qui", concluido: false },
-      { dia: "Sex", concluido: false },
-      { dia: "Sáb", concluido: false },
-      { dia: "Dom", concluido: false }
+      { dia: "Seg", concluido: false, eHoje: diaHojeIndex === 1 },
+      { dia: "Ter", concluido: false, eHoje: diaHojeIndex === 2 },
+      { dia: "Qua", concluido: false, eHoje: diaHojeIndex === 3 },
+      { dia: "Qui", concluido: false, eHoje: diaHojeIndex === 4 },
+      { dia: "Sex", concluido: false, eHoje: diaHojeIndex === 5 },
+      { dia: "Sáb", concluido: false, eHoje: diaHojeIndex === 6 },
+      { dia: "Dom", concluido: false, eHoje: diaHojeIndex === 0 }
     ];
 
     const nomeHoje = diasSemanaNomes[diaHojeIndex];
@@ -118,6 +118,11 @@ export default function StudentGamificationHeader({ user }) {
     }
   }, [user]);
 
+  // Função para simular acendimento ou disparar evento de estudo
+  const acenderFogoAgora = () => {
+    window.dispatchEvent(new CustomEvent("devhub_estudo_realizado"));
+  };
+
   const nomeAluno = user?.nome ? user.nome.split(" ")[0] : "Estudante";
 
   // Nível Dinâmico Aumentando conforme o XP
@@ -130,36 +135,45 @@ export default function StudentGamificationHeader({ user }) {
   const topSkill = stats.skills.find(s => s.progresso === maxProgresso);
   const temProgresso = maxProgresso > 0;
 
+  // Função para nomear o nível da habilidade
+  const getSkillLabel = (prog) => {
+    if (prog === 0) return "Iniciante 🐣";
+    if (prog <= 25) return "Padawan 🛡️";
+    if (prog <= 60) return "Praticante ⚡";
+    if (prog <= 85) return "Especialista 🔥";
+    return "Mestre Dev 👑";
+  };
+
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${estudouHojeState ? styles.cardAcesa : ""}`}>
       {/* Topo: Saudação e Badges de Nível / Streak */}
       <div className={styles.topRow}>
         <div>
           <h2 className={styles.greeting}>
             Olá, {nomeAluno} 👋
           </h2>
-          <div className={styles.subgreeting}>Realize provas e desafios para acender o fogo de estudo do dia!</div>
+          <div className={styles.subgreeting}>
+            <Sparkles size={16} color="#f59e0b" />
+            <span>Mantenha sua chama acesa diariamente completando exercícios e provas!</span>
+          </div>
         </div>
 
         <div className={styles.badgesGroup}>
           <div
-            className={styles.streakBadge}
-            style={{
-              backgroundColor: estudouHojeState ? "rgba(245, 158, 11, 0.2)" : "rgba(148, 163, 184, 0.1)",
-              borderColor: estudouHojeState ? "#f59e0b" : "rgba(148, 163, 184, 0.3)",
-              boxShadow: estudouHojeState ? "0 0 15px rgba(245, 158, 11, 0.4)" : "none"
-            }}
-            title={estudouHojeState ? "🔥 Fogo acendido hoje ao realizar prova!" : "⭕ Fogo apagado! Realize 1 prova para acender o fogo de hoje."}
+            className={estudouHojeState ? styles.streakBadgeActive : styles.streakBadgeInactive}
+            title={estudouHojeState ? "🔥 Fogo acendido hoje!" : "⭕ Fogo apagado! Faça 1 atividade para acender."}
           >
-            <Flame size={18} fill={estudouHojeState ? "#f59e0b" : "none"} color={estudouHojeState ? "#f59e0b" : "#94a3b8"} />
+            <Flame size={20} fill={estudouHojeState ? "#f59e0b" : "none"} color={estudouHojeState ? "#f59e0b" : "#ef4444"} />
             <span>
-              {estudouHojeState ? `${streakDias} ${streakDias === 1 ? "dia" : "dias"} de sequência 🔥` : "Fogo Apagado 🛑 (Faça 1 Prova)"}
+              {estudouHojeState
+                ? `🔥 ${streakDias} ${streakDias === 1 ? "Dia" : "Dias"} Incandescente!`
+                : "🌑 Chama Apagada Hoje"}
             </span>
           </div>
 
-          <div className={styles.levelBadge} title="Nível atual dinâmico (sobe a cada 1000 XP)">
-            <Award size={18} />
-            <span>Nível: {nivelDinamico}</span>
+          <div className={styles.levelBadge} title="Nível atual dinâmico (sobe a cada 1.000 XP)">
+            <Award size={20} color="#818cf8" />
+            <span>Nível {nivelDinamico} — Dev Explorer</span>
           </div>
         </div>
       </div>
@@ -179,60 +193,74 @@ export default function StudentGamificationHeader({ user }) {
 
       {/* Conteúdo em Grade: Streak Semanal + Progresso de Habilidades */}
       <div className={styles.gridContent}>
-        {/* Box 1: 🔥 Streak de estudos com indicação de Realizar Provas */}
+        {/* Box 1: 🔥 Streak de estudos (FOGO DA SEQUÊNCIA) */}
         <div className={styles.box}>
-          <div className={styles.boxTitle}>
-            <Flame size={16} color={estudouHojeState ? "#f59e0b" : "#94a3b8"} />
-            <span>🔥 Streak de Estudos (Acende ao Realizar Provas)</span>
+          <div>
+            <div className={styles.boxTitle}>
+              <Flame size={18} color={estudouHojeState ? "#f59e0b" : "#ef4444"} fill={estudouHojeState ? "#f59e0b" : "none"} />
+              <span>🔥 Fogo de Sequência Semanal</span>
+            </div>
+
+            {/* Grid dos 7 dias da semana estilo Duolingo */}
+            <div className={styles.streakGrid}>
+              {historicoDias.map((d, index) => (
+                <div key={index} className={styles.dayCol}>
+                  <span className={styles.dayName}>{d.dia}</span>
+                  {d.concluido ? (
+                    <div className={styles.dayIconChecked} title={`${d.dia}: Chama Acesa! 🔥`}>
+                      <Flame size={20} fill="#f59e0b" color="#ef4444" />
+                    </div>
+                  ) : d.eHoje ? (
+                    <div className={styles.dayIconToday} title="Hoje: Clique para acender sua chama!" onClick={acenderFogoAgora}>
+                      <Zap size={18} />
+                    </div>
+                  ) : (
+                    <div className={styles.dayIconMissed} title={`${d.dia}: Sem atividades`}>
+                      <Flame size={18} color="#475569" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className={styles.streakGrid}>
-            {historicoDias.map((d, index) => (
-              <div key={index} className={styles.dayCol}>
-                <span className={styles.dayName}>{d.dia}</span>
-                {d.concluido ? (
-                  <div className={styles.dayIconChecked} title="Prova/Exercício concluído nesta data 🔥">
-                    <Check size={16} />
-                  </div>
-                ) : (
-                  <div className={styles.dayIconMissed} title="Faltou realizar prova nesta data">
-                    <X size={16} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
+          {/* Banner de incentivo caso o fogo esteja apagado */}
           {!estudouHojeState && (
-            <div style={{ marginTop: "12px", fontSize: "0.82rem", color: "#f87171", display: "flex", alignItems: "center", gap: "6px", fontWeight: "700" }}>
-              <AlertCircle size={14} />
-              <span>Realize 1 prova ou desafio hoje para acender o fogo de sequência!</span>
+            <div className={styles.acenderFogoBanner}>
+              <div className={styles.acenderText}>
+                <AlertCircle size={16} color="#ef4444" />
+                <span>Sua chama apaga à meia-noite! Faça 1 prova para acendê-la.</span>
+              </div>
+              <button className={styles.btnAcender} onClick={acenderFogoAgora}>
+                <Flame size={15} fill="#FFF" />
+                <span>Acender Chama (+150 XP)</span>
+              </button>
             </div>
           )}
         </div>
 
         {/* Box 2: Progresso de Habilidades + Área Dominante */}
         <div className={styles.box}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
             <div className={styles.boxTitle} style={{ margin: 0 }}>
-              <Code size={16} color="#3b82f6" />
+              <Code size={18} color="#3b82f6" />
               <span>Progresso em Habilidades</span>
             </div>
 
-            {/* Badge da Área Dominante */}
+            {/* Badge da Área Dominante com Coroa Gold */}
             <div style={{
               background: "linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(234, 179, 8, 0.25) 100%)",
-              border: "1px solid rgba(245, 158, 11, 0.4)",
-              borderRadius: "10px",
-              padding: "4px 10px",
+              border: "1.5px solid rgba(245, 158, 11, 0.4)",
+              borderRadius: "12px",
+              padding: "4px 12px",
               fontSize: "0.78rem",
               fontWeight: "800",
-              color: "#f59e0b",
+              color: "#fbbf24",
               display: "flex",
               alignItems: "center",
-              gap: "5px"
+              gap: "6px"
             }}>
-              <Crown size={14} color="#f59e0b" />
+              <Crown size={14} color="#fbbf24" />
               <span>
                 {temProgresso
                   ? `Área Dominante: ${topSkill.nome} (${topSkill.progresso}%)`
@@ -246,16 +274,22 @@ export default function StudentGamificationHeader({ user }) {
               const isDominante = temProgresso && skill.nome === topSkill.nome;
               return (
                 <div key={idx} className={styles.skillItem}>
-                  <span className={styles.skillName} style={{ fontWeight: isDominante ? "800" : "700", color: isDominante ? skill.cor : "var(--text-primary)" }}>
-                    {isDominante ? `👑 ${skill.nome}` : skill.nome}
-                  </span>
+                  <div className={styles.skillInfo}>
+                    <span className={styles.skillName} style={{ color: isDominante ? skill.cor : "#f8fafc" }}>
+                      {skill.icon || "💻"} {skill.nome}
+                    </span>
+                    <span className={styles.skillLevelLabel}>
+                      {getSkillLabel(skill.progresso)}
+                    </span>
+                  </div>
+
                   <div className={styles.skillBarTrack}>
                     <div
                       className={styles.skillBarFill}
                       style={{
-                        width: `${skill.progresso}%`,
-                        backgroundColor: skill.cor,
-                        boxShadow: isDominante ? `0 0 12px ${skill.cor}` : `0 0 6px ${skill.cor}88`
+                        width: `${Math.max(5, skill.progresso)}%`,
+                        background: `linear-gradient(90deg, ${skill.cor}aa, ${skill.cor})`,
+                        boxShadow: isDominante ? `0 0 14px ${skill.cor}` : `0 0 8px ${skill.cor}66`
                       }}
                     />
                   </div>

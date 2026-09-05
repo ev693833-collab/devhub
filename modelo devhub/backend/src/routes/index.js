@@ -13,6 +13,8 @@ const deviaRoutes = require("./devia");
 const batalhasRoutes = require("./batalhas");
 const superadminRoutes = require("./superadmin");
 
+const gamificacaoRoutes = require("./gamificacao");
+
 router.use("/auth", authRoutes);
 router.use("/urls", urlRoutes);
 router.use("/reunioes", reunioesRoutes);
@@ -23,6 +25,7 @@ router.use("/frequencia", frequenciaRoutes);
 router.use("/dev-ia", deviaRoutes);
 router.use("/batalhas", batalhasRoutes);
 router.use("/superadmin", superadminRoutes);
+router.use("/gamificacao", gamificacaoRoutes);
 
 router.get("/", (req, res) => {
   res.send("API DevHub rodando com integração MySQL 🚀!");
