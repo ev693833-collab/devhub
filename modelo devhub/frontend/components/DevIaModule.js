@@ -883,23 +883,84 @@ export default function DevIaModule({ user }) {
         <div className={styles.overlay}>
           <div className={styles.modalCard}>
             <button className={styles.modalClose} onClick={() => setFerramenta(null)}><X size={18} /></button>
-            <h3>
-              {ferramenta === "slides" && "🎨 Criar slides"}
-              {ferramenta === "audio" && "🎧 Explicar por áudio"}
-              {ferramenta === "plano" && "🎯 Plano de estudos"}
-              {ferramenta === "roadmap" && "🗺️ Roadmap de aprendizado"}
-            </h3>
-            <p>Sobre qual assunto de programação você quer gerar?</p>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+              <div className={styles.botBadge} style={{ width: "44px", height: "44px", borderRadius: "14px", background: "linear-gradient(135deg,#6366f1,#a855f7)", flexShrink: 0 }}>
+                {ferramenta === "slides" && <Palette size={24} color="#FFF" />}
+                {ferramenta === "audio" && <Headphones size={24} color="#FFF" />}
+                {ferramenta === "plano" && <Target size={24} color="#FFF" />}
+                {ferramenta === "roadmap" && <Map size={24} color="#FFF" />}
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "900", color: "#FFF" }}>
+                  {ferramenta === "slides" && "🎨 Criar Slides Educativos"}
+                  {ferramenta === "audio" && "🎧 Explicação por Áudio"}
+                  {ferramenta === "plano" && "🎯 Gerar Plano de Estudos"}
+                  {ferramenta === "roadmap" && "🗺️ Roadmap de Aprendizado"}
+                </h3>
+                <p style={{ margin: "3px 0 0", fontSize: "0.85rem", color: "#94a3b8" }}>
+                  A Dev IA vai estruturar o conteúdo completo em segundos
+                </p>
+              </div>
+            </div>
+
+            <label style={{ display: "block", fontSize: "0.88rem", fontWeight: "800", color: "#cbd5e1", marginBottom: "4px" }}>
+              Qual assunto de programação você quer estudar?
+            </label>
+
             <input
               className={styles.temaInput}
               value={temaFerramenta || ""}
               onChange={(e) => setTemaFerramenta(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") executarFerramenta(); }}
-              placeholder="Ex.: Algoritmos, React, Python, Banco de Dados..."
+              placeholder="Ex.: Desenvolvimento Web do Zero, React.js, Python, Node.js..."
               autoFocus
             />
+
+            {/* SUGESTÕES RÁPIDAS CLICÁVEIS */}
+            <div style={{ marginBottom: "22px" }}>
+              <div style={{ fontSize: "0.78rem", fontWeight: "800", color: "#818cf8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                💡 Sugestões Rápidas:
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {[
+                  "Desenvolvimento Web do Zero 🚀",
+                  "React.js & Hooks ⚛️",
+                  "Node.js & Express 🟢",
+                  "Python para Iniciantes 🐍",
+                  "SQL & Banco de Dados 🗄️",
+                  "Estrutura de Dados 🧩"
+                ].map((sugestao, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setTemaFerramenta(sugestao.replace(/ [^\s]+$/, ""))}
+                    style={{
+                      padding: "6px 12px", borderRadius: "20px",
+                      backgroundColor: "rgba(99, 102, 241, 0.12)",
+                      border: "1px solid rgba(99, 102, 241, 0.3)",
+                      color: "#c084fc", fontSize: "0.8rem", fontWeight: "700",
+                      cursor: "pointer", transition: "all 0.2s ease"
+                    }}
+                  >
+                    {sugestao}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button className={styles.modalPrimary} onClick={executarFerramenta} disabled={gerandoFerramenta || !temaFerramenta || !temaFerramenta.trim()}>
-              {gerandoFerramenta ? "Gerando..." : "Gerar com a Dev IA"}
+              {gerandoFerramenta ? (
+                <>
+                  <Sparkles size={18} style={{ animation: "spin 1.5s linear infinite" }} />
+                  <span>Gerando com a Dev IA...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  <span>Gerar Conteúdo com Dev IA ➔</span>
+                </>
+              )}
             </button>
           </div>
         </div>
