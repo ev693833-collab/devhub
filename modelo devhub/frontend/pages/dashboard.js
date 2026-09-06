@@ -1089,6 +1089,45 @@ export default function Dashboard() {
     }
   };
 
+  // Verifica se o módulo está liberado para o aluno logado
+  const isModuloLiberado = (abaId) => {
+    if (!user) return true;
+    if (user.cargo === "superadmin" || user.cargo === "super_admin" || user.cargo === "admin") return true;
+
+    const mapaModulo = {
+      aulas: "Aulas",
+      caderno: "Caderno",
+      "provas-online": "Provas",
+      notas: "Provas",
+      games: "Arena",
+      ranking: "Ranking",
+      dev_ia: "Dev IA"
+    };
+
+    const nomeModulo = mapaModulo[abaId];
+    if (!nomeModulo) return true;
+
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("devhub_modulos_liberados") : null;
+      if (raw) {
+        const modulosMap = JSON.parse(raw);
+        const keys = [
+          user.id ? user.id.toString() : null,
+          user.email ? user.email.toLowerCase() : null,
+          user.nome ? user.nome.toLowerCase() : null
+        ].filter(Boolean);
+
+        for (const k of keys) {
+          if (modulosMap[k] && modulosMap[k][nomeModulo] === false) {
+            return false;
+          }
+        }
+      }
+    } catch (e) {}
+
+    return true;
+  };
+
   // Abrir Modal para Nova Aula
   const handleAbrirNovaAula = (dataPreenchida = "") => {
     const agora = new Date();
@@ -2050,8 +2089,43 @@ export default function Dashboard() {
 
           {/* ===== ÁREA DE CONTEÚDO PRINCIPAL ===== */}
           <main style={{ minWidth: 0 }}>
-            
-            {/* Banner de Topo Inteligente com Estatísticas Rápidas (Apenas no Dashboard / Aulas) */}
+            {!isModuloLiberado(abaAtiva) ? (
+              <div style={{
+                backgroundColor: isDark ? "rgba(23, 28, 44, 0.9)" : "#FFFFFF",
+                border: "2px dashed rgba(239, 68, 68, 0.4)",
+                borderRadius: "24px",
+                padding: "60px 30px",
+                textAlign: "center",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+                margin: "20px 0"
+              }}>
+                <div style={{
+                  width: "70px", height: "70px", borderRadius: "50%",
+                  backgroundColor: "rgba(239,68,68,0.15)", border: "2px solid rgba(239,68,68,0.4)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto 20px auto", color: "#EF4444"
+                }}>
+                  <Shield size={36} />
+                </div>
+                <h2 style={{ fontSize: "1.6rem", fontWeight: "900", color: isDark ? "#FFF" : "#0F172A", margin: "0 0 10px 0" }}>
+                  🔒 Módulo Trancado pelo Administrador
+                </h2>
+                <p style={{ fontSize: "0.95rem", color: colors.textSecondary, maxWidth: "480px", margin: "0 auto 24px auto", lineHeight: "1.5" }}>
+                  O seu acesso a esta seção foi temporariamente bloqueado para a sua conta por decisão do seu professor ou administrador.
+                </p>
+                <button
+                  onClick={() => setAbaAtiva("aulas")}
+                  style={{
+                    padding: "12px 24px", backgroundColor: "#3B82F6", color: "#FFF",
+                    border: "none", borderRadius: "14px", fontWeight: "800", fontSize: "0.9rem",
+                    cursor: "pointer", boxShadow: "0 4px 16px rgba(59,130,246,0.4)", fontFamily: "inherit"
+                  }}
+                >
+                  Voltar para as Aulas
+                </button>
+              </div>
+            ) : (
+              <>
             {abaAtiva === "aulas" && (
               <div style={{
                 background: isDark 
@@ -3287,11 +3361,17 @@ export default function Dashboard() {
 
 
 
+            {/* ABA: SUA EVOLUÇÃO — TIMELINE & XP */}
+            {abaAtiva === "evolucao" && (
+              <EvolucaoTimelineModule isDark={isDark} colors={colors} user={user} />
+            )}
+
             {/* ABA: DEV IA — ASSISTENTE DE ESTUDOS DE PROGRAMAÇÃO */}
             {abaAtiva === "dev_ia" && (
               <DevIaModule user={user} />
             )}
-
+              </>
+            )}
           </main>
         </div>
 

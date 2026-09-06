@@ -1,7 +1,7 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { TrendingUp, CheckCircle, Trophy, Rocket, Code, Award, Calendar, Zap, Star, Target, BookOpen, Swords, GitBranch, Flame, CheckCircle2, Lock, Sparkles } from "lucide-react";
 
-export default function EvolucaoTimelineModule({ isDark, colors }) {
+export default function EvolucaoTimelineModule({ isDark, colors, user }) {
   const [timeline, setTimeline] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroCategoria, setFiltroCategoria] = useState("todos");
@@ -11,52 +11,156 @@ export default function EvolucaoTimelineModule({ isDark, colors }) {
 
   useEffect(() => {
     carregarTimeline();
-  }, []);
+  }, [user]);
 
   const carregarTimeline = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${apiUrl}/gamificacao/timeline`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setTimeline(data);
-          const totalXp = data.reduce((acc, item) => acc + (item.xp || 0), 0);
-          setXpTotal(totalXp);
-        }
-      }
-    } catch (e) {
-      console.error("Erro ao carregar timeline:", e);
-    } finally {
-      setLoading(false);
+    setLoading(true);
+
+    let currentUser = user;
+    if (!currentUser && typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("userData");
+        if (raw) currentUser = JSON.parse(raw);
+      } catch (e) {}
     }
+
+    const emailUser = currentUser?.email ? currentUser.email.toLowerCase() : "";
+    const nomeUser = currentUser?.nome || "Desenvolvedor DevHub";
+    const marcosDinamicos = [];
+
+    // 1. Marco de Cadastro Oficial do Usuário
+    marcosDinamicos.push({
+      id: "cadastro-devhub",
+      data_marco: "03/09",
+      titulo: `Cadastrou-se no DevHub (${nomeUser})`,
+      descricao: `Início oficial da jornada de ${nomeUser} como programador na plataforma DevHub.`,
+      categoria: "conquista",
+      xp: 100,
+      badge: "🎉 Boas-Vindas",
+      status: "concluido"
+    });
+
+    if (typeof window !== "undefined") {
+      // 2. Provas Concluídas pelo Aluno
+      try {
+        const rawProvas = localStorage.getItem("devhub_provas_concluidas") || localStorage.getItem("devhub_notas_alunos");
+        if (rawProvas) {
+          const list = JSON.parse(rawProvas);
+          if (Array.isArray(list)) {
+            list.forEach((p, idx) => {
+              const pEmail = (p.userEmail || p.email || "").toLowerCase();
+              const pUser = p.userId || p.alunoNome || "";
+              if (!emailUser || pEmail === emailUser || pUser === currentUser?.id || pUser === nomeUser) {
+                const notaVal = p.nota !== undefined ? parseFloat(p.nota) : (p.prova1 !== undefined ? parseFloat(p.prova1) : 8.8);
+                const tituloProva = p.provaTitulo || p.titulo || "Prova Online de Programação";
+                marcosDinamicos.push({
+                  id: `prova-${p.id || idx}`,
+                  data_marco: p.dataRealizacao || p.dataConclusao || "05/09",
+                  titulo: `Prova Concluída: ${tituloProva}`,
+                  descricao: `Realizou a avaliação online com nota final de ${notaVal.toFixed(1)}/10.`,
+                  categoria: "prova",
+                  xp: notaVal >= 9.0 ? 250 : 180,
+                  badge: notaVal >= 9.0 ? "🌟 Nota Excelente" : "✅ Aprovado",
+                  status: "concluido"
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      // 3. Duelos 1v1 na Arena de Código
+      try {
+        const rawDuelos = localStorage.getItem("devhub_duelos_historico");
+        if (rawDuelos) {
+          const list = JSON.parse(rawDuelos);
+          if (Array.isArray(list)) {
+            list.forEach((d, idx) => {
+              marcosDinamicos.push({
+                id: `duelo-${idx}`,
+                data_marco: d.data || "05/09",
+                titulo: `Batalha 1v1 na Arena: ${d.desafio || "Validação de Parênteses"}`,
+                descricao: `Enfrentou ${d.oponente || "rival"} na Arena de Código. Resultado: ${d.resultado === 'vitoria' ? 'Vitória 🏆' : 'Participação ⚔️'}.`,
+                categoria: "batalha",
+                xp: d.resultado === 'vitoria' ? 300 : 120,
+                badge: d.resultado === 'vitoria' ? "🏆 Gladiador Dev" : "⚔️ Duelista Arena",
+                status: "concluido"
+              });
+            });
+          }
+        }
+      } catch (e) {}
+
+      // 4. Aulas e Módulos Assistidos
+      try {
+        const rawAulas = localStorage.getItem("devhub_aulas_concluidas");
+        if (rawAulas) {
+          const list = JSON.parse(rawAulas);
+          if (Array.isArray(list)) {
+            list.forEach((a, idx) => {
+              marcosDinamicos.push({
+                id: `aula-${idx}`,
+                data_marco: a.data || "04/09",
+                titulo: `Módulo Concluído: ${a.titulo || "Fundamentos de JavaScript ES6+"}`,
+                descricao: `Estudou o conteúdo completo e dominou os conceitos do módulo.`,
+                categoria: "aula",
+                xp: 140,
+                badge: "📚 Estudante ES6",
+                status: "concluido"
+              });
+            });
+          }
+        }
+      } catch (e) {}
+
+      // 5. Exercícios e Anotações no Caderno de Estudos
+      try {
+        const rawCaderno = localStorage.getItem("devhub_caderno_anotacoes");
+        if (rawCaderno) {
+          const list = JSON.parse(rawCaderno);
+          if (Array.isArray(list) && list.length > 0) {
+            marcosDinamicos.push({
+              id: "caderno-anotacoes",
+              data_marco: "05/09",
+              titulo: `Caderno de Estudos: ${list.length} Anotações Registradas`,
+              descricao: `Registrou resumo técnico e anotações para revisão de conteúdo.`,
+              categoria: "exercicio",
+              xp: 110,
+              badge: "📝 Caderno Ativo",
+              status: "concluido"
+            });
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Trilha de conquistas e objetivos futuros (desbloqueados conforme o usuário pratica)
+    const MARCOS_PADRAO_COMPLEMENTARES = [
+      { id: "p-aula1", data_marco: "Próximo", titulo: "Módulo Fundamentos de JavaScript ES6+", descricao: "Estude o módulo de JavaScript para desbloquear esta conquista.", categoria: "aula", xp: 120, badge: "📚 Estudante ES6", status: "em_progresso" },
+      { id: "p-prova1", data_marco: "Próximo", titulo: "Primeira Prova Online Aprovada", descricao: "Realize e seja aprovado em uma prova online para conquistar o selo de aprovação.", categoria: "prova", xp: 200, badge: "✅ Aprovado", status: "proximo" },
+      { id: "p-streak", data_marco: "Próximo", titulo: "Sequência de Estudos: 3 dias 🔥", descricao: "Acesse a plataforma por 3 dias consecutivos para acender a chama da ofensiva.", categoria: "streak", xp: 100, badge: "🔥 Em Chamas", status: "proximo" },
+      { id: "p-batalha", data_marco: "Próximo", titulo: "Vitória na Arena Batalha de Código 1v1 ⚔️", descricao: "Vença um duelo de código contra um colega na Arena 1v1.", categoria: "batalha", xp: 300, badge: "⚔️ Duelista Dev", status: "proximo" },
+      { id: "p-pair", data_marco: "Próximo", titulo: "Sessão de Pair Programming Concluída 🤝", descricao: "Complete um desafio colaborativo de programação em dupla.", categoria: "pair", xp: 220, badge: "🤝 Co-Piloto", status: "proximo" },
+      { id: "f-react", data_marco: "Meta", titulo: "Módulo React & Componentização Funcional", descricao: "Dominando useState, useEffect e Hooks customizados no frontend.", categoria: "aula", xp: 180, badge: "⚛️ Dev React", status: "bloqueado" },
+      { id: "f-level", data_marco: "Meta", titulo: "Subir para o Nível Superior (Rank Prata) 🚀", descricao: "Ultrapassar a marca de 1.000 XP acumulados na plataforma.", categoria: "conquista", xp: 500, badge: "🚀 Level Up!", status: "bloqueado" },
+      { id: "f-project", data_marco: "Meta", titulo: "Projeto Full Stack API REST + Frontend", descricao: "Construção de uma API completa em Node.js integrada com dashboard React.", categoria: "projeto", xp: 450, badge: "🏗️ Full Stack", status: "bloqueado" },
+      { id: "f-hall", data_marco: "Meta", titulo: "Entrada no Top 5 do Hall da Fama 🏆", descricao: "Alcance o topo do ranking acumulando conquistas e vitórias em batalhas.", categoria: "conquista", xp: 600, badge: "🏆 Hall da Fama", status: "bloqueado" }
+    ];
+
+    // Mescla mantendo marcos dinâmicos no topo sem duplicar IDs
+    const idsExistentes = new Set(marcosDinamicos.map(m => m.id));
+    const complementos = MARCOS_PADRAO_COMPLEMENTARES.filter(m => !idsExistentes.has(m.id));
+
+    const finalTimeline = [...marcosDinamicos, ...complementos];
+    const totalXp = finalTimeline.filter(i => i.status === "concluido").reduce((acc, i) => acc + (i.xp || 0), 0);
+
+    setTimeline(finalTimeline);
+    setXpTotal(totalXp);
+    setLoading(false);
   };
 
-  // Marcos Exemplo Ricos e Completos para demonstração visual da jornada completa
-  const MARCOS_COMPLETOS = [
-    { id: 1, data_marco: "03/09", titulo: "Cadastrou-se no DevHub", descricao: "Início oficial da sua jornada como desenvolvedor na plataforma.", categoria: "conquista", xp: 50, badge: "🎉 Boas-Vindas", status: "concluido" },
-    { id: 2, data_marco: "03/09", titulo: "Módulo Fundamentos de JavaScript ES6+", descricao: "Aprendeu variáveis, arrow functions, desestruturação e Promises.", categoria: "aula", xp: 120, badge: "📚 Estudante ES6", status: "concluido" },
-    { id: 3, data_marco: "04/09", titulo: "Primeira Prova Online Aprovada (88%)", descricao: "Realizou a avaliação de Lógica & Sintaxe com nota de excelência.", categoria: "prova", xp: 200, badge: "✅ Aprovado", status: "concluido" },
-    { id: 4, data_marco: "04/09", titulo: "Sequência de Estudos: 3 dias 🔥", descricao: "Acendeu o fogo de streak diário completando desafios consecutivos.", categoria: "streak", xp: 100, badge: "🔥 Em Chamas", status: "em_progresso" },
-    { id: 5, data_marco: "05/09", titulo: "Vitória na Arena Batalha de Código 1v1 ⚔️", descricao: "Venceu um duelo contra colega resolvendo o algoritmo de ordenação em tempo recorde.", categoria: "batalha", xp: 300, badge: "⚔️ Duelista Dev", status: "concluido" },
-    { id: 6, data_marco: "06/09", titulo: "Sessão de Pair Programming Concluída 🤝", descricao: "Programou em dupla e concluiu o desafio colaborativo de validação de dados.", categoria: "pair", xp: 220, badge: "🤝 Co-Piloto", status: "concluido" },
-    { id: 7, data_marco: "07/09", titulo: "Módulo React & Componentização Funcional", descricao: "Dominando useState, useEffect e Hooks customizados no frontend.", categoria: "aula", xp: 180, badge: "⚛️ Dev React", status: "em_progresso" },
-    { id: 8, data_marco: "08/09", titulo: "Subiu para o Nível 3 (Rank Bronze Superior) 🚀", descricao: "Ultrapassou a marca de 1.000 XP acumulados na plataforma.", categoria: "conquista", xp: 500, badge: "🚀 Level Up!", status: "proximo" },
-    { id: 9, data_marco: "09/09", titulo: "Projeto Full Stack API REST + Frontend", descricao: "Construção de uma API completa em Node.js integrada com dashboard React.", categoria: "projeto", xp: 450, badge: "🏗️ Full Stack", status: "bloqueado" },
-    { id: 10, data_marco: "10/09", titulo: "Entrada no Top 5 do Hall da Fama 🏆", descricao: "Alcance o topo do ranking acumulando conquistas e vitórias em batalhas.", categoria: "conquista", xp: 600, badge: "🏆 Hall da Fama", status: "bloqueado" },
-  ];
-
-  // Se a timeline real tiver apenas 1 item (ex: cadastro), funde com os marcos completos para exibição rica
-  const listaExibicao = (timeline.length > 1) 
-    ? timeline 
-    : (timeline.length === 1 
-        ? [ { ...timeline[0], status: "concluido" }, ...MARCOS_COMPLETOS.slice(1) ]
-        : MARCOS_COMPLETOS);
-
-  const totalXpExibir = xpTotal > 50 ? xpTotal : listaExibicao.filter(i => i.status === "concluido").reduce((acc, i) => acc + (i.xp || 0), 0);
+  const listaExibicao = timeline;
+  const totalXpExibir = xpTotal;
   const nivelAtual = Math.floor(totalXpExibir / 1000) + 1;
   const xpNoNivel = totalXpExibir % 1000;
   const percentualNivel = Math.min(100, Math.round((xpNoNivel / 1000) * 100));
