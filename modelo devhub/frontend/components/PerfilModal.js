@@ -50,14 +50,18 @@ export default function PerfilModal({ isOpen, onClose, user, onUpdateUser, onLog
   const carregarInventario = async () => {
     try {
       const token = localStorage.getItem("token");
+      if (!token) return;
       const res = await fetch(`${apiUrl}/gamificacao/carteira`, {
         headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCompras(data.itensComprados || []);
-        setTemaAtivo(data.economia?.tema_ativo || "padrao");
-        setTituloAtivo(data.economia?.titulo_ativo || "Dev Aprendiz");
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data) {
+          setCompras(data.itensComprados || []);
+          setTemaAtivo(data.economia?.tema_ativo || "padrao");
+          setTituloAtivo(data.economia?.titulo_ativo || "Dev Aprendiz");
+        }
       }
     } catch (e) {
       console.error("Erro ao carregar inventário no perfil:", e);
@@ -67,6 +71,7 @@ export default function PerfilModal({ isOpen, onClose, user, onUpdateUser, onLog
   const handleEquiparTemaDirect = async (temaId) => {
     try {
       const token = localStorage.getItem("token");
+      if (!token) return;
       const res = await fetch(`${apiUrl}/gamificacao/loja/equipar-tema`, {
         method: "POST",
         headers: {
@@ -74,8 +79,9 @@ export default function PerfilModal({ isOpen, onClose, user, onUpdateUser, onLog
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ temaId })
-      });
-      if (res.ok) {
+      }).catch(() => null);
+
+      if (res && res.ok) {
         setTemaAtivo(temaId);
         setNotificacaoTema(`✨ ${TEMAS_MAPA[temaId]?.nome || temaId} equipado com sucesso!`);
         setTimeout(() => setNotificacaoTema(""), 4000);
@@ -92,27 +98,77 @@ export default function PerfilModal({ isOpen, onClose, user, onUpdateUser, onLog
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("A imagem deve ser menor que 5MB.");
+      if (file.size > 10 * 1024 * 1024) {
+        alert("A imagem deve ser menor que 10MB.");
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarUrl(reader.result);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Compressão inteligente para 250x250px max (otimizado para avatares leves)
+          const canvas = document.createElement("canvas");
+          const MAX_SIZE = 250;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Converter para dataURL super otimizado
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          setAvatarUrl(compressedDataUrl);
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSalvarPerfil = (e) => {
+  const handleSalvarPerfil = async (e) => {
     e.preventDefault();
     setSalvando(true);
 
     try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          await fetch(`${apiUrl}/auth/perfil`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              nome: nome || user?.nome,
+              avatar_url: avatarUrl
+            })
+          });
+        } catch (netErr) {
+          console.warn("Aviso ao sincronizar foto com o servidor (salvo localmente):", netErr);
+        }
+      }
+
       const userDataStr = localStorage.getItem("userData");
       let parsed = {};
       if (userDataStr) {
-        parsed = JSON.parse(userDataStr);
+        try {
+          parsed = JSON.parse(userDataStr);
+        } catch (e) {}
       }
 
       const usuarioAtualizado = {
@@ -137,7 +193,6 @@ export default function PerfilModal({ isOpen, onClose, user, onUpdateUser, onLog
       }, 1000);
     } catch (err) {
       console.error("Erro ao salvar perfil:", err);
-      alert("Erro ao salvar perfil.");
     } finally {
       setSalvando(false);
     }
@@ -273,19 +328,21 @@ export default function PerfilModal({ isOpen, onClose, user, onUpdateUser, onLog
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "180px", overflowY: "auto" }}>
-                  {/* Tema Padrão Padrão do Sistema */}
+                  {/* Tema Padrão do Sistema */}
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: "12px",
-                    backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)"
+                    backgroundColor: "rgba(255,255,255,0.04)", border: temaAtivo === "padrao" ? "1.5px solid #10B981" : "1px solid rgba(255,255,255,0.08)"
                   }}>
                     <span style={{ fontSize: "13px", fontWeight: "700", color: "#FFF" }}>🎨 Tema Padrão DevHub</span>
                     <button
                       type="button"
                       onClick={() => handleEquiparTemaDirect("padrao")}
                       style={{
-                        padding: "6px 14px", borderRadius: "8px", border: "none", fontWeight: "800", fontSize: "12px", cursor: "pointer",
-                        backgroundColor: temaAtivo === "padrao" ? "rgba(16,185,129,0.3)" : "#3B82F6",
-                        color: temaAtivo === "padrao" ? "#10B981" : "#FFF"
+                        padding: "6px 16px", borderRadius: "10px", fontWeight: "800", fontSize: "12px", cursor: "pointer",
+                        background: temaAtivo === "padrao" ? "rgba(16,185,129,0.2)" : "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
+                        color: temaAtivo === "padrao" ? "#34D399" : "#FFFFFF",
+                        border: temaAtivo === "padrao" ? "1px solid #10B981" : "none",
+                        boxShadow: temaAtivo === "padrao" ? "none" : "0 4px 12px rgba(59,130,246,0.3)"
                       }}
                     >
                       {temaAtivo === "padrao" ? "✓ Equipado" : "Equipar"}
@@ -311,9 +368,11 @@ export default function PerfilModal({ isOpen, onClose, user, onUpdateUser, onLog
                             type="button"
                             onClick={() => handleEquiparTemaDirect(item.item_id)}
                             style={{
-                              padding: "6px 14px", borderRadius: "8px", border: "none", fontWeight: "800", fontSize: "12px", cursor: "pointer",
-                              backgroundColor: estaEquipado ? "rgba(16,185,129,0.3)" : "linear-gradient(135deg, #10B981, #059669)",
-                              color: estaEquipado ? "#10B981" : "#FFF"
+                              padding: "6px 16px", borderRadius: "10px", fontWeight: "800", fontSize: "12px", cursor: "pointer",
+                              background: estaEquipado ? "rgba(16,185,129,0.2)" : "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                              color: estaEquipado ? "#34D399" : "#FFFFFF",
+                              border: estaEquipado ? "1px solid #10B981" : "none",
+                              boxShadow: estaEquipado ? "none" : "0 4px 12px rgba(16,185,129,0.3)"
                             }}
                           >
                             {estaEquipado ? "✓ Equipado" : "Equipar Tema"}

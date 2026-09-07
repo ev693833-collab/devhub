@@ -52,6 +52,233 @@ function falarTexto(texto, onEnd) {
   return utter;
 }
 
+function extrairDadosFerramenta(content) {
+  if (!content) return null;
+  const match = content.match(/<!--FERRAMENTA_DADOS:([\s\S]*?):FERRAMENTA_DADOS-->/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function InlineSlideWidget({ dados, onFullscreen }) {
+  const [index, setIndex] = useState(0);
+  const slidesList = dados.slides || [];
+  const currentSlide = slidesList[index] || slidesList[0];
+
+  if (!slidesList.length) return null;
+
+  return (
+    <div style={{
+      marginTop: "12px",
+      padding: "16px",
+      borderRadius: "16px",
+      background: "linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15))",
+      border: "1px solid rgba(99, 102, 241, 0.3)",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px"
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: "0.85rem", fontWeight: "900", color: "#c084fc" }}>
+          🎨 {dados.titulo || "Slides Educativos"}
+        </div>
+        <div style={{ fontSize: "0.76rem", fontWeight: "800", color: "#cbd5e1", background: "rgba(255,255,255,0.08)", padding: "2px 8px", borderRadius: "8px" }}>
+          Slide {index + 1} / {slidesList.length}
+        </div>
+      </div>
+
+      <div style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", padding: "14px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ fontSize: "0.95rem", fontWeight: "800", color: "#FFF", marginBottom: "8px" }}>
+          {currentSlide?.titulo}
+        </div>
+        <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "0.84rem", color: "#cbd5e1", lineHeight: "1.5" }}>
+          {(currentSlide?.bullets || []).map((b, i) => (
+            <li key={i} style={{ marginBottom: "4px" }}>{b}</li>
+          ))}
+        </ul>
+        {currentSlide?.explicacao && (
+          <div style={{ marginTop: "8px", fontSize: "0.78rem", color: "#94a3b8", fontStyle: "italic", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" }}>
+            💡 {currentSlide.explicacao}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <button
+            type="button"
+            disabled={index === 0}
+            onClick={() => setIndex(i => i - 1)}
+            style={{
+              padding: "6px 12px", borderRadius: "8px", border: "none",
+              backgroundColor: index === 0 ? "rgba(255,255,255,0.05)" : "#6366f1",
+              color: index === 0 ? "#64748b" : "#FFF", fontSize: "0.78rem", fontWeight: "700",
+              cursor: index === 0 ? "default" : "pointer"
+            }}
+          >
+            ◄ Anterior
+          </button>
+          <button
+            type="button"
+            disabled={index >= slidesList.length - 1}
+            onClick={() => setIndex(i => i + 1)}
+            style={{
+              padding: "6px 12px", borderRadius: "8px", border: "none",
+              backgroundColor: index >= slidesList.length - 1 ? "rgba(255,255,255,0.05)" : "#6366f1",
+              color: index >= slidesList.length - 1 ? "#64748b" : "#FFF", fontSize: "0.78rem", fontWeight: "700",
+              cursor: index >= slidesList.length - 1 ? "default" : "pointer"
+            }}
+          >
+            Próximo ►
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onFullscreen(dados)}
+          style={{
+            padding: "6px 12px", borderRadius: "8px", border: "1px solid rgba(168, 85, 247, 0.4)",
+            backgroundColor: "rgba(168, 85, 247, 0.15)", color: "#c084fc",
+            fontSize: "0.78rem", fontWeight: "700", cursor: "pointer"
+          }}
+        >
+          🖥️ Abrir em Tela Cheia
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function InlineAudioWidget({ dados, tocarAudio }) {
+  return (
+    <div style={{
+      marginTop: "12px",
+      padding: "14px 16px",
+      borderRadius: "16px",
+      background: "linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.15))",
+      border: "1px solid rgba(16, 185, 129, 0.3)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "12px"
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{
+          width: "40px", height: "40px", borderRadius: "12px",
+          backgroundColor: "#10b981", display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#FFF", boxShadow: "0 4px 12px rgba(16,185,129,0.3)"
+        }}>
+          <Headphones size={22} />
+        </div>
+        <div>
+          <div style={{ fontSize: "0.88rem", fontWeight: "800", color: "#FFF" }}>
+            🎧 {dados.titulo || "Explicação em Áudio"}
+          </div>
+          <div style={{ fontSize: "0.76rem", color: "#a7f3d0" }}>
+            Ouvir áudio explicativo em voz alta
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => tocarAudio(dados.roteiro || "")}
+        style={{
+          padding: "8px 16px", borderRadius: "10px", border: "none",
+          backgroundColor: "#10b981", color: "#FFF", fontSize: "0.8rem", fontWeight: "800",
+          cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+          boxShadow: "0 4px 12px rgba(16,185,129,0.4)"
+        }}
+      >
+        <Volume2 size={16} /> Ouvir Áudio
+      </button>
+    </div>
+  );
+}
+
+function InlinePlanoWidget({ dados }) {
+  const semanas = dados.semanas || [];
+  return (
+    <div style={{
+      marginTop: "12px",
+      padding: "16px",
+      borderRadius: "16px",
+      background: "linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(236, 72, 153, 0.15))",
+      border: "1px solid rgba(245, 158, 11, 0.3)",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px"
+    }}>
+      <div style={{ fontSize: "0.9rem", fontWeight: "900", color: "#f59e0b" }}>
+        🎯 {dados.titulo || "Plano de Estudos Personalizado"}
+      </div>
+      {dados.duracao && (
+        <div style={{ fontSize: "0.78rem", color: "#fcd34d", fontWeight: "700" }}>
+          ⏱️ Duração estimada: {dados.duracao}
+        </div>
+      )}
+      {dados.objetivo && (
+        <div style={{ fontSize: "0.82rem", color: "#cbd5e1" }}>
+          📌 {dados.objetivo}
+        </div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+        {semanas.map((s, idx) => (
+          <div key={idx} style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", padding: "10px 12px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ fontSize: "0.82rem", fontWeight: "800", color: "#fbbf24", marginBottom: "4px" }}>
+              Semana {s.semana || idx + 1}: {s.foco}
+            </div>
+            {(s.dias || []).map((d, dIdx) => (
+              <div key={dIdx} style={{ fontSize: "0.78rem", color: "#cbd5e1", marginLeft: "8px", marginTop: "2px" }}>
+                • Dia {d.dia}: <strong>{d.tema}</strong> — {d.tarefa}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InlineRoadmapWidget({ dados, onAbrirJornada }) {
+  return (
+    <div style={{
+      marginTop: "12px",
+      padding: "16px",
+      borderRadius: "16px",
+      background: "linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(59, 130, 246, 0.15))",
+      border: "1px solid rgba(6, 182, 212, 0.3)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "12px"
+    }}>
+      <div>
+        <div style={{ fontSize: "0.9rem", fontWeight: "900", color: "#06b6d4" }}>
+          🗺️ {dados.titulo || "Roadmap de Aprendizado"}
+        </div>
+        <div style={{ fontSize: "0.78rem", color: "#a5f3fc", marginTop: "2px" }}>
+          {dados.objetivo || "Trilha visual com etapas e bifurcação de estudo"}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => onAbrirJornada()}
+        style={{
+          padding: "8px 14px", borderRadius: "10px", border: "none",
+          backgroundColor: "#06b6d4", color: "#FFF", fontSize: "0.8rem", fontWeight: "800",
+          cursor: "pointer", whiteSpace: "nowrap"
+        }}
+      >
+        🗺️ Ver Mapa Visual
+      </button>
+    </div>
+  );
+}
+
 export default function DevIaModule({ user }) {
   const [collapsed, setCollapsed] = useState(false);
   const [threads, setThreads] = useState([]);
@@ -403,20 +630,25 @@ export default function DevIaModule({ user }) {
 
   const executarFerramenta = async () => {
     const tema = temaFerramenta.trim();
-    if (!tema || !ferramenta || gerandoFerramenta) return;
+    const tipoAtual = ferramenta;
+    if (!tema || !tipoAtual || gerandoFerramenta) return;
+
     setGerandoFerramenta(true);
     setSending(true);
+    setFerramenta(null); // Fecha o modal imediatamente e retorna ao chat
+    setTemaFerramenta("");
 
     const rotulos = {
-      slides: "Criar slides",
-      audio: "Explicar por áudio",
-      plano: "Plano de estudos",
-      roadmap: "Roadmap de aprendizado"
+      slides: "🎨 Criar slides educativos",
+      audio: "🎧 Explicação em áudio",
+      plano: "🎯 Plano de estudos",
+      roadmap: "🗺️ Roadmap de aprendizado"
     };
+
     const userMsgObj = {
       id: Date.now(),
       sender: "user",
-      content: `${rotulos[ferramenta]}: ${tema}`,
+      content: `${rotulos[tipoAtual] || "Gerar material"}: ${tema}`,
       created_at: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMsgObj]);
@@ -431,7 +663,7 @@ export default function DevIaModule({ user }) {
         },
         body: JSON.stringify({
           thread_id: activeThreadId,
-          tipo: ferramenta,
+          tipo: tipoAtual,
           tema
         })
       });
@@ -443,8 +675,7 @@ export default function DevIaModule({ user }) {
           carregarThreads();
         }
         if (data.ia_message) setMessages(prev => [...prev, data.ia_message]);
-        aplicarResultadoFerramenta(ferramenta, data.dados);
-        setFerramenta(null);
+        aplicarResultadoFerramenta(tipoAtual, data.dados);
         setInputMessage("");
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -818,9 +1049,28 @@ export default function DevIaModule({ user }) {
 
                       <div className={styles.markdownContent}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {msg.content}
+                          {msg.content ? msg.content.replace(/<!--FERRAMENTA_DADOS:[\s\S]*?:FERRAMENTA_DADOS-->/g, '') : ""}
                         </ReactMarkdown>
                       </div>
+
+                      {(() => {
+                        const fObj = extrairDadosFerramenta(msg.content);
+                        if (!fObj || !fObj.dados) return null;
+
+                        if (fObj.tipo === "slides") {
+                          return <InlineSlideWidget dados={fObj.dados} onFullscreen={(d) => setSlides(d)} />;
+                        }
+                        if (fObj.tipo === "audio") {
+                          return <InlineAudioWidget dados={fObj.dados} tocarAudio={(txt) => tocarAudio(txt)} />;
+                        }
+                        if (fObj.tipo === "plano") {
+                          return <InlinePlanoWidget dados={fObj.dados} />;
+                        }
+                        if (fObj.tipo === "roadmap") {
+                          return <InlineRoadmapWidget dados={fObj.dados} onAbrirJornada={() => setPainelJornada(true)} />;
+                        }
+                        return null;
+                      })()}
 
                       <div className={styles.msgFooter}>
                         <span className={styles.timeLabel}>
@@ -849,7 +1099,11 @@ export default function DevIaModule({ user }) {
                   <Bot size={18} />
                 </div>
                 <div className={styles.messageBubble}>
-                  <div className={styles.typingIndicator}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.86rem", color: "#818cf8", fontWeight: "700" }}>
+                    <Sparkles size={16} style={{ animation: "spin 1.5s linear infinite" }} />
+                    <span>A Dev IA está gerando o seu conteúdo...</span>
+                  </div>
+                  <div className={styles.typingIndicator} style={{ marginTop: "6px" }}>
                     <span></span><span></span><span></span>
                   </div>
                 </div>

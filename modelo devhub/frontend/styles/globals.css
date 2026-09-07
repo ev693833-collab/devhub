@@ -283,3 +283,20 @@ select:focus {
   background-color: #1e293b;
   color: #f8fafc;
 }
+
+/* ===== SUPORTE DE IMPRESSÃO GLOBAL & EXPORTAÇÃO PDF ===== */
+@media print {
+  aside,
+  nav,
+  .no-print,
+  [class*="sidebar"],
+  [class*="navBar"],
+  [class*="topHeader"] {
+    display: none !important;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+}

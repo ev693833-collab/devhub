@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Swords, Trophy, Clock, Play, CheckCircle, Send, XCircle, Check, X, Shield, Sparkles, PlusCircle, Inbox, Users, Code, GraduationCap, AlertTriangle, HelpCircle, Terminal } from "lucide-react";
 import styles from "./BatalhaCodigoModule.module.css";
 
@@ -388,6 +388,57 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
   const [oponenteSelecionado, setOponenteSelecionado] = useState("");
   const [desafioSelecionadoId, setDesafioSelecionadoId] = useState("random");
   const [conviteEnviadoSucesso, setConviteEnviadoSucesso] = useState(null);
+
+  // 🟢 Filtrar apenas alunos que estão ONLINE no sistema
+  const alunosOnlineList = useMemo(() => {
+    if (typeof window === "undefined") return alunosCadastrados;
+    try {
+      const stored = localStorage.getItem("devhub_usuarios_online");
+      let onlineMap = stored ? JSON.parse(stored) : {};
+      const now = Date.now();
+
+      // Atualizar heartbeat do usuário atual
+      if (user?.nome) {
+        onlineMap[user.nome] = now;
+      }
+
+      // Garantir presença online inicial para os alunos cadastrados no sistema
+      let alterado = false;
+      alunosCadastrados.forEach(nome => {
+        if (!onlineMap[nome]) {
+          onlineMap[nome] = now;
+          alterado = true;
+        }
+      });
+
+      if (user?.nome || alterado) {
+        localStorage.setItem("devhub_usuarios_online", JSON.stringify(onlineMap));
+      }
+
+      // Retorna apenas alunos que estão online (último acesso < 5 minutos) e excluindo o próprio usuário
+      const filtrados = alunosCadastrados.filter(nome => {
+        if (user?.nome && nome.toLowerCase().trim() === user.nome.toLowerCase().trim()) return false;
+        const lastSeen = onlineMap[nome];
+        return lastSeen && (now - lastSeen < 300000);
+      });
+
+      return filtrados;
+    } catch(e) {
+      return alunosCadastrados.filter(n => user?.nome ? n.toLowerCase().trim() !== user.nome.toLowerCase().trim() : true);
+    }
+  }, [alunosCadastrados, user]);
+
+  useEffect(() => {
+    if (modalCriarSalaOpen) {
+      if (alunosOnlineList.length > 0) {
+        if (!oponenteSelecionado || !alunosOnlineList.includes(oponenteSelecionado)) {
+          setOponenteSelecionado(alunosOnlineList[0]);
+        }
+      } else {
+        setOponenteSelecionado("");
+      }
+    }
+  }, [modalCriarSalaOpen, alunosOnlineList]);
 
   // Notificação Pop-up Temporária Toast
   const [toastNotificacao, setToastNotificacao] = useState(null);
@@ -1139,16 +1190,16 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
               </div>
               <div>
                 <h3 style={{ fontSize: "1.3rem", fontWeight: "800", margin: 0 }}>🏠 Criar Sala de Duelo 1v1</h3>
-                <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>Selecione um aluno cadastrado no sistema para enviar a solicitação</div>
+                <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>Selecione um aluno online no sistema para enviar a solicitação</div>
               </div>
             </div>
 
             <form onSubmit={handleCriarSalaEEnviarConvite} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-              {/* 1. SELETOR DE ALUNOS CADASTRADOS */}
+              {/* 1. SELETOR DE ALUNOS ONLINE */}
               <div>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.88rem", fontWeight: "700", color: "#cbd5e1", marginBottom: "8px" }}>
-                  <GraduationCap size={16} color="#3b82f6" />
-                  <span>1. Selecione o Oponente (Alunos Cadastrados):</span>
+                  <GraduationCap size={16} color="#10b981" />
+                  <span>1. Selecione o Oponente (Alunos Online no Sistema):</span>
                 </label>
                 <select
                   value={oponenteSelecionado}
@@ -1160,12 +1211,23 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
                     fontSize: "0.95rem", fontWeight: "600", outline: "none"
                   }}
                 >
-                  {alunosCadastrados.map((nome, i) => (
-                    <option key={i} value={nome} style={{ background: "#171c2c", color: "#ffffff", padding: "10px" }}>
-                      🎓 {nome}
+                  {alunosOnlineList.length > 0 ? (
+                    alunosOnlineList.map((nome, i) => (
+                      <option key={i} value={nome} style={{ background: "#171c2c", color: "#ffffff", padding: "10px" }}>
+                        🟢 {nome} (Online Agora)
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled style={{ background: "#171c2c", color: "#94a3b8", padding: "10px" }}>
+                      ⚠️ Nenhum outro aluno online no momento
                     </option>
-                  ))}
+                  )}
                 </select>
+                {alunosOnlineList.length === 0 && (
+                  <div style={{ marginTop: "8px", padding: "10px 14px", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "10px", fontSize: "0.82rem", color: "#fca5a5" }}>
+                    ⚠️ Nenhum outro aluno está online no sistema no momento para receber a solicitação.
+                  </div>
+                )}
               </div>
 
               {/* 2. SELETOR DE DESAFIOS DE CÓDIGO DIVERSIFICADOS + DESAFIO SURPRESA */}
@@ -1198,13 +1260,19 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
               <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
                 <button
                   type="submit"
+                  disabled={!oponenteSelecionado || alunosOnlineList.length === 0}
                   style={{
                     flex: 1, padding: "14px",
-                    background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                    color: "#FFF", border: "none", borderRadius: "14px",
-                    fontWeight: "800", fontSize: "1rem", cursor: "pointer",
+                    background: (!oponenteSelecionado || alunosOnlineList.length === 0)
+                      ? "#334155"
+                      : "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                    color: (!oponenteSelecionado || alunosOnlineList.length === 0) ? "#94a3b8" : "#FFF",
+                    border: "none", borderRadius: "14px",
+                    fontWeight: "800", fontSize: "1rem",
+                    cursor: (!oponenteSelecionado || alunosOnlineList.length === 0) ? "not-allowed" : "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                    boxShadow: "0 4px 18px rgba(239, 68, 68, 0.4)"
+                    boxShadow: (!oponenteSelecionado || alunosOnlineList.length === 0) ? "none" : "0 4px 18px rgba(239, 68, 68, 0.4)",
+                    opacity: (!oponenteSelecionado || alunosOnlineList.length === 0) ? 0.6 : 1
                   }}
                 >
                   <Send size={18} />

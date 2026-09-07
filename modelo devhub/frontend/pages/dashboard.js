@@ -11,10 +11,16 @@ import EvolucaoTimelineModule from "../components/EvolucaoTimelineModule";
 import GameCatalogModule from "../components/GameCatalogModule";
 import MiniSistemasModule from "../components/MiniSistemasModule";
 import CadernoEstudosModule from "../components/CadernoEstudosModule";
+import CodePlaygroundModule from "../components/CodePlaygroundModule";
+import FlashcardsModule from "../components/FlashcardsModule";
+import TrilhasModule from "../components/TrilhasModule";
+import AulasSection from "../components/dashboard/AulasSection";
+import NotificationCenterModal from "../components/NotificationCenterModal";
+import TicketsModule from "../components/TicketsModule";
 import { 
   BookOpen, Calendar, Trophy, FileText, CheckSquare, 
   Sparkles, ChevronLeft, ChevronRight, ChevronDown, User, Shield, Layers, Swords, Crown,
-  LogOut, Moon, Sun, Settings, Bell, Zap, Check, BookMarked
+  LogOut, Moon, Sun, Settings, Bell, Zap, Check, BookMarked, Code, BrainCircuit, Compass, LifeBuoy
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -30,7 +36,32 @@ export default function Dashboard() {
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [menuAulasAberto, setMenuAulasAberto] = useState(true);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
+  const [modalNotificacoesOpen, setModalNotificacoesOpen] = useState(false);
+  const [modalTicketsOpen, setModalTicketsOpen] = useState(false);
+  const [unreadNotificacoesCount, setUnreadNotificacoesCount] = useState(0);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
+  // Estados de navegação profunda vindo das Trilhas de Aprendizado
+  const [targetProjetoId, setTargetProjetoId] = useState(null);
+  const [targetSnippetCodigo, setTargetSnippetCodigo] = useState(null);
+
+  const handleNavegarDaTrilha = (abaTarget, params = {}) => {
+    setAbaAtiva(abaTarget);
+    if (params.slideIndex !== undefined) {
+      setTimeout(() => {
+        const el = document.getElementById(`topico-slide-${params.slideIndex}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 350);
+    }
+    if (params.projetoId) {
+      setTargetProjetoId(params.projetoId);
+    }
+    if (params.snippetCodigo) {
+      setTargetSnippetCodigo(params.snippetCodigo);
+    }
+  };
 
   // Categoria Selecionada para Modal de Estudo
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
@@ -1092,7 +1123,7 @@ export default function Dashboard() {
   // Verifica se o módulo está liberado para o aluno logado
   const isModuloLiberado = (abaId) => {
     if (!user) return true;
-    if (user.cargo === "superadmin" || user.cargo === "super_admin" || user.cargo === "admin") return true;
+    if (abaId === "super_admin") return user.cargo === "superadmin" || user.cargo === "super_admin" || user.cargo === "admin";
 
     const mapaModulo = {
       aulas: "Aulas",
@@ -1108,18 +1139,56 @@ export default function Dashboard() {
     if (!nomeModulo) return true;
 
     try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("devhub_modulos_liberados") : null;
-      if (raw) {
-        const modulosMap = JSON.parse(raw);
-        const keys = [
-          user.id ? user.id.toString() : null,
-          user.email ? user.email.toLowerCase() : null,
-          user.nome ? user.nome.toLowerCase() : null
-        ].filter(Boolean);
+      const userIdStr = user.id ? user.id.toString() : "";
+      const userEmailStr = user.email ? user.email.toLowerCase().trim() : "";
+      const userNomeStr = user.nome ? user.nome.toLowerCase().trim() : "";
+      const userFirstName = userNomeStr.split(" ")[0];
 
-        for (const k of keys) {
-          if (modulosMap[k] && modulosMap[k][nomeModulo] === false) {
+      // 1. Checar Plano do Aluno (devhub_planos_alunos)
+      const rawPlanos = typeof window !== "undefined" ? localStorage.getItem("devhub_planos_alunos") : null;
+      if (rawPlanos) {
+        const planosMap = JSON.parse(rawPlanos);
+        let planoEncontrado = null;
+
+        for (const [key, planoKey] of Object.entries(planosMap)) {
+          const kLower = key.toLowerCase().trim();
+          if (
+            (userIdStr && kLower === userIdStr) ||
+            (userEmailStr && (kLower === userEmailStr || userEmailStr.includes(kLower))) ||
+            (userNomeStr && (kLower === userNomeStr || kLower === userFirstName || userNomeStr.startsWith(kLower) || kLower.startsWith(userFirstName)))
+          ) {
+            planoEncontrado = planoKey;
+            break;
+          }
+        }
+
+        if (planoEncontrado) {
+          const PLANOS_PERMISSOES = {
+            dev_start: ["Aulas", "Caderno", "Ranking"],
+            dev_plus: ["Aulas", "Caderno", "Provas", "Arena", "Ranking"],
+            dev_master: ["Aulas", "Caderno", "Provas", "Arena", "Ranking", "Dev IA"]
+          };
+          const permitidos = PLANOS_PERMISSOES[planoEncontrado] || PLANOS_PERMISSOES.dev_master;
+          if (!permitidos.includes(nomeModulo)) {
             return false;
+          }
+        }
+      }
+
+      // 2. Checar Travas Individuais por Módulo (devhub_modulos_liberados)
+      const rawModulos = typeof window !== "undefined" ? localStorage.getItem("devhub_modulos_liberados") : null;
+      if (rawModulos) {
+        const modulosMap = JSON.parse(rawModulos);
+        for (const [key, modObj] of Object.entries(modulosMap)) {
+          const kLower = key.toLowerCase().trim();
+          if (
+            (userIdStr && kLower === userIdStr) ||
+            (userEmailStr && (kLower === userEmailStr || userEmailStr.includes(kLower))) ||
+            (userNomeStr && (kLower === userNomeStr || kLower === userFirstName || userNomeStr.startsWith(kLower) || kLower.startsWith(userFirstName)))
+          ) {
+            if (modObj && modObj[nomeModulo] === false) {
+              return false;
+            }
           }
         }
       }
@@ -1127,6 +1196,12 @@ export default function Dashboard() {
 
     return true;
   };
+
+  useEffect(() => {
+    if (abaAtiva && !isModuloLiberado(abaAtiva)) {
+      setAbaAtiva("aulas");
+    }
+  }, [abaAtiva, user]);
 
   // Abrir Modal para Nova Aula
   const handleAbrirNovaAula = (dataPreenchida = "") => {
@@ -1492,6 +1567,37 @@ export default function Dashboard() {
                 </button>
               )}
 
+              {/* Botão de Notificações com Sininho */}
+              <button
+                onClick={() => setModalNotificacoesOpen(true)}
+                title="Central de Notificações"
+                style={{
+                  position: "relative",
+                  background: isDark ? "rgba(255, 255, 255, 0.06)" : "#F1F5F9",
+                  border: `1px solid ${colors.borderCard}`,
+                  color: colors.textPrimary,
+                  borderRadius: "12px",
+                  padding: "8px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer"
+                }}
+              >
+                <Bell size={18} color="#38bdf8" />
+                {unreadNotificacoesCount > 0 && (
+                  <span style={{
+                    position: "absolute", top: "-4px", right: "-4px",
+                    width: "16px", height: "16px", borderRadius: "50%",
+                    background: "#ef4444", color: "#fff", fontSize: "10px",
+                    fontWeight: "800", display: "flex", alignItems: "center",
+                    justifyContent: "center"
+                  }}>
+                    {unreadNotificacoesCount}
+                  </span>
+                )}
+              </button>
+
               {/* Botão Principal do Usuário (Dropdown) */}
               <div style={{ position: "relative" }}>
                 <button
@@ -1751,6 +1857,34 @@ export default function Dashboard() {
                           <span>Arena Batalha 1v1</span>
                         </button>
 
+                        {/* Tickets & Suporte */}
+                        <button
+                          onClick={() => {
+                            setModalTicketsOpen(true);
+                            setUserDropdownOpen(false);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            width: "100%",
+                            padding: "9px 12px",
+                            borderRadius: "10px",
+                            border: "none",
+                            backgroundColor: "transparent",
+                            color: colors.textPrimary,
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                            transition: "background 0.2s ease"
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                        >
+                          <LifeBuoy size={16} style={{ color: "#3B82F6" }} />
+                          <span>Tickets & Suporte 🎟️</span>
+                        </button>
+
                         <div style={{ height: "1px", backgroundColor: colors.borderCard, margin: "4px 0" }} />
 
                         {/* Botão Sair */}
@@ -1878,13 +2012,18 @@ export default function Dashboard() {
                 { id: "agenda", label: "Calendário & Agenda", sublabel: "Aulas & Reuniões", icon: Calendar, color: "#EF4444", badge: "Ao Vivo 🔴" },
                 { id: "games", label: "Jogos DevHub", sublabel: "Catálogo de Jogos", icon: Swords, color: "#6366F1", badge: "2 Jogos 🎮" },
                 { id: "caderno", label: "Caderno de Estudos", sublabel: "Anotações Dev", icon: BookMarked, color: "#818CF8", badge: "Notas 📝" },
+                { id: "playground", label: "Code Playground", sublabel: "Executor Web", icon: Code, color: "#10B981", badge: "Novo ⚡" },
+                { id: "flashcards", label: "Flashcards IA", sublabel: "Revisão Rápida", icon: BrainCircuit, color: "#F59E0B", badge: "IA 🧠" },
+                { id: "trilhas", label: "Trilhas & Badges", sublabel: "Roadmap Career", icon: Compass, color: "#06B6D4", badge: "Roadmap 🚀" },
                 { id: "mini_sistemas", label: "Mini-Sistemas", sublabel: "Laboratório Prático", icon: Layers, color: "#10B981", badge: "Prático 🧪" },
                 { id: "ranking", label: "Hall da Fama", sublabel: "Top Alunos", icon: Trophy, color: "#F59E0B", badge: "TOP 🏆" },
                 { id: "evolucao", label: "Sua Evolução", sublabel: "Timeline", icon: Zap, color: "#EC4899", badge: "Trilha 📈" },
                 { id: "notas", label: "Notas das Provas", sublabel: "Boletim", icon: FileText, color: "#A855F7" },
                 { id: "provas-online", label: "Realizar Provas", sublabel: "Avaliações", icon: CheckSquare, color: "#EC4899" },
                 { id: "dev_ia", label: "Dev IA Tutor", sublabel: "Assistente 24/7", icon: Sparkles, color: "#6366F1", badge: "IA ⚡" }
-              ].map((item) => {
+              ]
+                .filter((item) => isModuloLiberado(item.id))
+                .map((item) => {
                 const isAtivo = abaAtiva === item.id;
                 const IconComponent = item.icon;
 
@@ -2089,6 +2228,53 @@ export default function Dashboard() {
 
           {/* ===== ÁREA DE CONTEÚDO PRINCIPAL ===== */}
           <main style={{ minWidth: 0 }}>
+            {/* Banner de Anúncio Global (se houver) */}
+            {(() => {
+              try {
+                const raw = typeof window !== "undefined" ? localStorage.getItem("devhub_anuncios_globais") : null;
+                if (raw) {
+                  const lista = JSON.parse(raw);
+                  if (lista && lista.length > 0) {
+                    const top = lista[0];
+                    return (
+                      <div style={{
+                        padding: "14px 20px",
+                        borderRadius: "18px",
+                        background: "linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(234, 88, 12, 0.18))",
+                        border: "1px solid rgba(249, 115, 22, 0.4)",
+                        marginBottom: "20px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "14px",
+                        boxShadow: "0 8px 24px rgba(249, 115, 22, 0.15)"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                          <div style={{
+                            width: "40px", height: "40px", borderRadius: "12px",
+                            backgroundColor: "#f97316", display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "#FFF", flexShrink: 0, boxShadow: "0 4px 12px rgba(249, 115, 22, 0.4)"
+                          }}>
+                            <Megaphone size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "0.95rem", fontWeight: "900", color: "#FFF" }}>
+                              📢 {top.titulo}
+                            </div>
+                            {top.mensagem && (
+                              <div style={{ fontSize: "0.84rem", color: "#fdba74", marginTop: "2px" }}>
+                                {top.mensagem}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                }
+              } catch (e) {}
+              return null;
+            })()}
             {!isModuloLiberado(abaAtiva) ? (
               <div style={{
                 backgroundColor: isDark ? "rgba(23, 28, 44, 0.9)" : "#FFFFFF",
@@ -2186,7 +2372,7 @@ export default function Dashboard() {
                       <BookOpen size={16} style={{ color: "#3B82F6" }} />
                       <div>
                         <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Módulos</div>
-                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#3B82F6" }}>{categorias[0]?.slides?.length || 6} Tópicos</div>
+                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#3B82F6" }}>7 Módulos de Estudo</div>
                       </div>
                     </div>
 
@@ -2223,226 +2409,7 @@ export default function Dashboard() {
             )}
 
             {/* ABA 1: AULAS DE ESTUDO */}
-            {abaAtiva === "aulas" && (() => {
-              const topicos = categorias[0]?.slides || [];
-              const videos = categorias[0]?.videos || [];
-
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-
-                  {/* Dashboard Inteligente com Nível, XP, Streak de 7 Dias e Progresso de Habilidades */}
-                  <StudentGamificationHeader user={user} />
-
-                  {/* Cabeçalho da página */}
-                  <div>
-                    <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "4px" }}>
-                      📖 Guia de Estudo — Desenvolvimento Full Stack
-                    </h2>
-                    <p style={{ color: colors.textSecondary, fontSize: "14px" }}>
-                      Leia os conceitos fundamentais abaixo e assista às videoaulas para complementar seu aprendizado.
-                    </p>
-                  </div>
-
-                  {/* ===== SEÇÃO DE CONTEÚDO ESCRITO ===== */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                    {topicos.map((topico, idx) => (
-                      <div
-                        key={idx}
-                        id={`topico-slide-${idx}`}
-                        style={{
-                          backgroundColor: colors.bgCard,
-                          border: `1px solid ${colors.borderCard}`,
-                          borderRadius: "20px",
-                          overflow: "hidden",
-                          scrollMarginTop: "90px"
-                        }}
-                      >
-                        {/* Header do tópico */}
-                        <div style={{
-                          padding: "18px 24px",
-                          borderBottom: `1px solid ${topico.cor}33`,
-                          background: `linear-gradient(135deg, ${topico.cor}14, transparent)`,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "12px"
-                        }}>
-                          <span style={{
-                            fontSize: "28px",
-                            width: "48px", height: "48px",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            backgroundColor: `${topico.cor}22`,
-                            borderRadius: "14px",
-                            border: `1px solid ${topico.cor}33`
-                          }}>
-                            {topico.emoji}
-                          </span>
-                          <div style={{ flex: 1 }}>
-                            <h3 style={{ fontSize: "18px", fontWeight: "800", margin: 0, color: topico.cor }}>
-                              {topico.titulo}
-                            </h3>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px" }}>
-                              <span style={{ fontSize: "11px", fontWeight: "700", color: colors.textSecondary }}>
-                                Módulo {idx + 1} de {topicos.length}
-                              </span>
-                              {topico.nivel && (
-                                <span style={{
-                                  fontSize: "10px", fontWeight: "800",
-                                  padding: "2px 8px", borderRadius: "20px",
-                                  backgroundColor: topico.nivel === "Iniciante"
-                                    ? "rgba(16,185,129,0.15)"
-                                    : topico.nivel === "Intermediário"
-                                    ? "rgba(59,130,246,0.15)"
-                                    : "rgba(239,68,68,0.15)",
-                                  color: topico.nivel === "Iniciante"
-                                    ? "#10B981"
-                                    : topico.nivel === "Intermediário"
-                                    ? "#3B82F6"
-                                    : "#EF4444",
-                                  border: `1px solid ${
-                                    topico.nivel === "Iniciante"
-                                      ? "rgba(16,185,129,0.3)"
-                                      : topico.nivel === "Intermediário"
-                                      ? "rgba(59,130,246,0.3)"
-                                      : "rgba(239,68,68,0.3)"
-                                  }`
-                                }}>
-                                  {topico.nivel === "Iniciante" ? "🌱" : topico.nivel === "Intermediário" ? "🚀" : "⚡"} {topico.nivel}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                        </div>
-
-                        {/* Corpo do tópico */}
-                        <div style={{ padding: "20px 24px" }}>
-
-                          {/* Descrição */}
-                          <p style={{
-                            fontSize: "14px", lineHeight: "1.75",
-                            color: colors.textSecondary,
-                            borderLeft: `3px solid ${topico.cor}`,
-                            paddingLeft: "14px",
-                            marginBottom: "20px"
-                          }}>
-                            {topico.descricao}
-                          </p>
-
-                          {/* Tópicos */}
-                          <div style={{ marginBottom: "20px" }}>
-                            <p style={{ fontSize: "12px", fontWeight: "800", color: topico.cor, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                              📌 Pontos-chave
-                            </p>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "8px" }}>
-                              {topico.topicos.map((item, i) => (
-                                <div key={i} style={{
-                                  padding: "10px 14px",
-                                  borderRadius: "10px",
-                                  backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F8FAFC",
-                                  border: `1px solid ${colors.borderCard}`,
-                                  fontSize: "13px",
-                                  fontWeight: "500",
-                                  color: colors.textPrimary
-                                }}>
-                                  {item}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Exemplo de código */}
-                          {topico.exemplo && (
-                            <div>
-                              <p style={{ fontSize: "12px", fontWeight: "800", color: topico.cor, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                💻 Exemplo de Código
-                              </p>
-                              <pre style={{
-                                backgroundColor: isDark ? "#0F172A" : "#1E293B",
-                                color: "#E2E8F0",
-                                padding: "16px 20px",
-                                borderRadius: "12px",
-                                fontSize: "13px",
-                                fontFamily: "monospace",
-                                overflowX: "auto",
-                                lineHeight: "1.7",
-                                border: `1px solid ${topico.cor}33`,
-                                margin: 0
-                              }}>
-                                {topico.exemplo}
-                              </pre>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* ===== SEÇÃO DE VIDEOAULAS ===== */}
-                  <div style={{
-                    backgroundColor: colors.bgCard,
-                    border: `1px solid ${colors.borderCard}`,
-                    borderRadius: "20px",
-                    padding: "24px"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
-                      <span style={{
-                        fontSize: "22px", width: "44px", height: "44px",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        backgroundColor: "rgba(59,130,246,0.12)",
-                        borderRadius: "12px", border: "1px solid rgba(59,130,246,0.25)"
-                      }}>🎥</span>
-                      <div>
-                        <h3 style={{ fontSize: "17px", fontWeight: "800", margin: 0 }}>
-                          Videoaulas do DevHub
-                        </h3>
-                        <p style={{ fontSize: "13px", color: colors.textSecondary, margin: "2px 0 0 0" }}>
-                          Assista às aulas gravadas para reforçar o conteúdo
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      {videos.map((v, i) => (
-                        <a
-                          key={i}
-                          href={v.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "14px 18px",
-                            borderRadius: "12px",
-                            backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F8FAFC",
-                            border: `1px solid ${colors.borderCard}`,
-                            color: colors.textPrimary,
-                            textDecoration: "none",
-                            transition: "border-color 0.2s"
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <span style={{
-                              width: "32px", height: "32px",
-                              backgroundColor: "rgba(239,68,68,0.12)",
-                              border: "1px solid rgba(239,68,68,0.25)",
-                              borderRadius: "8px",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "14px"
-                            }}>▶</span>
-                            <span style={{ fontWeight: "600", fontSize: "14px" }}>{v.titulo}</span>
-                          </div>
-                          <span style={{ fontSize: "13px", fontWeight: "700", color: "#3B82F6" }}>
-                            Assistir →
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              );
-            })()}
+            {abaAtiva === "aulas" && <AulasSection user={user} />}
 
 
             {/* ABA 2: CALENDÁRIO & AGENDA MENSAL/DIÁRIA */}
@@ -2782,9 +2749,24 @@ export default function Dashboard() {
               <CadernoEstudosModule user={user} isDark={isDark} colors={colors} />
             )}
 
+            {/* ABA: CODE PLAYGROUND WEB */}
+            {abaAtiva === "playground" && (
+              <CodePlaygroundModule initialCode={targetSnippetCodigo} />
+            )}
+
+            {/* ABA: FLASHCARDS IA */}
+            {abaAtiva === "flashcards" && (
+              <FlashcardsModule />
+            )}
+
+            {/* ABA: TRILHAS DE APRENDIZADO & BADGES */}
+            {abaAtiva === "trilhas" && (
+              <TrilhasModule user={user} onSelectAba={handleNavegarDaTrilha} />
+            )}
+
             {/* ABA: LABORATÓRIO DE MINI-SISTEMAS PRÁTICOS */}
             {abaAtiva === "mini_sistemas" && (
-              <MiniSistemasModule user={user} isDark={isDark} colors={colors} />
+              <MiniSistemasModule user={user} isDark={isDark} colors={colors} initialProjetoId={targetProjetoId} />
             )}
 
             {/* ABA 3: HALL DA FAMA / RANKING DE DEVS */}
@@ -4548,6 +4530,20 @@ export default function Dashboard() {
           </div>
         )}
 
+
+        {/* MODAL DA CENTRAL DE NOTIFICAÇÕES */}
+        <NotificationCenterModal 
+          isOpen={modalNotificacoesOpen} 
+          onClose={() => setModalNotificacoesOpen(false)} 
+          onUpdateUnreadCount={(count) => setUnreadNotificacoesCount(count)}
+        />
+
+        {/* MODAL DE TICKETS & SUPORTE */}
+        <TicketsModule 
+          user={user} 
+          isOpen={modalTicketsOpen} 
+          onClose={() => setModalTicketsOpen(false)} 
+        />
 
         </div>
     </>

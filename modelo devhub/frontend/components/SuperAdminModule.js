@@ -168,9 +168,40 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
   const [novaProvaMateria, setNovaProvaMateria] = useState("JavaScript");
   const [novaProvaPrazo, setNovaProvaPrazo] = useState("");
   const [novaProvaTipo, setNovaProvaTipo] = useState("multipla");
-  const [modulosLiberados, setModulosLiberados] = useState({});
-
   const modulos = ["Aulas", "Caderno", "Provas", "Arena", "Ranking", "Dev IA"];
+
+  const PLANOS_ALUNOS = {
+    dev_start: {
+      id: "dev_start",
+      nome: "Dev Start",
+      badge: "🌱 Dev Start",
+      cor: "#10B981",
+      border: "rgba(16, 185, 129, 0.4)",
+      bg: "rgba(16, 185, 129, 0.12)",
+      modulosPermitidos: ["Aulas", "Caderno", "Ranking"],
+      descricao: "Módulos básicos: Aulas, Caderno de Estudos e Ranking"
+    },
+    dev_plus: {
+      id: "dev_plus",
+      nome: "Dev Plus",
+      badge: "⚡ Dev Plus",
+      cor: "#3B82F6",
+      border: "rgba(59, 130, 246, 0.4)",
+      bg: "rgba(59, 130, 246, 0.12)",
+      modulosPermitidos: ["Aulas", "Caderno", "Provas", "Arena", "Ranking"],
+      descricao: "Dev Start + Adicionais: Provas e Arena de Código"
+    },
+    dev_master: {
+      id: "dev_master",
+      nome: "Dev Master",
+      badge: "👑 Dev Master",
+      cor: "#A855F7",
+      border: "rgba(168, 85, 247, 0.4)",
+      bg: "rgba(168, 85, 247, 0.12)",
+      modulosPermitidos: ["Aulas", "Caderno", "Provas", "Arena", "Ranking", "Dev IA"],
+      descricao: "Acesso total a todos os módulos do sistema (com Dev IA)"
+    }
+  };
 
   // ── ANALYTICS AVANÇADO ─────────────────────────
   const retencaoSemanal = [
@@ -251,7 +282,65 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
     { id: 6, nome: "Bia Brasil", email: "biabrasil@gmail.com", cargo: "usuario", data: "Há 5 dias" }
   ];
 
+  const [modulosLiberados, setModulosLiberados] = useState({});
+  const [planosAlunos, setPlanosAlunos] = useState({});
+
   useEffect(() => { carregarUsuarios(); }, []);
+
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("devhub_planos_alunos") : null;
+      if (raw) setPlanosAlunos(JSON.parse(raw));
+    } catch (e) {}
+  }, []);
+
+  const handleChangePlanoAluno = (usuarioId, usuarioNome, novoPlanoKey) => {
+    const planoDef = PLANOS_ALUNOS[novoPlanoKey];
+    if (!planoDef) return;
+
+    setPlanosAlunos(prev => {
+      const novostate = { ...prev, [usuarioId]: novoPlanoKey };
+      const foundUser = usuarios.find(u => u.id === usuarioId || u.nome === usuarioNome);
+      if (foundUser) {
+        if (foundUser.email) novostate[foundUser.email.toLowerCase()] = novoPlanoKey;
+        if (foundUser.nome) {
+          const nLower = foundUser.nome.toLowerCase();
+          novostate[nLower] = novoPlanoKey;
+          const firstName = nLower.split(" ")[0];
+          if (firstName) novostate[firstName] = novoPlanoKey;
+        }
+      }
+      try {
+        localStorage.setItem("devhub_planos_alunos", JSON.stringify(novostate));
+      } catch (e) {}
+      return novostate;
+    });
+
+    setModulosLiberados(prev => {
+      const novostate = { ...prev };
+      const configMod = {};
+      modulos.forEach(m => {
+        configMod[m] = planoDef.modulosPermitidos.includes(m);
+      });
+      novostate[usuarioId] = configMod;
+      const foundUser = usuarios.find(u => u.id === usuarioId || u.nome === usuarioNome);
+      if (foundUser) {
+        if (foundUser.email) novostate[foundUser.email.toLowerCase()] = { ...configMod };
+        if (foundUser.nome) {
+          const nLower = foundUser.nome.toLowerCase();
+          novostate[nLower] = { ...configMod };
+          const firstName = nLower.split(" ")[0];
+          if (firstName) novostate[firstName] = { ...configMod };
+        }
+      }
+      try {
+        localStorage.setItem("devhub_modulos_liberados", JSON.stringify(novostate));
+      } catch (e) {}
+      return novostate;
+    });
+
+    showToast(`Plano de ${usuarioNome} alterado para ${planoDef.badge}!`);
+  };
 
   useEffect(() => {
     if (usuarios.length > 0) {
@@ -296,10 +385,18 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
           };
         }
         if (foundUser.nome) {
-          novostate[foundUser.nome.toLowerCase()] = {
-            ...(novostate[foundUser.nome.toLowerCase()] || {}),
+          const nLower = foundUser.nome.toLowerCase();
+          novostate[nLower] = {
+            ...(novostate[nLower] || {}),
             [modulo]: novoValor
           };
+          const firstName = nLower.split(" ")[0];
+          if (firstName) {
+            novostate[firstName] = {
+              ...(novostate[firstName] || {}),
+              [modulo]: novoValor
+            };
+          }
         }
       }
       try {
@@ -408,7 +505,8 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
     { id: "analytics", label: "Analytics", icon: <BarChart size={16} /> },
     { id: "academico", label: "Acadêmico", icon: <GraduationCap size={16} /> },
     { id: "plataforma", label: "Plataforma", icon: <Settings size={16} /> },
-    { id: "usuarios", label: "Usuários", icon: <Users size={16} /> }
+    { id: "usuarios", label: "Usuários", icon: <Users size={16} /> },
+    { id: "planos", label: "Planos & Acessos", icon: <Shield size={16} /> }
   ];
 
   // ─────────────────────────────────────────────
@@ -953,9 +1051,33 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                 </FormInput>
                 <PrimaryButton gradient="linear-gradient(135deg, #f97316, #ea580c)" shadow="0 4px 16px rgba(249,115,22,0.4)" onClick={() => {
                   if (!anuncioTitulo) return showToast("Digite um título para o anúncio.", "error");
-                  setAnunciosEnviados(prev => [{ id: Date.now(), titulo: anuncioTitulo, tipo: anuncioTipo, data: "Agora" }, ...prev]);
+                  const novoItem = {
+                    id: Date.now(),
+                    titulo: anuncioTitulo,
+                    mensagem: anuncioMsg,
+                    tipo: anuncioTipo,
+                    data: new Date().toLocaleDateString("pt-BR")
+                  };
+                  const novaLista = [novoItem, ...anunciosEnviados];
+                  setAnunciosEnviados(novaLista);
+                  try {
+                    localStorage.setItem("devhub_anuncios_globais", JSON.stringify(novaLista));
+
+                    // Sincroniza com a Central de Notificações
+                    const rawNotifs = localStorage.getItem("devhub_notifications");
+                    const prevNotifs = rawNotifs ? JSON.parse(rawNotifs) : [];
+                    const novaNotifCenter = {
+                      id: Date.now(),
+                      tipo: anuncioTipo === "alerta" ? "alerta" : anuncioTipo === "conquista" ? "conquista" : "agenda",
+                      titulo: `📢 ${anuncioTitulo}`,
+                      texto: anuncioMsg || anuncioTitulo,
+                      tempo: "Agora",
+                      lida: false
+                    };
+                    localStorage.setItem("devhub_notifications", JSON.stringify([novaNotifCenter, ...prevNotifs]));
+                  } catch (e) {}
                   setAnuncioTitulo(""); setAnuncioMsg(""); setAnuncioTipo("info");
-                  showToast("🔔 Anúncio global enviado para todos os alunos!");
+                  showToast("📢 Anúncio global publicado para todos os alunos!");
                 }}>
                   <Send size={17} /> Publicar Anúncio
                 </PrimaryButton>
@@ -970,7 +1092,11 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                           <div style={{ fontSize: "0.85rem", fontWeight: "700", color: isDark ? "#FFF" : "#0F172A" }}>{a.titulo}</div>
                           <div style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b" }}>{a.data} · {a.tipo}</div>
                         </div>
-                        <button onClick={() => setAnunciosEnviados(prev => prev.filter(x => x.id !== a.id))} style={{ background: "rgba(239,68,68,0.12)", border: "none", color: "#EF4444", padding: "6px", borderRadius: "8px", cursor: "pointer" }}>
+                        <button onClick={() => {
+                          const novaLista = anunciosEnviados.filter(x => x.id !== a.id);
+                          setAnunciosEnviados(novaLista);
+                          try { localStorage.setItem("devhub_anuncios_globais", JSON.stringify(novaLista)); } catch (e) {}
+                        }} style={{ background: "rgba(239,68,68,0.12)", border: "none", color: "#EF4444", padding: "6px", borderRadius: "8px", cursor: "pointer" }}>
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -991,6 +1117,35 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                   <FormInput isDark={isDark} label="Mensagem" as="textarea" value={notifMensagem} onChange={e => setNotifMensagem(e.target.value)} placeholder="Ex: Você tem uma prova pendente!" style={{ minHeight: "80px" }} />
                   <PrimaryButton gradient="linear-gradient(135deg, #a855f7, #7c3aed)" shadow="0 4px 16px rgba(168,85,247,0.4)" onClick={() => {
                     if (!notifAluno || !notifMensagem) return showToast("Selecione um aluno e escreva a mensagem.", "error");
+                    let salvas = [];
+                    try {
+                      const raw = localStorage.getItem("devhub_notificacoes_alunos");
+                      if (raw) salvas = JSON.parse(raw);
+                    } catch (e) {}
+                    const novaNotif = {
+                      id: Date.now(),
+                      aluno: notifAluno,
+                      mensagem: notifMensagem,
+                      lida: false,
+                      data: new Date().toLocaleDateString("pt-BR") + " " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                    };
+                    const listaAtualizada = [novaNotif, ...salvas];
+                    try {
+                      localStorage.setItem("devhub_notificacoes_alunos", JSON.stringify(listaAtualizada));
+
+                      // Sincroniza com a Central de Notificações
+                      const rawNotifs = localStorage.getItem("devhub_notifications");
+                      const prevNotifs = rawNotifs ? JSON.parse(rawNotifs) : [];
+                      const novaNotifCenter = {
+                        id: Date.now(),
+                        tipo: "alerta",
+                        titulo: `🔔 Notificação do Administrador`,
+                        texto: `[Para ${notifAluno}]: ${notifMensagem}`,
+                        tempo: "Agora",
+                        lida: false
+                      };
+                      localStorage.setItem("devhub_notifications", JSON.stringify([novaNotifCenter, ...prevNotifs]));
+                    } catch (e) {}
                     showToast(`🔔 Notificação enviada para ${notifAluno}!`);
                     setNotifAluno(""); setNotifMensagem("");
                   }}>
@@ -1089,43 +1244,6 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
               </div>
             </SectionCard>
           </div>
-
-          {/* Liberação de Módulos por Aluno */}
-          <SectionCard isDark={isDark} icon={<Shield size={20} color="#FFF" />} gradient="linear-gradient(135deg, #6366f1, #4f46e5)" title="🔓 Liberação de Módulos por Aluno" subtitle="Controle individualmente quais módulos cada aluno pode acessar">
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left", padding: "10px 14px", color: isDark ? "#94a3b8" : "#64748b", fontWeight: "700", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"}` }}>Aluno</th>
-                    {modulos.map(m => (
-                      <th key={m} style={{ padding: "10px 14px", textAlign: "center", color: isDark ? "#94a3b8" : "#64748b", fontWeight: "700", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"}` }}>{m}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuarios.map((u) => (
-                    <tr key={u.id}>
-                      <td style={{ padding: "10px 14px", fontWeight: "700", color: isDark ? "#E2E8F0" : "#0F172A", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "#F1F5F9"}` }}>{u.nome}</td>
-                      {modulos.map(m => {
-                        const liberado = modulosLiberados[u.id]?.[m] !== false;
-                        return (
-                          <td key={m} style={{ textAlign: "center", padding: "10px", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "#F1F5F9"}` }}>
-                            <button
-                              onClick={() => handleToggleModulo(u.id, u.nome, m, liberado)}
-                              title={liberado ? `Trancar ${m} para ${u.nome}` : `Liberar ${m} para ${u.nome}`}
-                              style={{ background: "none", border: "none", cursor: "pointer", color: liberado ? "#10B981" : "#EF4444", padding: "4px", transition: "transform 0.15s ease" }}
-                            >
-                              {liberado ? <Unlock size={18} /> : <Lock size={18} />}
-                            </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
         </>
       )}
 
@@ -1312,6 +1430,33 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                   <FormInput isDark={isDark} label="Meta de XP Semanal" type="number" value={trilhaMeta} onChange={e => setTrilhaMeta(e.target.value)} placeholder="Ex: 500" />
                   <PrimaryButton gradient="linear-gradient(135deg, #6366f1, #4f46e5)" shadow="0 4px 16px rgba(99,102,241,0.4)" onClick={() => {
                     if (!trilhaAluno || !trilhaTema) return showToast("Selecione o aluno e defina o foco.", "error");
+
+                    try {
+                      const savedTrilhas = localStorage.getItem("devhub_trilhas_individuais");
+                      const mapa = savedTrilhas ? JSON.parse(savedTrilhas) : {};
+                      mapa[trilhaAluno] = {
+                        tema: trilhaTema,
+                        metaXp: trilhaMeta || 500,
+                        data: new Date().toLocaleDateString("pt-BR"),
+                        instrutor: user?.nome || "Super Admin"
+                      };
+                      localStorage.setItem("devhub_trilhas_individuais", JSON.stringify(mapa));
+
+                      const savedNotifs = localStorage.getItem("devhub_notifications");
+                      const notifsList = savedNotifs ? JSON.parse(savedNotifs) : [];
+                      const novaNotif = {
+                        id: Date.now(),
+                        alunoAlvo: trilhaAluno,
+                        titulo: "🎯 Nova Trilha Individual Definida!",
+                        mensagem: `Seu professor definiu um novo foco de estudos: "${trilhaTema}" com meta de ${trilhaMeta || 500} XP/semana.`,
+                        tipo: "trilha",
+                        data: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                        lida: false
+                      };
+                      localStorage.setItem("devhub_notifications", JSON.stringify([novaNotif, ...notifsList]));
+                      window.dispatchEvent(new Event("storage"));
+                    } catch (e) {}
+
                     showToast(`🗺️ Trilha personalizada definida para ${trilhaAluno}!`);
                     setTrilhaAluno(""); setTrilhaTema(""); setTrilhaMeta("");
                   }}>
@@ -1518,6 +1663,93 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
             </form>
           </div>
         </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════
+          ABA 8 — PLANOS & ACESSOS DOS ALUNOS
+      ══════════════════════════════════════════════════ */}
+      {abaAdmin === "planos" && (
+        <SectionCard isDark={isDark} icon={<Shield size={20} color="#FFF" />} gradient="linear-gradient(135deg, #6366f1, #4f46e5)" title="🔓 Gestão de Planos & Liberação de Módulos" subtitle="Defina o Plano de cada aluno ou altere individualmente a liberação de cada módulo do sistema (exclusivo para SuperAdmin)">
+          {/* Banner Informativo dos Planos */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+            {Object.values(PLANOS_ALUNOS).map(p => (
+              <div key={p.id} style={{
+                padding: "12px 16px",
+                borderRadius: "12px",
+                backgroundColor: p.bg,
+                border: `1px solid ${p.border}`,
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px"
+              }}>
+                <div style={{ fontWeight: "800", color: p.cor, fontSize: "0.95rem" }}>{p.badge}</div>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#cbd5e1" : "#475569" }}>{p.descricao}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: isDark ? "#94a3b8" : "#64748b", fontWeight: "700", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"}` }}>Aluno</th>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: isDark ? "#94a3b8" : "#64748b", fontWeight: "700", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"}` }}>Plano Atual</th>
+                  {modulos.map(m => (
+                    <th key={m} style={{ padding: "10px 14px", textAlign: "center", color: isDark ? "#94a3b8" : "#64748b", fontWeight: "700", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"}` }}>{m}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {usuarios.map((u) => {
+                  const planoKey = planosAlunos[u.id] || planosAlunos[u.email?.toLowerCase()] || planosAlunos[u.nome?.toLowerCase()] || "dev_master";
+                  const planoAtual = PLANOS_ALUNOS[planoKey] || PLANOS_ALUNOS.dev_master;
+
+                  return (
+                    <tr key={u.id}>
+                      <td style={{ padding: "10px 14px", fontWeight: "700", color: isDark ? "#E2E8F0" : "#0F172A", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "#F1F5F9"}` }}>{u.nome}</td>
+                      <td style={{ padding: "10px 14px", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "#F1F5F9"}` }}>
+                        <select
+                          value={planoKey}
+                          onChange={(e) => handleChangePlanoAluno(u.id, u.nome, e.target.value)}
+                          style={{
+                            backgroundColor: planoAtual.bg,
+                            color: planoAtual.cor,
+                            border: `1px solid ${planoAtual.border}`,
+                            borderRadius: "10px",
+                            padding: "5px 10px",
+                            fontSize: "0.8rem",
+                            fontWeight: "800",
+                            cursor: "pointer",
+                            outline: "none",
+                            fontFamily: "inherit"
+                          }}
+                        >
+                          <option value="dev_start">🌱 Dev Start</option>
+                          <option value="dev_plus">⚡ Dev Plus</option>
+                          <option value="dev_master">👑 Dev Master</option>
+                        </select>
+                      </td>
+                      {modulos.map(m => {
+                        const liberado = modulosLiberados[u.id]?.[m] !== false;
+                        return (
+                          <td key={m} style={{ textAlign: "center", padding: "10px", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "#F1F5F9"}` }}>
+                            <button
+                              onClick={() => handleToggleModulo(u.id, u.nome, m, liberado)}
+                              title={liberado ? `Trancar ${m} para ${u.nome}` : `Liberar ${m} para ${u.nome}`}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: liberado ? "#10B981" : "#EF4444", padding: "4px", transition: "transform 0.15s ease" }}
+                            >
+                              {liberado ? <Unlock size={18} /> : <Lock size={18} />}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
       )}
 
     </div>

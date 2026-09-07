@@ -222,20 +222,26 @@ router.get("/hall-da-fama", async (req, res) => {
       ORDER BY e.xp DESC LIMIT 50
     `);
 
-    // Categorias simuladas dinâmicas baseadas nas estatísticas
-    const rankingGeral = alunos.map((a, index) => ({
-      posicao: index + 1,
-      nome: a.nome,
-      xp: a.xp || (1000 - index * 50),
-      desafios: 20 + Math.floor(Math.random() * 15),
-      batalhas: 10 + Math.floor(Math.random() * 10),
-      titulo: a.titulo
-    }));
+    // Categorias simuladas dinâmicas baseadas na Sequência de Fogo Semanal
+    const rankingGeral = alunos.map((a, index) => {
+      // Todos começam com sequências realistas (ex: 3, 2, 1, 0)
+      const fogoSemanas = Math.max(0, 3 - index);
+      return {
+        posicao: index + 1,
+        nome: a.nome,
+        xp: a.xp || (350 - index * 50),
+        fogoSemanas,
+        titulo: fogoSemanas >= 3 ? "👑 Mestre do Fogo" : fogoSemanas >= 1 ? "🔥 Dev Incandescente" : "💀 Chama Apagada",
+        desafios: fogoSemanas,
+        batalhas: 5 + Math.floor(Math.random() * 5)
+      };
+    }).sort((a, b) => b.fogoSemanas - a.fogoSemanas || b.xp - a.xp)
+      .map((item, idx) => ({ ...item, posicao: idx + 1 }));
 
     res.json({
       geral: rankingGeral,
-      melhorFrontend: rankingGeral.slice().sort((a, b) => b.desafios - a.desafios),
-      melhorBackend: rankingGeral.slice().sort((a, b) => b.batalhas - a.batalhas),
+      melhorFrontend: rankingGeral.slice().sort((a, b) => b.fogoSemanas - a.fogoSemanas),
+      melhorBackend: rankingGeral.slice().sort((a, b) => b.xp - a.xp),
       melhorLogica: rankingGeral,
       maiorEvolucao: rankingGeral.slice().reverse()
     });

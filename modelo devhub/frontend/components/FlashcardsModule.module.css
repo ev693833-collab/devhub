@@ -1,0 +1,212 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid #1e293b;
+  margin-bottom: 30px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 16px;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconBadge {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  padding: 10px;
+  border-radius: 12px;
+  color: #fff;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 2px 0 0 0;
+}
+
+.generateForm {
+  display: flex;
+  gap: 10px;
+}
+
+.inputTopic {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  outline: none;
+  min-width: 260px;
+}
+
+.inputTopic:focus {
+  border-color: #f59e0b;
+}
+
+.btnGenerate {
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btnGenerate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.cardWrapper {
+  perspective: 1000px;
+  height: 220px;
+  cursor: pointer;
+}
+
+.cardInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+  border-radius: 14px;
+}
+
+.flipped {
+  transform: rotateY(180deg);
+}
+
+.cardFront, .cardBack {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.cardFront {
+  background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+  color: #f8fafc;
+}
+
+.cardBack {
+  background: linear-gradient(145deg, #3b0764 0%, #1e1b4b 100%);
+  color: #e9d5ff;
+  transform: rotateY(180deg);
+  border-color: #a855f7;
+}
+
+.categoryTag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #f59e0b;
+  letter-spacing: 0.5px;
+}
+
+.cardQuestion {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 10px 0;
+}
+
+.cardAnswer {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin: 10px 0;
+}
+
+.cardFooterHint {
+  font-size: 0.75rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.loadingBanner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.15) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  padding: 16px 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  animation: pulse 1.5s infinite alternate;
+}
+
+.skeletonCard {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  height: 220px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 0.6;
+  animation: pulse 1.2s infinite alternate;
+}
+
+.skeletonLine {
+  background: #334155;
+  border-radius: 6px;
+  height: 14px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}

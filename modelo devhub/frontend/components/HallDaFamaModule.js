@@ -38,11 +38,10 @@ export default function HallDaFamaModule({ isDark, colors }) {
   const restante = listaAtual.slice(3);
 
   const CATEGORIAS = [
-    { id: "geral", nome: "Ranking Geral 👑", desc: "Os maiores pontuadores de XP" },
-    { id: "melhorFrontend", nome: "Melhor Front-end 🎨", desc: "Líderes em desafios visuais e UI" },
-    { id: "melhorBackend", nome: "Melhor Back-end ⚙️", desc: "Mestres em bancos de dados e APIs" },
-    { id: "melhorLogica", nome: "Melhor Lógica 🧩", desc: "Campeões em algoritmos e complexidade" },
-    { id: "maiorEvolucao", nome: "Maior Evolução 🚀", desc: "Alunos com maior crescimento recente" }
+    { id: "geral", nome: "Mestres do Fogo 🔥", desc: "Os alunos com a maior sequência de chamas semanas acesas" },
+    { id: "melhorFrontend", nome: "Maior Foco Semanal ⚡", desc: "Líderes em constância de estudo" },
+    { id: "melhorBackend", nome: "Maiores Pontuadores 👑", desc: "Ranking por XP acumulado" },
+    { id: "maiorEvolucao", nome: "Chamas Mais Longas 🚀", desc: "Sequências ininterruptas de estudo" }
   ];
 
   return (
@@ -51,10 +50,10 @@ export default function HallDaFamaModule({ isDark, colors }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
         <div>
           <h2 style={{ fontSize: "22px", fontWeight: "900", display: "flex", alignItems: "center", gap: "10px", margin: "0 0 6px 0" }}>
-            🏆 Hall da Fama DevHub
+            🏆 Hall da Fama — Fogo de Estudo DevHub
           </h2>
           <p style={{ color: colors?.textSecondary || "#94A3B8", fontSize: "14px", margin: 0 }}>
-            Reconhecimento oficial dos melhores alunos em cada especialidade da tecnologia.
+            Reconhecimento dos alunos com a maior sequência e constância semanal de estudo (Chamas Acesas 🔥).
           </p>
         </div>
 
@@ -94,8 +93,11 @@ export default function HallDaFamaModule({ isDark, colors }) {
                 boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
               }}>
                 <strong style={{ fontSize: "16px", display: "block" }}>{top3[1].nome}</strong>
-                <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: "700" }}>{top3[1].titulo || "Dev Pleno"}</span>
-                <div style={{ marginTop: "12px", fontSize: "14px", fontWeight: "900", color: "#F59E0B" }}>⚡ {top3[1].xp} XP</div>
+                <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: "700" }}>{top3[1].titulo || "Dev Incandescente"}</span>
+                <div style={{ marginTop: "10px", fontSize: "15px", fontWeight: "900", color: "#F59E0B" }}>
+                  🔥 {top3[1].fogoSemanas || top3[1].desafios || 1} Semanas em Chamas
+                </div>
+                <div style={{ fontSize: "12px", color: "#818cf8", fontWeight: "700", marginTop: "4px" }}>⚡ {top3[1].xp} XP Total</div>
               </div>
             </div>
           )}
@@ -109,9 +111,11 @@ export default function HallDaFamaModule({ isDark, colors }) {
                 boxShadow: "0 12px 30px rgba(245,158,11,0.3)"
               }}>
                 <strong style={{ fontSize: "18px", display: "block", color: "#F59E0B" }}>{top3[0].nome}</strong>
-                <span style={{ fontSize: "13px", color: "#FBBF24", fontWeight: "800" }}>{top3[0].titulo || "Senior Developer"}</span>
-                <div style={{ marginTop: "14px", fontSize: "18px", fontWeight: "900", color: "#F59E0B" }}>🔥 {top3[0].xp} XP</div>
-                <div style={{ fontSize: "11px", color: colors?.textSecondary, marginTop: "4px" }}>{top3[0].desafios} desafios • {top3[0].batalhas} batalhas</div>
+                <span style={{ fontSize: "13px", color: "#FBBF24", fontWeight: "800" }}>{top3[0].titulo || "👑 Mestre do Fogo"}</span>
+                <div style={{ marginTop: "12px", fontSize: "18px", fontWeight: "900", color: "#F59E0B" }}>
+                  🔥 {top3[0].fogoSemanas || top3[0].desafios || 1} Semanas Incandescente!
+                </div>
+                <div style={{ fontSize: "13px", color: "#38bdf8", fontWeight: "800", marginTop: "4px" }}>⚡ {top3[0].xp} XP Total</div>
               </div>
             </div>
           )}
@@ -125,8 +129,11 @@ export default function HallDaFamaModule({ isDark, colors }) {
                 boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
               }}>
                 <strong style={{ fontSize: "16px", display: "block" }}>{top3[2].nome}</strong>
-                <span style={{ fontSize: "12px", color: "#D97706", fontWeight: "700" }}>{top3[2].titulo || "Dev Jr"}</span>
-                <div style={{ marginTop: "12px", fontSize: "14px", fontWeight: "900", color: "#F59E0B" }}>⚡ {top3[2].xp} XP</div>
+                <span style={{ fontSize: "12px", color: "#D97706", fontWeight: "700" }}>{top3[2].titulo || "Chama Ativa"}</span>
+                <div style={{ marginTop: "10px", fontSize: "15px", fontWeight: "900", color: "#F59E0B" }}>
+                  🔥 {top3[2].fogoSemanas || top3[2].desafios || 1} Semanas em Chamas
+                </div>
+                <div style={{ fontSize: "12px", color: "#818cf8", fontWeight: "700", marginTop: "4px" }}>⚡ {top3[2].xp} XP Total</div>
               </div>
             </div>
           )}
@@ -140,8 +147,8 @@ export default function HallDaFamaModule({ isDark, colors }) {
             <tr style={{ borderBottom: `1px solid ${colors?.borderCard || "rgba(255,255,255,0.1)"}`, color: colors?.textSecondary || "#94A3B8" }}>
               <th style={{ padding: "16px 20px" }}>Posição</th>
               <th style={{ padding: "16px 20px" }}>Aluno</th>
-              <th style={{ padding: "16px 20px" }}>Título</th>
-              <th style={{ padding: "16px 20px" }}>Desafios Concluídos</th>
+              <th style={{ padding: "16px 20px" }}>Título de Fogo</th>
+              <th style={{ padding: "16px 20px" }}>Sequência de Fogo (Semanas 🔥)</th>
               <th style={{ padding: "16px 20px", textAlign: "right" }}>XP Total</th>
             </tr>
           </thead>
@@ -150,9 +157,15 @@ export default function HallDaFamaModule({ isDark, colors }) {
               <tr key={index} style={{ borderBottom: `1px solid ${colors?.borderCard || "rgba(255,255,255,0.05)"}` }}>
                 <td style={{ padding: "16px 20px", fontWeight: "800", color: colors?.textSecondary }}>#{index + 4}</td>
                 <td style={{ padding: "16px 20px", fontWeight: "700" }}>{aluno.nome}</td>
-                <td style={{ padding: "16px 20px" }}><span style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "10px", backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B", fontWeight: "800" }}>{aluno.titulo}</span></td>
-                <td style={{ padding: "16px 20px", color: colors?.textSecondary }}>{aluno.desafios} exercícios</td>
-                <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: "900", color: "#F59E0B" }}>{aluno.xp} XP</td>
+                <td style={{ padding: "16px 20px" }}>
+                  <span style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "10px", backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B", fontWeight: "800" }}>
+                    {aluno.titulo}
+                  </span>
+                </td>
+                <td style={{ padding: "16px 20px", fontWeight: "800", color: "#F59E0B" }}>
+                  🔥 {aluno.fogoSemanas || aluno.desafios || 1} Semanas Incandescente
+                </td>
+                <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: "900", color: "#38bdf8" }}>{aluno.xp} XP</td>
               </tr>
             ))}
           </tbody>

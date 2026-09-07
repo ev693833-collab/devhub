@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Code, Play, Eye, Sparkles, Terminal, User, ShoppingBag, DollarSign, CheckCircle2, AlertCircle, RefreshCw, Copy, Check, Table, HelpCircle, Layers, Inbox, Trash2, BookOpen, ShieldCheck, Cpu, ArrowLeft, Star, FileCode, CheckSquare, Award, Flame
 } from "lucide-react";
@@ -22,7 +22,7 @@ const PROJETOS_REAIS = [
     ],
     dicaSenior: "💡 Dica de Tech Lead: Separe a lógica de validação da manipulação dos objetos para manter o código limpo (Clean Code).",
     boilerplate: `// 📚 DESAFIO: Sistema de Biblioteca & Empréstimos
-// Requisito: Defina os livros e atribua o retorno compilado à variável 'resultado'
+// Requisito: Defina a função 'emprestarLivro' e atribua a variável 'resultado'
 
 const acervo = [
   { id: 1, titulo: "Clean Code", autor: "Robert C. Martin", status: "disponivel" },
@@ -31,22 +31,19 @@ const acervo = [
 ];
 
 function emprestarLivro(id) {
-  const livro = acervo.find(l => l.id === id);
-  if (livro && livro.status === "disponivel") {
-    livro.status = "emprestado";
-  }
+  // TODO: Busque o livro pelo ID no acervo e altere o status de "disponivel" para "emprestado"
+  
 }
 
-// Realiza 1 empréstimo para teste
-emprestarLivro(1);
+// TODO: Chame a função emprestarLivro(1) para testar o empréstimo
 
+
+// TODO: Atribua o resultado compilado à variável 'resultado':
 const resultado = {
   totalLivros: acervo.length,
-  emprestados: acervo.filter(l => l.status === "emprestado").length,
+  emprestados: 0, // TODO: Substitua pelo cálculo de livros com status "emprestado"
   acervoAtualizado: acervo
-};
-
-console.log("✅ Sistema de Biblioteca executado com sucesso!");`
+};`
   },
   {
     id: "auth_jwt",
@@ -70,18 +67,14 @@ const usuariosDB = [
 ];
 
 function realizarLogin(email) {
-  const user = usuariosDB.find(u => u.email === email);
-  if (!user) return { sucesso: false, erro: "Usuário não encontrado" };
+  // TODO: Busque o usuário em usuariosDB pelo email.
+  // Se não encontrar, retorne { sucesso: false, erro: "Usuário não encontrado" }
+  // Se encontrar, retorne { sucesso: true, token: "bearer_xyz_123", usuario: user.email }
   
-  return {
-    sucesso: true,
-    token: "bearer_xyz_" + Math.random().toString(36).substr(2, 9),
-    usuario: user.email
-  };
 }
 
-const resultado = realizarLogin("dev@devhub.com");
-console.log("🔑 Autenticação efetuada.");`
+// TODO: Execute realizarLogin("dev@devhub.com") e atribua o retorno à variável 'resultado'
+const resultado = null;`
   },
   {
     id: "api_rest",
@@ -106,23 +99,13 @@ const produtos = [
 ];
 
 function postProduto(novoProduto) {
-  if (!novoProduto.nome || !novoProduto.preco) {
-    return { status: 400, body: { erro: "Nome e preço são obrigatórios." } };
-  }
-  const item = { id: produtos.length + 1, ...novoProduto };
-  produtos.push(item);
-  return { status: 201, body: item };
+  // TODO: Valide se o produto contém 'nome' e 'preco'. Se não tiver, retorne { status: 400, body: { erro: "..." } }
+  // Caso válido, insira no array 'produtos' com novo ID e retorne { status: 201, body: produtoCriado }
+  
 }
 
-const respostaApi = postProduto({ nome: "Mouse Gamer 16000 DPI", preco: 149.90, categoria: "Periféricos" });
-
-const resultado = {
-  statusHttp: respostaApi.status,
-  produtoCriado: respostaApi.body,
-  totalProdutos: produtos.length
-};
-
-console.log("🚀 Requisição REST simulada.");`
+// TODO: Cadastre um novo produto e atribua o resultado à variável 'resultado'
+const resultado = null;`
   },
   {
     id: "ecommerce",
@@ -146,20 +129,17 @@ const carrinho = [
   { item: "Apostila de Algoritmos", qtd: 2, precoUnitario: 35.00 }
 ];
 
-let subtotal = carrinho.reduce((acc, i) => acc + (i.qtd * i.precoUnitario), 0);
-let desconto = subtotal > 200 ? subtotal * 0.10 : 0;
-let frete = subtotal > 150 ? 0 : 15.00;
-let total = subtotal - desconto + frete;
+// TODO: Calcule o subtotal somando (qtd * precoUnitario) dos itens do carrinho
+let subtotal = 0; 
 
-const resultado = {
-  itens: carrinho.length,
-  subtotal: subtotal.toFixed(2),
-  descontoAplicado: desconto.toFixed(2),
-  frete: frete === 0 ? "GRÁTIS 🚚" : \`R$ \${frete.toFixed(2)}\`,
-  totalPagar: \`R$ \${total.toFixed(2)}\`
-};
+// TODO: Aplique 10% de desconto se subtotal > 200, senão 0
+let desconto = 0; 
 
-console.log("🛒 Pedido calculado.");`
+// TODO: Calcule frete (0 se subtotal > 150, senão 15.00)
+let frete = 0; 
+
+// TODO: Atribua o objeto com a compra final à variável 'resultado'
+const resultado = null;`
   },
   {
     id: "dashboard",
@@ -184,18 +164,15 @@ const transacoes = [
   { id: 3, descricao: "Consultoria Dev", valor: 800.00, tipo: "receita" }
 ];
 
-const totalReceitas = transacoes.filter(t => t.tipo === "receita").reduce((a, b) => a + b.valor, 0);
-const totalDespesas = transacoes.filter(t => t.tipo === "despesa").reduce((a, b) => a + b.valor, 0);
-const saldoLiquido = totalReceitas - totalDespesas;
+// TODO: Calcule o total de receitas e o total de despesas
+const totalReceitas = 0;
+const totalDespesas = 0;
 
-const resultado = {
-  receitaTotal: \`R$ \${totalReceitas.toFixed(2)}\`,
-  despesaTotal: \`R$ \${totalDespesas.toFixed(2)}\`,
-  saldoLiquido: \`R$ \${saldoLiquido.toFixed(2)}\`,
-  margemLucro: \`\${((saldoLiquido / totalReceitas) * 100).toFixed(1)}%\`
-};
+// TODO: Calcule o saldo líquido (receitas - despesas)
+const saldoLiquido = 0;
 
-console.log("📊 KPIs consolidados.");`
+// TODO: Atribua o resumo dos KPIs à variável 'resultado'
+const resultado = null;`
   },
   {
     id: "helpdesk",
@@ -219,18 +196,15 @@ const tickets = [
 ];
 
 function atenderTicketCritico() {
-  const critico = tickets.find(t => t.prioridade === "ALTA" && t.status === "aberto");
-  if (critico) critico.status = "em_atendimento";
+  // TODO: Encontre o ticket de prioridade "ALTA" que esteja "aberto" e mude seu status para "em_atendimento"
+  
 }
 
-atenderTicketCritico();
+// TODO: Execute a função atenderTicketCritico()
 
-const resultado = {
-  chamadosAbertos: tickets.filter(t => t.status !== "resolvido").length,
-  filaAtendimento: tickets
-};
 
-console.log("🎟️ Ticket atendeu prioridade alta.");`
+// TODO: Atribua o objeto final dos chamados à variável 'resultado'
+const resultado = null;`
   },
   {
     id: "financeiro",
@@ -252,24 +226,16 @@ let saldoConta = 500.00;
 const historicoExtrato = [];
 
 function efetuarPagamento(descricao, valor) {
-  if (valor > saldoConta) {
-    historicoExtrato.push({ descricao, valor, status: "RECUSADO ❌ (Saldo insuficiente)" });
-    return false;
-  }
-  saldoConta -= valor;
-  historicoExtrato.push({ descricao, valor, status: "APROVADO ✅" });
-  return true;
+  // TODO: Se valor > saldoConta, registre no extrato { descricao, valor, status: "RECUSADO" } e retorne false.
+  // Senão, subtraia de saldoConta, registre no extrato { descricao, valor, status: "APROVADO" } e retorne true.
+  
 }
 
-efetuarPagamento("Servidor VPS", 120.00);
-efetuarPagamento("Notebook Novo", 4500.00);
+// TODO: Teste pagamentos (ex: efetuarPagamento("Servidor VPS", 120.00))
 
-const resultado = {
-  saldoFinal: \`R$ \${saldoConta.toFixed(2)}\`,
-  operacoes: historicoExtrato
-};
 
-console.log("💰 Balanço financeiro concluído.");`
+// TODO: Atribua o extrato e saldo final à variável 'resultado'
+const resultado = null;`
   },
   {
     id: "chat_realtime",
@@ -293,17 +259,12 @@ const conversas = [
 ];
 
 function marcarComoLido() {
-  conversas.forEach(m => m.lido = true);
+  // TODO: Altere o atributo 'lido' de todas as mensagens para true
+  
 }
 
-const resultado = {
-  totalMensagens: conversas.length,
-  naoLidasAntes: conversas.filter(m => !m.lido).length,
-  mensagens: conversas
-};
-
-marcarComoLido();
-console.log("💬 Chat processado.");`
+// TODO: Atribua a lista de mensagens e o total lidos/não lidos à variável 'resultado'
+const resultado = null;`
   },
   {
     id: "fullstack_app",
@@ -324,24 +285,18 @@ const Database = {
   projetos: [{ id: 1, nome: "Plataforma DevHub", progresso: 100 }]
 };
 
-const Controller = {
-  getDashboard() {
-    return {
-      app: "DevHub FullStack",
-      versao: "2.0.0",
-      statusServidor: "ONLINE 🟢",
-      projetosConcluidos: Database.projetos
-    };
-  }
-};
+function cadastrarProjeto(nome, progresso) {
+  // TODO: Adicione o projeto no Database.projetos com ID novo
+  
+}
 
-const resultado = Controller.getDashboard();
-console.log("⚡ Aplicação FullStack Executada.");`
+// TODO: Atribua o estado final da aplicação à variável 'resultado'
+const resultado = null;`
   }
 ];
 
-export default function MiniSistemasModule({ user, isDark, colors }) {
-  const [projetoSelecionadoId, setProjetoSelecionadoId] = useState(null);
+export default function MiniSistemasModule({ user, isDark, colors, initialProjetoId }) {
+  const [projetoSelecionadoId, setProjetoSelecionadoId] = useState(initialProjetoId || null);
   const [filtroNivel, setFiltroNivel] = useState("Todos");
   const [codigoText, setCodigoText] = useState("");
   const [analiseStatus, setAnaliseStatus] = useState(null);
@@ -350,6 +305,16 @@ export default function MiniSistemasModule({ user, isDark, colors }) {
   const [codeReviewIa, setCodeReviewIa] = useState(null);
   const [copiado, setCopiado] = useState(false);
   const [projetosConcluidosIds, setProjetosConcluidosIds] = useState(["biblioteca"]);
+
+  useEffect(() => {
+    if (initialProjetoId) {
+      const proj = PROJETOS_REAIS.find(p => p.id === initialProjetoId);
+      if (proj) {
+        setProjetoSelecionadoId(proj.id);
+        setCodigoText(proj.boilerplate);
+      }
+    }
+  }, [initialProjetoId]);
 
   // Obter o projeto ativo selecionado pelo aluno
   const projetoAtivo = useMemo(() => {
