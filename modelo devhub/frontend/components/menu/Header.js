@@ -243,15 +243,15 @@ export default function Header({ auth }) {
             <div className={styles.userInfo}>
 
               <div className={`${styles.userAvatar} userAvatar`} onClick={() => setShowUserDropdown(!showUserDropdown)}>
-                {user.avatar_url ? (
+                {(user?.avatar_url || user?.avatar) ? (
                   <img
-                    src={user.avatar_url}
+                    src={user.avatar_url || user.avatar}
                     alt="Avatar"
                     className={styles.avatarImage}
                   />
                 ) : (
                   <div className={styles.avatarPlaceholder}>
-                    {user.nome ? user.nome.charAt(0).toUpperCase() : 'U'}
+                    {user?.nome ? user.nome.charAt(0).toUpperCase() : 'U'}
                   </div>
                 )}
                 <div className={styles.userDetails}>

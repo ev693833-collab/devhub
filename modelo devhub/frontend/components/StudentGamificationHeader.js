@@ -14,7 +14,7 @@ export default function StudentGamificationHeader({ user }) {
     ]
   });
 
-  const [streakDias, setStreakDias] = useState(0);
+  const [streakDias, setStreakDias] = useState(1);
   const [estudouHojeState, setEstudouHojeState] = useState(false);
   const [historicoDias, setHistoricoDias] = useState([
     { dia: "Seg", concluido: false },
@@ -26,21 +26,43 @@ export default function StudentGamificationHeader({ user }) {
     { dia: "Dom", concluido: false }
   ]);
 
-  // Lógica de Streak: O fogo SÓ É ACENDIDO quando o aluno REALIZA PROVAS / EXERCÍCIOS
+  // Função para pegar ano e semana atual
+  const getSemanaAnoObj = () => {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const pastDays = (now - startOfYear) / 86400000;
+    const semNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
+    return { ano: now.getFullYear(), semana: semNum, semId: `${now.getFullYear()}_W${semNum}` };
+  };
+
+  // Lógica de Streak Semanal (Se falhar a semana, o fogo morre e zera!)
   const atualizarEstadoStreak = () => {
     if (typeof window === "undefined" || !user) return;
 
     const userEmailKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, "_") : "aluno_default";
-    const keyUltimoEstudo = `devhub_access_date_${userEmailKey}`;
-    const keyStreakContador = `devhub_streak_count_${userEmailKey}`;
-    const hojeStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-    const keyEstudouHoje = `devhub_estudou_hoje_${userEmailKey}_${hojeStr}`;
+    const semInfo = getSemanaAnoObj();
+    const keyEstudouSemana = `devhub_chama_semanal_${userEmailKey}_${semInfo.semId}`;
+    const keyStreakSemanal = `devhub_weekly_streak_${userEmailKey}`;
+    const keyUltimoAno = `devhub_last_lit_year_${userEmailKey}`;
+    const keyUltimaSemanaNum = `devhub_last_lit_week_num_${userEmailKey}`;
 
-    const estudouHoje = localStorage.getItem(keyEstudouHoje) === "true";
-    setEstudouHojeState(estudouHoje);
+    const estudouNaSemana = localStorage.getItem(keyEstudouSemana) === "true";
+    setEstudouHojeState(estudouNaSemana);
 
-    const rawStreak = localStorage.getItem(keyStreakContador);
-    const streakSalvo = rawStreak ? parseInt(rawStreak) : 0;
+    const lastYear = parseInt(localStorage.getItem(keyUltimoAno) || "0");
+    const lastWeekNum = parseInt(localStorage.getItem(keyUltimaSemanaNum) || "0");
+
+    let streakSalvo = parseInt(localStorage.getItem(keyStreakSemanal) || "0");
+
+    // Se o aluno ficou mais de 1 semana sem acender a chama, O FOGO MORREU 💀 (Zera!)
+    if (lastYear > 0 && lastWeekNum > 0) {
+      const difSemanas = (semInfo.ano - lastYear) * 52 + (semInfo.semana - lastWeekNum);
+      if (difSemanas > 1 && !estudouNaSemana) {
+        streakSalvo = 0;
+        localStorage.setItem(keyStreakSemanal, "0");
+      }
+    }
+
     setStreakDias(streakSalvo);
 
     const diasSemanaNomes = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -59,7 +81,7 @@ export default function StudentGamificationHeader({ user }) {
     const nomeHoje = diasSemanaNomes[diaHojeIndex];
     const itemHoje = historicoAtualizado.find(d => d.dia === nomeHoje);
     if (itemHoje) {
-      itemHoje.concluido = estudouHoje;
+      itemHoje.concluido = estudouNaSemana;
     }
     setHistoricoDias(historicoAtualizado);
   };
@@ -67,27 +89,39 @@ export default function StudentGamificationHeader({ user }) {
   useEffect(() => {
     atualizarEstadoStreak();
 
-    // Event listener global para acender o fogo assim que o aluno realizar uma prova/exercício
+    // Event listener global para acender a chama semanal
     const handleEstudoConcluido = () => {
       if (!user) return;
       const userEmailKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, "_") : "aluno_default";
-      const hojeStr = new Date().toISOString().split("T")[0];
-      const keyUltimoEstudo = `devhub_access_date_${userEmailKey}`;
-      const keyStreakContador = `devhub_streak_count_${userEmailKey}`;
-      const keyEstudouHoje = `devhub_estudou_hoje_${userEmailKey}_${hojeStr}`;
+      const semInfo = getSemanaAnoObj();
+      const keyEstudouSemana = `devhub_chama_semanal_${userEmailKey}_${semInfo.semId}`;
+      const keyStreakSemanal = `devhub_weekly_streak_${userEmailKey}`;
+      const keyUltimoAno = `devhub_last_lit_year_${userEmailKey}`;
+      const keyUltimaSemanaNum = `devhub_last_lit_week_num_${userEmailKey}`;
 
-      const jaEstudou = localStorage.getItem(keyEstudouHoje) === "true";
-      localStorage.setItem(keyEstudouHoje, "true");
+      const jaEstudouNaSemana = localStorage.getItem(keyEstudouSemana) === "true";
+      localStorage.setItem(keyEstudouSemana, "true");
 
-      if (!jaEstudou) {
-        const rawStreak = localStorage.getItem(keyStreakContador);
-        const streakSalvo = rawStreak ? parseInt(rawStreak) : 0;
-        const novoStreak = streakSalvo + 1;
+      if (!jaEstudouNaSemana) {
+        const lastYear = parseInt(localStorage.getItem(keyUltimoAno) || "0");
+        const lastWeekNum = parseInt(localStorage.getItem(keyUltimaSemanaNum) || "0");
+        let streakAtual = parseInt(localStorage.getItem(keyStreakSemanal) || "0");
 
-        localStorage.setItem(keyUltimoEstudo, hojeStr);
-        localStorage.setItem(keyStreakContador, String(novoStreak));
+        if (lastYear > 0 && lastWeekNum > 0) {
+          const difSemanas = (semInfo.ano - lastYear) * 52 + (semInfo.semana - lastWeekNum);
+          if (difSemanas > 1) {
+            streakAtual = 1; // Reiniciou do zero
+          } else {
+            streakAtual = streakAtual + 1; // Mantém a sequência
+          }
+        } else {
+          streakAtual = 1;
+        }
 
-        setStreakDias(novoStreak);
+        localStorage.setItem(keyUltimoAno, String(semInfo.ano));
+        localStorage.setItem(keyUltimaSemanaNum, String(semInfo.semana));
+        localStorage.setItem(keyStreakSemanal, String(streakAtual));
+        setStreakDias(streakAtual);
       }
 
       setEstudouHojeState(true);
@@ -154,20 +188,20 @@ export default function StudentGamificationHeader({ user }) {
           </h2>
           <div className={styles.subgreeting}>
             <Sparkles size={16} color="#f59e0b" />
-            <span>Mantenha sua chama acesa diariamente completando exercícios e provas!</span>
+            <span>Mantenha sua chama acesa semanalmente estudando e praticando no DevHub!</span>
           </div>
         </div>
 
         <div className={styles.badgesGroup}>
           <div
             className={estudouHojeState ? styles.streakBadgeActive : styles.streakBadgeInactive}
-            title={estudouHojeState ? "🔥 Fogo acendido hoje!" : "⭕ Fogo apagado! Faça 1 atividade para acender."}
+            title={estudouHojeState ? "🔥 Fogo acendido esta semana!" : "⭕ Chama apagada esta semana! Estude para acendê-la."}
           >
             <Flame size={20} fill={estudouHojeState ? "#f59e0b" : "none"} color={estudouHojeState ? "#f59e0b" : "#ef4444"} />
             <span>
               {estudouHojeState
-                ? `🔥 ${streakDias} ${streakDias === 1 ? "Dia" : "Dias"} Incandescente!`
-                : "🌑 Chama Apagada Hoje"}
+                ? `🔥 ${streakDias} ${streakDias === 1 ? "Semana" : "Semanas"} Incandescente!`
+                : "🌑 Chama Apagada Esta Semana"}
             </span>
           </div>
 
@@ -201,21 +235,21 @@ export default function StudentGamificationHeader({ user }) {
               <span>🔥 Fogo de Sequência Semanal</span>
             </div>
 
-            {/* Grid dos 7 dias da semana estilo Duolingo */}
+            {/* Grid dos 7 dias da semana */}
             <div className={styles.streakGrid}>
               {historicoDias.map((d, index) => (
                 <div key={index} className={styles.dayCol}>
                   <span className={styles.dayName}>{d.dia}</span>
                   {d.concluido ? (
-                    <div className={styles.dayIconChecked} title={`${d.dia}: Chama Acesa! 🔥`}>
+                    <div className={styles.dayIconChecked} title={`${d.dia}: Chama Acesa nesta Semana! 🔥`}>
                       <Flame size={20} fill="#f59e0b" color="#ef4444" />
                     </div>
                   ) : d.eHoje ? (
-                    <div className={styles.dayIconToday} title="Hoje: Clique para acender sua chama!" onClick={acenderFogoAgora}>
+                    <div className={styles.dayIconToday} title="Acenda sua chama semanal!" onClick={acenderFogoAgora}>
                       <Zap size={18} />
                     </div>
                   ) : (
-                    <div className={styles.dayIconMissed} title={`${d.dia}: Sem atividades`}>
+                    <div className={styles.dayIconMissed} title={`${d.dia}: Sem atividade registrada`}>
                       <Flame size={18} color="#475569" />
                     </div>
                   )}
@@ -224,17 +258,26 @@ export default function StudentGamificationHeader({ user }) {
             </div>
           </div>
 
-          {/* Banner de incentivo caso o fogo esteja apagado */}
-          {!estudouHojeState && (
+          {/* Banner de incentivo para acender a chama semanal */}
+          {!estudouHojeState ? (
             <div className={styles.acenderFogoBanner}>
               <div className={styles.acenderText}>
                 <AlertCircle size={16} color="#ef4444" />
-                <span>Sua chama apaga à meia-noite! Faça 1 prova para acendê-la.</span>
+                <span>Acenda sua chama semanal realizando 1 atividade ou clicando abaixo!</span>
               </div>
               <button className={styles.btnAcender} onClick={acenderFogoAgora}>
                 <Flame size={15} fill="#FFF" />
-                <span>Acender Chama (+150 XP)</span>
+                <span>Acender Chama Semanal (+150 XP)</span>
               </button>
+            </div>
+          ) : (
+            <div style={{
+              marginTop: "16px", padding: "12px 16px", borderRadius: "14px",
+              backgroundColor: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)",
+              color: "#10b981", fontSize: "12.5px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px"
+            }}>
+              <Flame size={16} fill="#10b981" />
+              <span>🔥 Sua chama está acesa esta semana! Continue praticando para acumular XP.</span>
             </div>
           )}
         </div>

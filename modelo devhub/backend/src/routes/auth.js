@@ -3,16 +3,19 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 
+const verifyToken = require("../middlewares/auth");
+
 const router = express.Router();
 const saltRounds = 10;
 
-// Garantir que a coluna 'cargo' exista no banco de dados (auto-migração)
+// Garantir que as colunas 'cargo' e 'avatar_url' existam no banco de dados (auto-migração)
 (async () => {
   try {
     await pool.query("ALTER TABLE users ADD COLUMN cargo VARCHAR(50) DEFAULT 'usuario'");
-  } catch (err) {
-    // Coluna já existe ou ignorar erro
-  }
+  } catch (err) {}
+  try {
+    await pool.query("ALTER TABLE users ADD COLUMN avatar_url LONGTEXT DEFAULT NULL");
+  } catch (err) {}
 })();
 
 // 1. Rota de Cadastro de Usuário (suporta cargo: usuario, admin, super_admin)
@@ -65,7 +68,7 @@ router.post("/login", async (req, res) => {
 
   try {
     const [usuarios] = await pool.query(
-      "SELECT id, nome, email, senha, cargo, created_at FROM users WHERE email = ?",
+      "SELECT id, nome, email, senha, cargo, avatar_url, created_at FROM users WHERE email = ?",
       [email]
     );
 
@@ -96,6 +99,8 @@ router.post("/login", async (req, res) => {
         nome: usuario.nome,
         email: usuario.email,
         cargo: usuario.cargo || "usuario",
+        avatar_url: usuario.avatar_url,
+        avatar: usuario.avatar_url,
         created_at: usuario.created_at
       }
     });
@@ -256,6 +261,31 @@ router.post("/check-suspensao", async (req, res) => {
     return res.json({ suspenso: false });
   } catch (e) {
     return res.json({ suspenso: false });
+  }
+});
+
+// 10. Atualizar Perfil do Usuário (Foto de Perfil / Nome)
+router.put("/perfil", verifyToken, async (req, res) => {
+  const userId = req.user.id;
+  const { nome, avatar_url } = req.body;
+
+  try {
+    try {
+      await pool.query("ALTER TABLE users ADD COLUMN avatar_url LONGTEXT DEFAULT NULL");
+    } catch (e) {}
+
+    await pool.query(
+      "UPDATE users SET nome = COALESCE(?, nome), avatar_url = COALESCE(?, avatar_url) WHERE id = ?",
+      [nome || null, avatar_url || null, userId]
+    );
+
+    res.status(200).json({
+      message: "Perfil atualizado com sucesso!",
+      user: { id: userId, nome, avatar_url }
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar perfil no servidor:", error);
+    res.status(500).json({ error: "Erro ao atualizar perfil no servidor." });
   }
 });
 

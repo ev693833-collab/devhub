@@ -413,8 +413,8 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
       const token = localStorage.getItem("token");
       let textoRespostaIa = "";
 
-      // Tenta chamar o endpoint de backend /dev-ia/chat se disponível
-      const res = await fetch(`${apiUrl}/dev-ia/chat`, {
+      // Tenta chamar o endpoint de backend isolado /dev-ia/caderno-chat
+      const res = await fetch(`${apiUrl}/dev-ia/caderno-chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -463,75 +463,194 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
     }
   };
 
-  // Dados dinâmicos do Estúdio gerados a partir do caderno e fontes anexadas
+  // Extrair texto limpo das fontes para análise contextual profunda
+  const extrairResumoLimpo = (txt, maxLen = 240) => {
+    if (!txt) return "";
+    const limpo = txt.replace(/\[Arquivo.*?\]/g, "").replace(/[\r\n]+/g, " ").trim();
+    if (limpo.length <= maxLen) return limpo || "Conteúdo técnico carregado para análise contextual da IA.";
+    return limpo.slice(0, maxLen) + "...";
+  };
+
+  // 🎴 Flashcards profundos com base nos arquivos e notas anexadas
   const flashcardsExemplo = useMemo(() => {
     const fontes = notebookAtivo?.fontes || [];
+    const notas = notebookAtivo?.notas || [];
+    const cards = [];
+
     if (fontes.length > 0) {
+      fontes.forEach((f, i) => {
+        const trecho = extrairResumoLimpo(f.conteudo, 260);
+        cards.push({
+          pergunta: `[Fonte ${i + 1}: ${f.titulo}] Qual o conceito chave e objetivo deste arquivo/snippet?`,
+          resposta: `📄 "${f.titulo}" (${f.tipo}): ${trecho || "Estrutura de código e documentação para desenvolvimento de software."}`
+        });
+        cards.push({
+          pergunta: `[Fonte ${i + 1}: ${f.titulo}] Como aplicar este conteúdo na prática no projeto?`,
+          resposta: `💡 Aplicação prática de "${f.titulo}": Organizar componentes/funções modulares, tratar exceções e seguir os padrões descritos no documento.`
+        });
+      });
+    }
+
+    if (notas.length > 0) {
+      notas.forEach((n, i) => {
+        cards.push({
+          pergunta: `[Nota de Estudo: ${n.titulo}] Qual a anotação salva pelo aluno?`,
+          resposta: `📝 Nota em ${n.data || "hoje"}: ${extrairResumoLimpo(n.conteudo, 240)}`
+        });
+      });
+    }
+
+    if (cards.length === 0) {
       return [
-        ...fontes.map((f, i) => ({
-          pergunta: `[Fonte ${i + 1}: ${f.titulo}] Qual o ponto principal deste arquivo/snippet?`,
-          resposta: `Extraído da fonte: ${f.conteudo.slice(0, 220)}...`
-        })),
         {
-          pergunta: `Qual o tema central estudado no caderno "${notebookAtivo?.titulo}"?`,
-          resposta: `Integração e prática dos tópicos de ${fontes.map(f => f.titulo).join(", ")} com grounding de IA.`
+          pergunta: `Qual o objetivo principal do caderno "${notebookAtivo?.titulo}"?`,
+          resposta: `📌 Foco em ${notebookAtivo?.titulo}: Organizar documentações de código, praticar no Playground e reforçar retenção com IA.`
+        },
+        {
+          pergunta: `Como tirar o máximo proveito do Estúdio com suas fontes?`,
+          resposta: `💡 Anexe arquivos .js, .py, .pdf ou notas no painel esquerdo para gerar automaticamente flashcards, resumos em áudio e slides sobre o seu código.`
         }
       ];
     }
-    return [
-      {
-        pergunta: `Qual o conceito chave estudado no caderno "${notebookAtivo?.titulo}"?`,
-        resposta: `Organizar fontes de código e notas para treinar retenção com IA e praticar boas práticas de desenvolvimento.`
-      },
-      {
-        pergunta: `Como utilizar as fontes anexadas a este notebook?`,
-        resposta: `As fontes servem como a base de dados (Grounding) para a IA responder perguntas no chat e alimentar o Estúdio.`
-      }
-    ];
+
+    return cards;
   }, [notebookAtivo]);
 
+  // ❓ Quiz com perguntas contextualizadas aos arquivos
   const quizExemplo = useMemo(() => {
     const fontes = notebookAtivo?.fontes || [];
     if (fontes.length > 0) {
+      const f1 = fontes[0];
       return {
-        pergunta: `Com base na fonte "${fontes[0].titulo}", qual a melhor prática ou objetivo ao trabalhar com esse conteúdo?`,
+        pergunta: `Com base no arquivo/fonte "${f1.titulo}", qual a melhor prática recomendada ao integrar essa funcionalidade?`,
         opcoes: [
-          `A) Analisar e implementar o conteúdo de "${fontes[0].titulo}" com boas práticas`,
-          "B) Ignorar testes automatizados e validações no código",
-          "C) Apagar as fontes do caderno assim que concluir a leitura",
-          "D) Desativar o suporte da IA durante os estudos"
+          `A) Analisar e implementar o conteúdo de "${f1.titulo}" com modularidade, testes e tratamento de exceções`,
+          "B) Ignorar validações, acoplamento de código e tratamento de exceções",
+          "C) Apagar as fontes salvas assim que concluir a primeira leitura",
+          "D) Escrever scripts inteiros em um único arquivo sem funções ou componentes"
         ],
         correta: 0
       };
     }
     return {
-      pergunta: `Ao estudar "${notebookAtivo?.titulo}", qual a melhor prática recomendada pelas fontes anexadas?`,
+      pergunta: `Ao estudar "${notebookAtivo?.titulo}", qual a melhor prática de arquitetura de software recomendada?`,
       opcoes: [
-        "A) Manter o código estruturado, testado e desacoplado",
-        "B) Ignorar validações e tratamento de erros",
-        "C) Não utilizar fontes de documentação",
-        "D) Escrever código sem identação"
+        "A) Manter o código limpo, estruturado, desacoplado e devidamente testado",
+        "B) Ignorar erros de execução e tratamento de exceções",
+        "C) Não utilizar documentações nem notas de estudo",
+        "D) Evitar reutilização de funções e componentes"
       ],
       correta: 0
     };
   }, [notebookAtivo]);
 
-  const slidesVideo = [
-    {
-      titulo: `1. Introdução a ${notebookAtivo?.titulo || 'Estudos'}`,
-      resumo: `Apresentação dos conceitos fundamentais extraídos de ${notebookAtivo?.fontes?.length || 0} fontes salvas.`
-    },
-    {
-      titulo: "2. Principais Conceitos & Código",
-      resumo: notebookAtivo?.fontes?.[0]?.titulo
-        ? `Foco principal na fonte: "${notebookAtivo.fontes[0].titulo}".`
-        : "Adicione arquivos ou snippets no painel esquerdo para personalizar este slide."
-    },
-    {
-      titulo: "3. Conclusão & Boas Práticas Dev",
-      resumo: "Revise com os Flashcards e faça o Quiz no Estúdio para garantir o domínio total do conteúdo!"
+  // 📹 Slides dinâmicos gerados a partir do conteúdo real das fontes
+  const slidesVideo = useMemo(() => {
+    const fontes = notebookAtivo?.fontes || [];
+    const notas = notebookAtivo?.notas || [];
+
+    if (fontes.length > 0) {
+      const lista = [
+        {
+          titulo: `1. Visão Geral: ${notebookAtivo?.titulo || 'Estudos'}`,
+          resumo: `Apresentação dos conceitos e estruturas extraídos de ${fontes.length} fontes anexadas (${fontes.map(f => f.titulo).join(", ")}).`
+        }
+      ];
+
+      fontes.forEach((f, i) => {
+        lista.push({
+          titulo: `${i + 2}. Análise da Fonte: ${f.titulo}`,
+          resumo: `📄 Detalhes de "${f.titulo}": ${extrairResumoLimpo(f.conteudo, 260)}`
+        });
+      });
+
+      if (notas.length > 0) {
+        lista.push({
+          titulo: `${lista.length + 1}. Anotações de Estudo: ${notas[0].titulo}`,
+          resumo: `📝 Resumo da anotação: ${extrairResumoLimpo(notas[0].conteudo, 220)}`
+        });
+      }
+
+      lista.push({
+        titulo: `${lista.length + 1}. Conclusão & Boas Práticas Dev`,
+        resumo: `Aplique os conceitos de ${fontes.map(f => f.titulo).join(", ")} na prática, executando códigos no Playground e revisando no Quiz.`
+      });
+
+      return lista;
     }
-  ];
+
+    return [
+      {
+        titulo: `1. Introdução a ${notebookAtivo?.titulo || 'Estudos'}`,
+        resumo: `Visão geral do caderno de estudos. Anexe arquivos (.js, .py, .pdf) para personalizar estes slides automaticamente.`
+      },
+      {
+        titulo: "2. Estrutura de Código & Padrões",
+        resumo: "Organizar código limpo (Clean Code), desacoplado e fácil de manter."
+      },
+      {
+        titulo: "3. Próximos Passos & Prática",
+        resumo: "Use os Flashcards para memorização e o Quiz de fixação para validar seus conhecimentos."
+      }
+    ];
+  }, [notebookAtivo]);
+
+  // 🎧 Podcast / Transcrição dinâmica em voz
+  const podcastTranscricao = useMemo(() => {
+    const fontes = notebookAtivo?.fontes || [];
+    const notas = notebookAtivo?.notas || [];
+
+    if (fontes.length > 0) {
+      const nomesFontes = fontes.map(f => f.titulo).join(", ");
+      const trechosFontes = fontes.map(f => `• Em '${f.titulo}': ${extrairResumoLimpo(f.conteudo, 150)}`).join(" ");
+
+      return `Olá, dev! Seja bem-vindo à síntese falada do caderno '${notebookAtivo?.titulo}'. Neste episódio, analisamos profundamente as ${fontes.length} fontes anexadas (${nomesFontes}). ${trechosFontes} A principal recomendação prática para o seu desenvolvimento é integrar esses conceitos no código real, tratando exceções e mantendo os componentes desacoplados.`;
+    }
+
+    return `Olá, dev! Esta é a síntese em voz sobre '${notebookAtivo?.titulo}'. Anexe arquivos de código (.js, .py, .pdf) ou adicione anotações no painel esquerdo para gerar uma narração em voz rica e personalizada.`;
+  }, [notebookAtivo]);
+
+  // 📝 Relatório executivo de estudos
+  const relatorioExecutivo = useMemo(() => {
+    const fontes = notebookAtivo?.fontes || [];
+    if (fontes.length > 0) {
+      return {
+        resumo: `O caderno "${notebookAtivo?.titulo}" contém ${fontes.length} fontes vinculadas (${fontes.map(f => f.titulo).join(", ")}). O conteúdo foi analisado para extrair padrões de desenvolvimento e boas práticas.`,
+        padroes: fontes.map(f => `• ${f.titulo}: ${extrairResumoLimpo(f.conteudo, 160)}`).join("\n"),
+        recomendacao: `Pratique a implementação dos conceitos de ${fontes[0]?.titulo || 'código'} no Playground e responda o Quiz de fixação.`
+      };
+    }
+
+    return {
+      resumo: `O caderno "${notebookAtivo?.titulo}" aborda padrões de desenvolvimento de software e boas práticas.`,
+      padroes: "• Manter código limpo, comentado e modularizado.\n• Escrever testes para validar a lógica das funções.",
+      recomendacao: "Anexe fontes (arquivos de código, PDF ou notas) para que a IA estruture um relatório profundo e personalizado."
+    };
+  }, [notebookAtivo]);
+
+  // 🧠 Conexões do Mapa Mental
+  const mapaMentalConexoes = useMemo(() => {
+    const fontes = notebookAtivo?.fontes || [];
+    const nodes = [
+      { titulo: `🎯 ${notebookAtivo?.titulo || 'Caderno de Estudos'}`, sub: "Tópico Central", cor: "#8b5cf6" }
+    ];
+
+    if (fontes.length > 0) {
+      fontes.forEach(f => {
+        nodes.push({
+          titulo: `📚 ${f.titulo}`,
+          sub: extrairResumoLimpo(f.conteudo, 80),
+          cor: f.tipo === "codigo" ? "#3b82f6" : "#ec4899"
+        });
+      });
+      nodes.push({ titulo: "💡 Boas Práticas & Arquitetura", sub: "Clean Code & Testes", cor: "#10b981" });
+    } else {
+      nodes.push({ titulo: "📚 0 Fontes Salvas", sub: "Adicione arquivos no painel esquerdo", cor: "#f472b6" });
+      nodes.push({ titulo: "💡 Boas Práticas Dev", sub: "Arquitetura e Clean Code", cor: "#34d399" });
+    }
+
+    return nodes;
+  }, [notebookAtivo]);
 
   // Filtragem da Home
   const notebooksFiltrados = notebooks.filter(n =>
@@ -917,7 +1036,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
 
               {/* SAÍDA DO ESTÚDIO SELECIONADO */}
               <div className={styles.studioOutputArea}>
-                {/* 1. RESUMO EM ÁUDIO */}
+                {/* 1. RESUMO EM ÁUDIO / PODCAST */}
                 {estudioAtivo === "audio" && (
                   <div>
                     <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#818cf8", textTransform: "uppercase" }}>
@@ -936,7 +1055,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                       </button>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: "0.8rem", color: "#cbd5e1", fontWeight: 700 }}>
-                          {audioTocando ? "🔊 Reproduzindo áudio explicativo..." : "Clique para iniciar reprodução"}
+                          {audioTocando ? "🔊 Reproduzindo síntese contextual em áudio..." : "Clique para iniciar reprodução em voz"}
                         </div>
                         <div style={{ height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "2px", marginTop: "6px", overflow: "hidden" }}>
                           <div style={{ width: audioTocando ? "68%" : "0%", height: "100%", background: "#34d399", transition: "width 0.4s ease" }} />
@@ -944,8 +1063,8 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                       </div>
                     </div>
 
-                    <div style={{ background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "8px", fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.4 }}>
-                      📜 <strong>Transcrição:</strong> "Nesta síntese sobre {notebookAtivo?.titulo}, analisamos a estrutura das {notebookAtivo?.fontes?.length || 0} fontes salvas e suas aplicações no código..."
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "14px", borderRadius: "10px", fontSize: "0.82rem", color: "#cbd5e1", lineHeight: 1.5 }}>
+                      📜 <strong>Transcrição Completa:</strong> "{podcastTranscricao}"
                     </div>
                   </div>
                 )}
@@ -960,11 +1079,11 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                     </div>
 
                     <div style={{ background: "linear-gradient(135deg, #0d2820, #131b26)", border: "1px solid #10b981", borderRadius: "12px", padding: "16px", minHeight: "140px", display: "flex", flexDirection: "column", justifyContent: "center", marginBottom: "12px" }}>
-                      <h4 style={{ margin: "0 0 6px 0", color: "#6ee7b7", fontSize: "0.95rem" }}>
-                        {slidesVideo[slideVideoIndex].titulo}
+                      <h4 style={{ margin: "0 0 8px 0", color: "#6ee7b7", fontSize: "0.98rem" }}>
+                        {slidesVideo[slideVideoIndex % slidesVideo.length]?.titulo}
                       </h4>
-                      <p style={{ margin: 0, fontSize: "0.82rem", color: "#e2e8f0", lineHeight: 1.4 }}>
-                        {slidesVideo[slideVideoIndex].resumo}
+                      <p style={{ margin: 0, fontSize: "0.84rem", color: "#e2e8f0", lineHeight: 1.5 }}>
+                        {slidesVideo[slideVideoIndex % slidesVideo.length]?.resumo}
                       </p>
                     </div>
 
@@ -998,21 +1117,21 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                     </h4>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      <div style={{ background: "#8b5cf6", padding: "10px", borderRadius: "8px", color: "#FFF", fontWeight: 800, fontSize: "0.85rem", textAlign: "center" }}>
-                        🎯 {notebookAtivo?.titulo}
+                      <div style={{ background: "#8b5cf6", padding: "12px", borderRadius: "10px", color: "#FFF", fontWeight: 800, fontSize: "0.9rem", textAlign: "center" }}>
+                        {mapaMentalConexoes[0].titulo}
                       </div>
 
                       <div style={{ display: "flex", justifyContent: "center" }}>
                         <div style={{ width: "2px", height: "16px", background: "#8b5cf6" }} />
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                        <div style={{ background: "#1e293b", border: "1px solid #f472b6", padding: "8px", borderRadius: "8px", fontSize: "0.78rem", color: "#f1f5f9", textAlign: "center" }}>
-                          📚 {notebookAtivo?.fontes?.length || 0} Fontes Salvas
-                        </div>
-                        <div style={{ background: "#1e293b", border: "1px solid #34d399", padding: "8px", borderRadius: "8px", fontSize: "0.78rem", color: "#f1f5f9", textAlign: "center" }}>
-                          💡 Boas Práticas Dev
-                        </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px" }}>
+                        {mapaMentalConexoes.slice(1).map((node, i) => (
+                          <div key={i} style={{ background: "#1e293b", border: `1px solid ${node.cor}`, padding: "10px", borderRadius: "10px", fontSize: "0.78rem", color: "#f1f5f9" }}>
+                            <div style={{ fontWeight: 800, color: node.cor }}>{node.titulo}</div>
+                            {node.sub && <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: "4px", lineHeight: 1.3 }}>{node.sub}</div>}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1028,13 +1147,23 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                       Síntese: {notebookAtivo?.titulo}
                     </h4>
 
-                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "12px", borderRadius: "10px", fontSize: "0.82rem", color: "#cbd5e1", lineHeight: 1.5 }}>
-                      <p style={{ margin: "0 0 8px 0" }}>
-                        <strong>📌 Resumo dos Tópicos:</strong> O caderno aborda padrões estruturais de desenvolvimento, com base em {notebookAtivo?.fontes?.length || 0} fontes vinculadas.
-                      </p>
-                      <p style={{ margin: 0 }}>
-                        <strong>✅ Recomendação de Estudo:</strong> Pratique os conceitos escrevendo novas notas na aba central.
-                      </p>
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "14px", borderRadius: "10px", fontSize: "0.82rem", color: "#cbd5e1", lineHeight: 1.5, display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <div>
+                        <strong style={{ color: "#fbbf24" }}>📌 Resumo dos Tópicos:</strong>
+                        <p style={{ margin: "4px 0 0 0" }}>{relatorioExecutivo.resumo}</p>
+                      </div>
+                      {relatorioExecutivo.padroes && (
+                        <div>
+                          <strong style={{ color: "#38bdf8" }}>💡 Padrões e Fontes Anexadas:</strong>
+                          <pre style={{ margin: "4px 0 0 0", whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: "0.78rem", color: "#94a3b8" }}>
+                            {relatorioExecutivo.padroes}
+                          </pre>
+                        </div>
+                      )}
+                      <div>
+                        <strong style={{ color: "#34d399" }}>✅ Recomendação de Estudo:</strong>
+                        <p style={{ margin: "4px 0 0 0" }}>{relatorioExecutivo.recomendacao}</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1056,10 +1185,10 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                         {flashcardVerso ? "💡 CONCEITO / RESPOSTA" : "❓ PERGUNTA DE ESTUDO"}
                       </span>
 
-                      <h4 style={{ margin: 0, fontSize: "0.95rem", color: "#FFF", lineHeight: 1.4 }}>
+                      <h4 style={{ margin: 0, fontSize: "0.92rem", color: "#FFF", lineHeight: 1.4 }}>
                         {flashcardVerso
-                          ? flashcardsExemplo[flashcardIndex % flashcardsExemplo.length].resposta
-                          : flashcardsExemplo[flashcardIndex % flashcardsExemplo.length].pergunta
+                          ? flashcardsExemplo[flashcardIndex % flashcardsExemplo.length]?.resposta
+                          : flashcardsExemplo[flashcardIndex % flashcardsExemplo.length]?.pergunta
                         }
                       </h4>
 

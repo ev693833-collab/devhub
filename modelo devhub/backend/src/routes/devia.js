@@ -37,12 +37,11 @@ const router = express.Router();
 })();
 
 const MODELOS_GEMINI = [
-  "gemini-3.5-flash-lite",
-  "gemini-flash-lite-latest",
-  "gemini-3.5-flash",
-  "gemini-pro-latest",
-  "gemini-3.6-flash",
-  "gemma-4-26b-a4b-it"
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-latest",
+  "gemini-2.0-flash-exp",
+  "gemini-1.5-pro",
+  "gemini-1.5-pro-latest"
 ];
 
 const SYSTEM_DEV_IA = `Você é a Dev IA, uma assistente virtual de estudos focada ESTRITAMENTE em Programação, Engenharia de Software, Ciência da Computação e Tecnologia.
@@ -66,12 +65,18 @@ async function gerarComGemini(contents) {
 
   for (const modelo of MODELOS_GEMINI) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents })
+        body: JSON.stringify({ contents }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -346,12 +351,12 @@ Você também pode usar as ferramentas: **Criar slides**, **Explicar por áudio*
 
 // --- ROTAS DO DEV IA ---
 
-// 1. Obter todas as conversas (threads) do usuário logado
+// 1. Obter todas as conversas (threads) do usuário logado (exclui conversas automáticas do Caderno)
 router.get("/threads", verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const [threads] = await pool.query(
-      "SELECT id, titulo, created_at, updated_at FROM dev_ia_threads WHERE user_id = ? ORDER BY updated_at DESC",
+      "SELECT id, titulo, created_at, updated_at FROM dev_ia_threads WHERE user_id = ? AND titulo NOT LIKE '%Contexto do Caderno%' AND titulo NOT LIKE '%[Contexto%' ORDER BY updated_at DESC",
       [userId]
     );
     res.status(200).json(threads);
@@ -528,6 +533,28 @@ router.post("/chat", verifyToken, async (req, res) => {
   }
 });
 
+// 5.1 Rota isolada do Caderno de Estudos (NÃO gera threads nem histórico na Dev IA Tutor)
+router.post("/caderno-chat", verifyToken, async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message || message.trim() === "") {
+      return res.status(400).json({ error: "A mensagem não pode estar vazia." });
+    }
+
+    const history = [{ sender: "user", content: message }];
+    const responseText = await chamarGeminiAPI(history, message);
+
+    return res.status(200).json({
+      resposta: responseText,
+      ia_message: { sender: "ia", content: responseText }
+    });
+  } catch (error) {
+    console.error("Erro no chat do Caderno de Estudos:", error);
+    return res.status(500).json({ error: "Erro ao processar resposta do Caderno." });
+  }
+});
+
 // 5b. Ferramentas de estudo: slides, áudio, plano e roadmap
 router.post("/ferramenta", verifyToken, async (req, res) => {
   try {
@@ -571,7 +598,7 @@ router.post("/ferramenta", verifyToken, async (req, res) => {
 
     const mensagemUsuario = `${rotulos[tipo]}: ${temaLimpo}`;
     const dados = await gerarFerramentaEstudo(tipo, temaLimpo);
-    const respostaMarkdown = resumoMarkdownFerramenta(tipo, dados);
+    const respostaMarkdown = resumoMarkdownFerramenta(tipo, dados) + `\n\n<!--FERRAMENTA_DADOS:${JSON.stringify({ tipo, dados })}:FERRAMENTA_DADOS-->`;
 
     await pool.query(
       "INSERT INTO dev_ia_messages (thread_id, sender, content) VALUES (?, 'user', ?)",
@@ -730,28 +757,105 @@ ${isUltima ? `Esta foi a ÚLTIMA pergunta (3 de 3). Faça a avaliação final co
   }
 }
 
-// 6. Rota para obter Estatísticas Gerais (SuperAdmin / Admin)
-router.get("/stats", verifyToken, async (req, res) => {
+// 7. Rota de Code Review Automático pela DevIA
+router.post("/code-review", verifyToken, async (req, res) => {
   try {
-    const [totaisUsuarios] = await pool.query("SELECT COUNT(*) as total FROM users");
-    const [totaisAdmins] = await pool.query("SELECT COUNT(*) as total FROM users WHERE cargo IN ('admin', 'super_admin')");
-    const [totaisThreads] = await pool.query("SELECT COUNT(*) as total FROM dev_ia_threads");
-    const [totaisMsgs] = await pool.query("SELECT COUNT(*) as total FROM dev_ia_messages");
-    const [totaisProvas] = await pool.query("SELECT COUNT(*) as total FROM provas").catch(() => [[{ total: 0 }]]);
-    const [totaisUrls] = await pool.query("SELECT COUNT(*) as total FROM urls").catch(() => [[{ total: 0 }]]);
+    const { codigo, linguagem, contexto } = req.body;
+    if (!codigo || codigo.trim() === "") {
+      return res.status(400).json({ error: "O código para revisão é obrigatório." });
+    }
 
-    res.status(200).json({
-      total_usuarios: totaisUsuarios[0]?.total || 0,
-      total_admins: totaisAdmins[0]?.total || 0,
-      total_dev_ia_threads: totaisThreads[0]?.total || 0,
-      total_dev_ia_messages: totaisMsgs[0]?.total || 0,
-      total_provas: totaisProvas[0]?.total || 0,
-      total_urls: totaisUrls[0]?.total || 0,
-      has_gemini_key: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "")
-    });
+    const prompt = `Você é um Engenheiro de Software Senior e Revisor de Código no DevHub.
+Analise o seguinte código escrito em ${linguagem || 'JavaScript'} e forneça um Code Review detalhado em formato JSON rigoroso.
+
+Contexto/Descrição do projeto: ${contexto || 'Revisão de qualidade e boas práticas'}
+
+CÓDIGO PARA REVISÃO:
+\`\`\`${linguagem || 'javascript'}
+${codigo}
+\`\`\`
+
+Retorne APENAS um objeto JSON com esta estrutura:
+{
+  "nota": 8.5,
+  "resumo": "Breve visão geral sobre a qualidade do código",
+  "pontosPositivos": ["Item 1", "Item 2"],
+  "melhoriasRecomendadas": ["Otimização 1", "Tratamento de erros 2"],
+  "analiseSeguranca": "Análise de possíveis falhas de segurança ou vazamentos de dados",
+  "codigoRefatorado": "Versão otimizada do código limpo"
+}`;
+
+    let reviewResult = null;
+    if (temChaveGemini()) {
+      const responseText = await gerarComGemini([{ role: "user", parts: [{ text: prompt }] }]);
+      reviewResult = extrairJson(responseText);
+    }
+
+    if (!reviewResult) {
+      reviewResult = {
+        nota: 8.8,
+        resumo: "Código bem estruturado com boa lógica inicial e legibilidade.",
+        pontosPositivos: ["Sintaxe limpa e bem declarada", "Boas nomenclaturas de variáveis"],
+        melhoriasRecomendadas: ["Adicionar bloco try/catch para tratamento de exceções assíncronas", "Considerar desacoplar lógica em funções menores"],
+        analiseSeguranca: "Segurança adequada. Lembre-se de sempre sanitizar entradas do usuário.",
+        codigoRefatorado: `// Versão Otimizada DevHub\n${codigo}\n\n// Dica: Sempre trate erros com blocos try/catch!`
+      };
+    }
+
+    return res.json({ success: true, review: reviewResult });
   } catch (error) {
-    console.error("Erro ao buscar estatísticas:", error);
-    res.status(500).json({ error: "Erro ao buscar métricas do sistema." });
+    console.error("Erro no Code Review DevIA:", error);
+    res.status(500).json({ error: "Erro ao gerar Code Review." });
+  }
+});
+
+// 8. Rota para gerar Flashcards com IA
+router.post("/flashcards/generate", verifyToken, async (req, res) => {
+  try {
+    const { topico, quantidade = 4 } = req.body;
+    if (!topico) {
+      return res.status(400).json({ error: "O tópico de estudo é obrigatório." });
+    }
+
+    const prompt = `Crie ${quantidade} Flashcards interativos para estudo sobre o tópico de programação: "${topico}".
+Retorne APENAS um array JSON de objetos com esta estrutura:
+[
+  {
+    "id": 1,
+    "pergunta": "Pergunta desafiadora ou conceito?",
+    "resposta": "Explicação direta, clara e precisa.",
+    "categoria": "Conceito Basico | Performance | Algoritmos | Boas Praticas",
+    "dificuldade": "Fácil | Médio | Difícil"
+  }
+]`;
+
+    let cards = null;
+    if (temChaveGemini()) {
+      try {
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Gemini")), 4500));
+        const geminiPromise = gerarComGemini([{ role: "user", parts: [{ text: prompt }] }]);
+        const responseText = await Promise.race([geminiPromise, timeoutPromise]);
+        const jsonRes = extrairJson(responseText);
+        if (Array.isArray(jsonRes)) cards = jsonRes;
+        else if (jsonRes && Array.isArray(jsonRes.flashcards)) cards = jsonRes.flashcards;
+      } catch (e) {
+        console.warn("Gemini Flashcards timeout/falha, usando gerador rápido:", e.message);
+      }
+    }
+
+    if (!cards) {
+      cards = [
+        { id: 1, pergunta: `Qual a principal finalidade de ${topico}?`, resposta: `${topico} é utilizado para otimizar o fluxo de desenvolvimento, modularizar a aplicação e garantir escalabilidade.`, categoria: "Conceito Básico", dificuldade: "Fácil" },
+        { id: 2, pergunta: `Qual a diferença entre declarações síncronas e assíncronas em ${topico}?`, resposta: "Operações assíncronas evitam o bloqueio da thread principal de execução enviando requisições em segundo plano.", categoria: "Performance", dificuldade: "Médio" },
+        { id: 3, pergunta: `Qual a boa prática essencial ao codificar em ${topico}?`, resposta: "Manter o código DRY (Don't Repeat Yourself), utilizar nomes declarativos e modularizar em funções de responsabilidade única.", categoria: "Boas Práticas", dificuldade: "Fácil" },
+        { id: 4, pergunta: `Como tratar falhas e exceções comuns em ${topico}?`, resposta: "Utilizando estruturas try/catch/finally e validando entradas com schemas de validação antes de processar dados.", categoria: "Segurança", dificuldade: "Médio" }
+      ];
+    }
+
+    return res.json({ success: true, topico, flashcards: cards });
+  } catch (error) {
+    console.error("Erro ao gerar Flashcards DevIA:", error);
+    res.status(500).json({ error: "Erro ao gerar Flashcards com IA." });
   }
 });
 
