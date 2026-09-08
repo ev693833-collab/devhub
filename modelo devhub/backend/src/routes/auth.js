@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 
-const verifyToken = require("../middlewares/auth");
+const { verifyToken, requireRole } = require("../middlewares/auth");
 
 const router = express.Router();
 const saltRounds = 10;

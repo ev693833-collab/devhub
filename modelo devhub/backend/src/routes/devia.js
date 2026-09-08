@@ -1,7 +1,7 @@
 const express = require("express");
 require("dotenv").config();
 const pool = require("../config/database");
-const verifyToken = require("../middlewares/auth");
+const { verifyToken } = require("../middlewares/auth");
 
 const router = express.Router();
 
@@ -809,50 +809,118 @@ Retorne APENAS um objeto JSON com esta estrutura:
   }
 });
 
-// 8. Rota para gerar Flashcards com IA
+// Helper avançado para validar se o tópico pertence a Programação ou TI
+function eTopicoProgramacao(topico) {
+  if (!topico || typeof topico !== "string") return false;
+  const t = topico.toLowerCase().trim();
+
+  // Lista de termos explicitamente não-técnicos
+  const naoTecnicos = [
+    "arroz", "feijao", "feijão", "flamengo", "corinthians", "palmeiras", "vasco", "sao paulo", "são paulo",
+    "santos", "gremio", "grêmio", "inter", "botafogo", "fluminense", "futebol", "comida", "receita", "carro",
+    "fofoca", "politica", "política", "novela", "filme", "musica", "música", "amor", "namoro", "maquiagem",
+    "roupa", "sapato", "viagem", "praia", "cerveja", "churrasco", "basquete", "vôlei", "volei", "casa",
+    "jardim", "cachorro", "gato", "pet", "almoço", "jantar", "vinho", "pizza", "hamburguer", "hambúrguer"
+  ];
+
+  if (naoTecnicos.some(item => t.includes(item))) return false;
+
+  // Vocabulário e termos comuns do ecossistema de Tecnologia/Programação
+  const termosTecnicos = [
+    "js", "javascript", "ts", "typescript", "react", "next", "vue", "angular", "node", "express",
+    "python", "django", "flask", "java", "spring", "c#", ".net", "c++", "ruby", "rails", "php", "laravel",
+    "go", "golang", "rust", "swift", "kotlin", "sql", "mysql", "postgres", "postgresql", "mongodb", "redis",
+    "html", "css", "flexbox", "grid", "tailwind", "sass", "git", "github", "gitlab", "docker", "kubernetes",
+    "aws", "cloud", "api", "rest", "graphql", "json", "http", "https", "web", "frontend", "backend", "fullstack",
+    "devops", "linux", "bash", "terminal", "algoritmo", "estrutura", "array", "objeto", "funcao", "função",
+    "promise", "async", "await", "hook", "hooks", "state", "props", "redux", "zod", "jwt", "auth", "autenticacao",
+    "banco de dados", "query", "crud", "orm", "prisma", "sequelize", "oo", "poo", "dry", "solid", "clean code",
+    "design pattern", "tdd", "ci/cd", "microservicos", "microserviços", "security", "segurança", "teste", "codigo", "código"
+  ];
+
+  return termosTecnicos.some(termo => t.includes(termo));
+}
+
+// 8. Rota para gerar Flashcards com IA (Restrito estritamente a Programação e TI)
 router.post("/flashcards/generate", verifyToken, async (req, res) => {
   try {
     const { topico, quantidade = 4 } = req.body;
-    if (!topico) {
+    if (!topico || !topico.trim()) {
       return res.status(400).json({ error: "O tópico de estudo é obrigatório." });
     }
 
-    const prompt = `Crie ${quantidade} Flashcards interativos para estudo sobre o tópico de programação: "${topico}".
+    const topicoLimpo = topico.trim();
+    const eTecnico = eTopicoProgramacao(topicoLimpo);
+
+    const cardAvisoNaoTecnico = [
+      {
+        id: 1,
+        pergunta: `⚠️ "${topicoLimpo}" não é um assunto de Programação`,
+        resposta: `A DevIA é focada exclusivamente em Ciência da Computação e Tecnologia. O assunto "${topicoLimpo}" não pertence ao desenvolvimento de software. Por favor, insira um assunto de TI como JavaScript, React, SQL, Python, Git ou Docker.`,
+        categoria: "DevIA 🤖",
+        dificuldade: "Aviso"
+      }
+    ];
+
+    // Se for claramente um assunto não técnico (futebol, comida, etc.)
+    if (!eTecnico && (topicoLimpo.length < 3 || eTopicoProgramacao(topicoLimpo) === false)) {
+      return res.json({ success: true, topico: topicoLimpo, flashcards: cardAvisoNaoTecnico });
+    }
+
+    const prompt = `${SYSTEM_DEV_IA}
+
+Sua tarefa: Analisar o tópico de estudo fornecido: "${topicoLimpo}".
+SE o tópico NÃO for um assunto de programação, desenvolvimento de software, banco de dados ou tecnologia (ex: futebol, comida, times de futebol como "${topicoLimpo}"), retorne APENAS este JSON:
+[
+  {
+    "id": 1,
+    "pergunta": "⚠️ Tópico Não-Técnico Detectado",
+    "resposta": "O assunto '${topicoLimpo}' não pertence a Programação ou Tecnologia. Por favor, insira um assunto técnico como React, Python, SQL, Git ou Lógica de Programação.",
+    "categoria": "DevIA 🤖",
+    "dificuldade": "Aviso"
+  }
+]
+
+SE FOR um assunto válido de programação e tecnologia, crie ${quantidade} Flashcards interativos para estudo.
 Retorne APENAS um array JSON de objetos com esta estrutura:
 [
   {
     "id": 1,
-    "pergunta": "Pergunta desafiadora ou conceito?",
-    "resposta": "Explicação direta, clara e precisa.",
-    "categoria": "Conceito Basico | Performance | Algoritmos | Boas Praticas",
-    "dificuldade": "Fácil | Médio | Difícil"
+    "pergunta": "Pergunta técnica sobre o conceito de ${topicoLimpo}?",
+    "resposta": "Explicação técnica direta, clara e precisa.",
+    "categoria": "Conceito Básico",
+    "dificuldade": "Fácil"
   }
 ]`;
 
     let cards = null;
     if (temChaveGemini()) {
       try {
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Gemini")), 4500));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Gemini")), 6000));
         const geminiPromise = gerarComGemini([{ role: "user", parts: [{ text: prompt }] }]);
         const responseText = await Promise.race([geminiPromise, timeoutPromise]);
         const jsonRes = extrairJson(responseText);
         if (Array.isArray(jsonRes)) cards = jsonRes;
         else if (jsonRes && Array.isArray(jsonRes.flashcards)) cards = jsonRes.flashcards;
       } catch (e) {
-        console.warn("Gemini Flashcards timeout/falha, usando gerador rápido:", e.message);
+        console.warn("Gemini Flashcards timeout/falha, usando gerador seguro:", e.message);
       }
     }
 
     if (!cards) {
-      cards = [
-        { id: 1, pergunta: `Qual a principal finalidade de ${topico}?`, resposta: `${topico} é utilizado para otimizar o fluxo de desenvolvimento, modularizar a aplicação e garantir escalabilidade.`, categoria: "Conceito Básico", dificuldade: "Fácil" },
-        { id: 2, pergunta: `Qual a diferença entre declarações síncronas e assíncronas em ${topico}?`, resposta: "Operações assíncronas evitam o bloqueio da thread principal de execução enviando requisições em segundo plano.", categoria: "Performance", dificuldade: "Médio" },
-        { id: 3, pergunta: `Qual a boa prática essencial ao codificar em ${topico}?`, resposta: "Manter o código DRY (Don't Repeat Yourself), utilizar nomes declarativos e modularizar em funções de responsabilidade única.", categoria: "Boas Práticas", dificuldade: "Fácil" },
-        { id: 4, pergunta: `Como tratar falhas e exceções comuns em ${topico}?`, resposta: "Utilizando estruturas try/catch/finally e validando entradas com schemas de validação antes de processar dados.", categoria: "Segurança", dificuldade: "Médio" }
-      ];
+      if (!eTecnico) {
+        cards = cardAvisoNaoTecnico;
+      } else {
+        cards = [
+          { id: 1, pergunta: `Qual a principal finalidade de ${topicoLimpo} na programação?`, resposta: `${topicoLimpo} é um conceito/tecnologia utilizado no desenvolvimento de software para estruturar a lógica da aplicação, otimizar processos e garantir manutenibilidade.`, categoria: "Conceito Básico", dificuldade: "Fácil" },
+          { id: 2, pergunta: `Quais são as melhores práticas ao implementar ${topicoLimpo}?`, resposta: "Aplicar princípios de Clean Code (DRY e responsabilidade única), nomear variáveis de forma declarativa e tratar exceções.", categoria: "Boas Práticas", dificuldade: "Médio" },
+          { id: 3, pergunta: `Como funciona o fluxo de execução com ${topicoLimpo}?`, resposta: "A execução segue um fluxo previsível controlando requisições, manipulando estados e evitando vazamentos de memória na aplicação.", categoria: "Arquitetura", dificuldade: "Médio" },
+          { id: 4, pergunta: `Como realizar o tratamento de erros e depuração em ${topicoLimpo}?`, resposta: "Utilizando blocos try/catch, validando os dados de entrada e inspecionando logs com ferramentas de depuração.", categoria: "Segurança", dificuldade: "Médio" }
+        ];
+      }
     }
 
-    return res.json({ success: true, topico, flashcards: cards });
+    return res.json({ success: true, topico: topicoLimpo, flashcards: cards });
   } catch (error) {
     console.error("Erro ao gerar Flashcards DevIA:", error);
     res.status(500).json({ error: "Erro ao gerar Flashcards com IA." });

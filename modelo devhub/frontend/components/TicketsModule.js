@@ -4,10 +4,27 @@ import {
   LifeBuoy, PlusCircle, Ticket, Bug, Lightbulb, HelpCircle, 
   Upload, X, CheckCircle, AlertTriangle, Clock, MessageSquare, 
   Send, User, Mail, ShieldCheck, ChevronRight, Play, Image as ImageIcon,
-  Search, Filter, Check, CheckCheck, RotateCcw, Trash2
+  Search, Filter, Check, CheckCheck, RotateCcw, Trash2, Inbox, CheckCircle2, XCircle, AlertCircle
 } from "lucide-react";
 
 const TICKETS_PADRAO = [
+  {
+    id: "TKT-1020",
+    usuarioNome: "Nicholas Araujo",
+    usuarioEmail: "nicholas.araujo@devhub.com",
+    tipo: "bug",
+    tipoLabel: "🐛 Bug / Falha no Sistema",
+    prioridade: "alta",
+    prioridadeLabel: "🔴 Alta",
+    titulo: "Falha na resposta do console no simulador web",
+    descricao: "Ao tentar executar o código no playground em tela pequena, o console não abre e retorna mensagem vazia.",
+    anexoUrl: null,
+    anexoTipo: null,
+    anexoNome: null,
+    status: "Pendente",
+    mensagens: [],
+    dataCriacao: "08/09/2026 00:45"
+  },
   {
     id: "TKT-1001",
     usuarioNome: "Enzo Vieira",
@@ -63,7 +80,8 @@ const TICKETS_PADRAO = [
 ];
 
 export default function TicketsModule({ user, isOpen, onClose }) {
-  const [abaAtiva, setAbaAtiva] = useState("criar"); // 'criar', 'meus_tickets', 'todos'
+  const [abaAtiva, setAbaAtiva] = useState("criar"); // 'criar', 'meus_tickets', 'correio', 'todos'
+  const [subAbaCorreio, setSubAbaCorreio] = useState("pendentes"); // 'pendentes', 'rejeitados'
   const [tickets, setTickets] = useState([]);
   
   // Filtros avançados para o SuperAdmin / Usuário
@@ -73,6 +91,9 @@ export default function TicketsModule({ user, isOpen, onClose }) {
 
   // Input de mensagens indexado por ticketId
   const [mensagemInputs, setMensagemInputs] = useState({});
+  // Rejeição inline modal/prompts
+  const [ticketRejeitandoId, setTicketRejeitandoId] = useState(null);
+  const [motivoRejeicaoInput, setMotivoRejeicaoInput] = useState("");
 
   // Dados do formulário
   const userName = user?.nome || user?.name || user?.username || "Aluno DevHub";
@@ -137,7 +158,7 @@ export default function TicketsModule({ user, isOpen, onClose }) {
     reader.readAsDataURL(file);
   };
 
-  // Criar novo Ticket
+  // Criar novo Ticket (Inicia na Caixa de Correio como Pendente)
   const handleCriarTicket = (e) => {
     e.preventDefault();
 
@@ -172,7 +193,7 @@ export default function TicketsModule({ user, isOpen, onClose }) {
       anexoUrl,
       anexoTipo,
       anexoNome,
-      status: "Aberto",
+      status: "Pendente", // Chega na Caixa de Correio para Triagem do Admin!
       mensagens: [],
       dataCriacao: new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
     };
@@ -187,11 +208,94 @@ export default function TicketsModule({ user, isOpen, onClose }) {
     setAnexoTipo(null);
     setAnexoNome(null);
 
-    setSucessoMsg(`🎉 Ticket ${novoTicket.id} aberto com sucesso!`);
+    setSucessoMsg(`🎉 Ticket ${novoTicket.id} enviado para a Caixa de Correio! Aguardando aprovação do suporte.`);
     setTimeout(() => {
       setSucessoMsg(null);
       setAbaAtiva("meus_tickets");
-    }, 1500);
+    }, 2000);
+  };
+
+  // Triagem: APROVAR TICKET (Mover para Admin Gestão com status Aberto)
+  const handleAprovarTicket = (ticketId) => {
+    const msgAprovado = {
+      id: `msg-${Date.now()}`,
+      autor: "Sistema DevHub",
+      email: "suporte@devhub.com",
+      role: "admin",
+      texto: "✅ Ticket aprovado na Caixa de Correio de triagem e liberado para atendimento da equipe.",
+      data: new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+    };
+
+    const atualizados = tickets.map(t => {
+      if (t.id === ticketId) {
+        return {
+          ...t,
+          status: "Aberto",
+          mensagens: [...(t.mensagens || []), msgAprovado]
+        };
+      }
+      return t;
+    });
+
+    salvarTickets(atualizados);
+    alert(`Ticket ${ticketId} APROVADO com sucesso! Ele foi transferido para a Gestão de Admin.`);
+  };
+
+  // Triagem: REJEITAR TICKET (Mover para aba de Rejeitados com motivo)
+  const handleConfirmarRejeicao = (ticketId) => {
+    const motivoText = motivoRejeicaoInput.trim() || "Solicitação fora do escopo ou dados insuficientes.";
+
+    const msgRejeitado = {
+      id: `msg-${Date.now()}`,
+      autor: "Sistema DevHub",
+      email: "suporte@devhub.com",
+      role: "admin",
+      texto: `❌ Ticket rejeitado na triagem. Motivo: ${motivoText}`,
+      data: new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+    };
+
+    const atualizados = tickets.map(t => {
+      if (t.id === ticketId) {
+        return {
+          ...t,
+          status: "Rejeitado",
+          motivoRejeicao: motivoText,
+          mensagens: [...(t.mensagens || []), msgRejeitado]
+        };
+      }
+      return t;
+    });
+
+    salvarTickets(atualizados);
+    setTicketRejeitandoId(null);
+    setMotivoRejeicaoInput("");
+  };
+
+  // Triagem: REAVALIAR / RE-APROVAR TICKET REJEITADO
+  const handleReavaliarTicket = (ticketId) => {
+    const msgReavaliado = {
+      id: `msg-${Date.now()}`,
+      autor: "Sistema DevHub",
+      email: "suporte@devhub.com",
+      role: "admin",
+      texto: "🔄 Ticket reavaliado e aprovado! Transferido para Gestão de Atendimento.",
+      data: new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+    };
+
+    const atualizados = tickets.map(t => {
+      if (t.id === ticketId) {
+        return {
+          ...t,
+          status: "Aberto",
+          motivoRejeicao: null,
+          mensagens: [...(t.mensagens || []), msgReavaliado]
+        };
+      }
+      return t;
+    });
+
+    salvarTickets(atualizados);
+    alert(`Ticket ${ticketId} reavaliado e transferido para a Gestão de Admin!`);
   };
 
   // Enviar Mensagem na thread do Ticket
@@ -224,35 +328,11 @@ export default function TicketsModule({ user, isOpen, onClose }) {
     setMensagemInputs(prev => ({ ...prev, [ticketId]: "" }));
   };
 
-  // Alterar Status do Ticket
+  // Alterar Status do Ticket no Admin
   const handleAlterarStatus = (ticketId, novoStatus) => {
     const atualizados = tickets.map(t => {
       if (t.id === ticketId) {
         return { ...t, status: novoStatus };
-      }
-      return t;
-    });
-    salvarTickets(atualizados);
-  };
-
-  // Reabrir Ticket
-  const handleReabrirTicket = (ticketId) => {
-    const msgReabrir = {
-      id: `msg-${Date.now()}`,
-      autor: userName,
-      email: userEmail,
-      role: isAdmin ? "admin" : "aluno",
-      texto: "🔄 Ticket reaberto para nova revisão.",
-      data: new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
-    };
-
-    const atualizados = tickets.map(t => {
-      if (t.id === ticketId) {
-        return {
-          ...t,
-          status: "Aberto",
-          mensagens: [...(t.mensagens || []), msgReabrir]
-        };
       }
       return t;
     });
@@ -269,9 +349,32 @@ export default function TicketsModule({ user, isOpen, onClose }) {
 
   const meusTickets = tickets.filter(t => t.usuarioEmail === userEmail || t.usuarioNome === userName);
 
+  // Filtros de contagens
+  const countPendentes = tickets.filter(t => t.status === "Pendente").length;
+  const countRejeitados = tickets.filter(t => t.status === "Rejeitado").length;
+  const countAtivosAdmin = tickets.filter(t => t.status !== "Pendente" && t.status !== "Rejeitado").length;
+
+  const totalTickets = tickets.length;
+  const countAbertos = tickets.filter(t => t.status === "Aberto").length;
+  const countAnalise = tickets.filter(t => t.status === "Em Análise").length;
+  const countResolvidos = tickets.filter(t => t.status === "Resolvido").length;
+  const countBugs = tickets.filter(t => t.tipo === "bug").length;
+
   // Filtragem avançada e busca
   const listagemTicketsExibida = () => {
-    let lista = abaAtiva === "todos" ? tickets : meusTickets;
+    let lista = [];
+
+    if (abaAtiva === "correio") {
+      if (subAbaCorreio === "pendentes") {
+        lista = tickets.filter(t => t.status === "Pendente");
+      } else {
+        lista = tickets.filter(t => t.status === "Rejeitado");
+      }
+    } else if (abaAtiva === "todos") {
+      lista = tickets.filter(t => t.status !== "Pendente" && t.status !== "Rejeitado");
+    } else {
+      lista = meusTickets;
+    }
 
     if (filtroTipo !== "todos") {
       lista = lista.filter(t => t.tipo === filtroTipo);
@@ -294,12 +397,22 @@ export default function TicketsModule({ user, isOpen, onClose }) {
     return lista;
   };
 
-  // Estatísticas do Admin
-  const totalTickets = tickets.length;
-  const countAbertos = tickets.filter(t => t.status === "Aberto").length;
-  const countAnalise = tickets.filter(t => t.status === "Em Análise").length;
-  const countResolvidos = tickets.filter(t => t.status === "Resolvido").length;
-  const countBugs = tickets.filter(t => t.tipo === "bug").length;
+  const getBadgeStatusStyle = (st) => {
+    switch (st) {
+      case "Pendente":
+        return { bg: "rgba(245, 158, 11, 0.18)", color: "#f59e0b", border: "rgba(245, 158, 11, 0.35)", label: "⏳ Pendente de Triagem" };
+      case "Aberto":
+        return { bg: "rgba(59, 130, 246, 0.18)", color: "#3b82f6", border: "rgba(59, 130, 246, 0.35)", label: "🟡 Aberto" };
+      case "Em Análise":
+        return { bg: "rgba(168, 85, 247, 0.18)", color: "#a855f7", border: "rgba(168, 85, 247, 0.35)", label: "🔵 Em Análise" };
+      case "Resolvido":
+        return { bg: "rgba(16, 185, 129, 0.18)", color: "#10b981", border: "rgba(16, 185, 129, 0.35)", label: "🟢 Resolvido" };
+      case "Rejeitado":
+        return { bg: "rgba(239, 68, 68, 0.18)", color: "#ef4444", border: "rgba(239, 68, 68, 0.35)", label: "❌ Ticket Rejeitado" };
+      default:
+        return { bg: "rgba(148, 163, 184, 0.18)", color: "#94a3b8", border: "rgba(148, 163, 184, 0.35)", label: st };
+    }
+  };
 
   const contentJSX = (
     <div className={styles.container}>
@@ -319,7 +432,7 @@ export default function TicketsModule({ user, isOpen, onClose }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {/* NAU TABS */}
+          {/* NAV TABS */}
           <div className={styles.navTabs}>
             <button 
               className={`${styles.tabBtn} ${abaAtiva === "criar" ? styles.tabBtnActive : ""}`}
@@ -333,13 +446,36 @@ export default function TicketsModule({ user, isOpen, onClose }) {
             >
               <Ticket size={15} /> Meus Tickets ({meusTickets.length})
             </button>
+
+            {/* ABA CAIXA DE CORREIO DE TRIAGEM (ADMIN) */}
+            {isAdmin && (
+              <button 
+                className={`${styles.tabBtn} ${abaAtiva === "correio" ? styles.tabBtnActive : ""}`}
+                onClick={() => setAbaAtiva("correio")}
+                style={{ 
+                  borderColor: countPendentes > 0 ? "#f59e0b" : "#38bdf8",
+                  position: "relative"
+                }}
+              >
+                <Inbox size={15} color={countPendentes > 0 ? "#f59e0b" : "#38bdf8"} /> 
+                Caixa de Correio ({countPendentes})
+                {countPendentes > 0 && (
+                  <span style={{
+                    width: "8px", height: "8px", borderRadius: "50%",
+                    backgroundColor: "#f59e0b", display: "inline-block", marginLeft: "4px"
+                  }} />
+                )}
+              </button>
+            )}
+
+            {/* ABA GESTÃO DE ADMIN */}
             {isAdmin && (
               <button 
                 className={`${styles.tabBtn} ${abaAtiva === "todos" ? styles.tabBtnActive : ""}`}
                 onClick={() => setAbaAtiva("todos")}
                 style={{ borderColor: "#a855f7" }}
               >
-                <ShieldCheck size={15} color="#a855f7" /> Admin ({tickets.length})
+                <ShieldCheck size={15} color="#a855f7" /> Admin ({countAtivosAdmin})
               </button>
             )}
           </div>
@@ -373,7 +509,6 @@ export default function TicketsModule({ user, isOpen, onClose }) {
       {/* TAB 1: FORMULÁRIO DE ABERTURA DE TICKET */}
       {abaAtiva === "criar" && (
         <div className={styles.formCard}>
-          {/* BANNER COM DADOS AUTOMÁTICOS DO USUÁRIO */}
           <div className={styles.userBanner}>
             <div className={styles.userInfo}>
               <div className={styles.avatar}>
@@ -445,7 +580,7 @@ export default function TicketsModule({ user, isOpen, onClose }) {
               <label className={styles.label}>Descrição Detalhada do Ocorrido</label>
               <textarea 
                 className={styles.textarea}
-                placeholder="Descreva detalhadamente o que aconteceu, os passos para reproduzir o problema ou a melhoria que você gostaria de ver..."
+                placeholder="Descreva detalhadamente o que aconteceu, os passos para reproduzir o problema..."
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
                 required
@@ -494,13 +629,305 @@ export default function TicketsModule({ user, isOpen, onClose }) {
             </div>
 
             <button type="submit" className={styles.btnSubmit}>
-              <Send size={16} /> Enviar Ticket de Suporte
+              <Send size={16} /> Enviar Ticket para a Caixa de Correio
             </button>
           </form>
         </div>
       )}
 
-      {/* TAB 2 & 3: LISTA DE MEUS TICKETS OU GESTÃO ADMIN */}
+      {/* ABA CAIXA DE CORREIO (TRIAGEM DE TICKETS PARA SUPERADMIN) */}
+      {abaAtiva === "correio" && isAdmin && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+          
+          {/* CAIXA DE CORREIO HERO BANNER */}
+          <div style={{
+            backgroundColor: "#0f172a",
+            border: "1px solid #1e293b",
+            borderRadius: "20px",
+            padding: "20px 24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "16px"
+          }}>
+            <div>
+              <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#f8fafc", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+                <Inbox color="#f59e0b" size={22} />
+                <span>📫 Caixa de Correio (Triagem de Solicitações)</span>
+              </h3>
+              <p style={{ fontSize: "13px", color: "#94a3b8", margin: "4px 0 0 0" }}>
+                Avalie cada ticket criado pelos alunos. Aprove para liberar na aba Admin ou rejeite com motivo.
+              </p>
+            </div>
+
+            {/* SUB-ABAS DA CAIXA DE CORREIO: PENDENTES VS REJEITADOS */}
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={() => setSubAbaCorreio("pendentes")}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: "14px",
+                  fontWeight: "800",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  border: subAbaCorreio === "pendentes" ? "1.5px solid #f59e0b" : "1px solid #334155",
+                  backgroundColor: subAbaCorreio === "pendentes" ? "rgba(245, 158, 11, 0.15)" : "#1e293b",
+                  color: subAbaCorreio === "pendentes" ? "#fbbf24" : "#94a3b8",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                <Clock size={16} /> 📥 Pendentes de Triagem ({countPendentes})
+              </button>
+
+              <button
+                onClick={() => setSubAbaCorreio("rejeitados")}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: "14px",
+                  fontWeight: "800",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  border: subAbaCorreio === "rejeitados" ? "1.5px solid #ef4444" : "1px solid #334155",
+                  backgroundColor: subAbaCorreio === "rejeitados" ? "rgba(239, 68, 68, 0.15)" : "#1e293b",
+                  color: subAbaCorreio === "rejeitados" ? "#f87171" : "#94a3b8",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                <XCircle size={16} /> ❌ Tickets Rejeitados ({countRejeitados})
+              </button>
+            </div>
+          </div>
+
+          {/* LISTAGEM DOS TICKETS DA CAIXA DE CORREIO */}
+          <div className={styles.ticketsList}>
+            {listagemTicketsExibida().length === 0 ? (
+              <div className={styles.emptyWrap}>
+                <Inbox size={42} color="#64748b" />
+                <h4 style={{ color: "#f8fafc", margin: "10px 0 4px 0" }}>
+                  {subAbaCorreio === "pendentes" 
+                    ? "Nenhum ticket pendente na Caixa de Correio 🎉" 
+                    : "Nenhum ticket rejeitado até o momento"}
+                </h4>
+                <p style={{ fontSize: "13px", color: "#94a3b8" }}>
+                  {subAbaCorreio === "pendentes"
+                    ? "Todas as solicitações enviadas pelos alunos foram triadas."
+                    : "Os tickets recusados no processo de triagem ficarão salvos aqui."}
+                </p>
+              </div>
+            ) : (
+              listagemTicketsExibida().map((t) => {
+                const badgeSt = getBadgeStatusStyle(t.status);
+                const isRejeitando = ticketRejeitandoId === t.id;
+
+                return (
+                  <div key={t.id} className={styles.ticketCard} style={{ borderColor: subAbaCorreio === "pendentes" ? "rgba(245, 158, 11, 0.4)" : "rgba(239, 68, 68, 0.3)" }}>
+                    <div className={styles.ticketCardHeader}>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                        <span className={styles.ticketId}>{t.id}</span>
+                        <span className={styles.typeBadge}>{t.tipoLabel}</span>
+                        <span className={styles.prioridadeBadge}>{t.prioridadeLabel}</span>
+                      </div>
+
+                      <span 
+                        style={{
+                          backgroundColor: badgeSt.bg,
+                          color: badgeSt.color,
+                          border: `1px solid ${badgeSt.border}`,
+                          fontSize: "11px",
+                          fontWeight: "800",
+                          padding: "4px 12px",
+                          borderRadius: "12px"
+                        }}
+                      >
+                        {badgeSt.label}
+                      </span>
+                    </div>
+
+                    <h4 className={styles.ticketTitle}>{t.titulo}</h4>
+
+                    <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span><User size={13} style={{ display: "inline", marginRight: "4px" }} /> {t.usuarioNome} ({t.usuarioEmail})</span>
+                      <span>•</span>
+                      <span><Clock size={13} style={{ display: "inline", marginRight: "4px" }} /> {t.dataCriacao}</span>
+                    </div>
+
+                    <div className={styles.descricaoBox}>
+                      <span style={{ fontSize: "10.5px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
+                        📄 Relato Inicial do Aluno:
+                      </span>
+                      {t.descricao}
+                    </div>
+
+                    {/* ANEXO SE HOUVER */}
+                    {t.anexoUrl && (
+                      <div style={{ marginTop: "12px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
+                          📎 Anexo Enviado:
+                        </span>
+                        {t.anexoTipo === "video" ? (
+                          <video src={t.anexoUrl} controls className={styles.previewVideo} style={{ maxHeight: "200px" }} />
+                        ) : (
+                          <img src={t.anexoUrl} alt="Anexo do ticket" className={styles.previewImg} style={{ maxHeight: "200px" }} />
+                        )}
+                      </div>
+                    )}
+
+                    {/* MOTIVO SE FOI REJEITADO */}
+                    {t.status === "Rejeitado" && t.motivoRejeicao && (
+                      <div style={{
+                        marginTop: "12px",
+                        backgroundColor: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        color: "#f87171",
+                        padding: "12px 14px",
+                        borderRadius: "12px",
+                        fontSize: "12.5px"
+                      }}>
+                        <strong>Motivo da Rejeição:</strong> {t.motivoRejeicao}
+                      </div>
+                    )}
+
+                    {/* BARRA DE AÇÕES DE TRIAGEM (APROVAR OU REJEITAR) */}
+                    {subAbaCorreio === "pendentes" && (
+                      <div style={{
+                        marginTop: "16px",
+                        paddingTop: "14px",
+                        borderTop: "1px solid #1e293b",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px"
+                      }}>
+                        {!isRejeitando ? (
+                          <div style={{ display: "flex", gap: "12px" }}>
+                            <button
+                              onClick={() => handleAprovarTicket(t.id)}
+                              style={{
+                                flex: 1,
+                                backgroundColor: "#10b981",
+                                color: "#FFF",
+                                border: "none",
+                                borderRadius: "12px",
+                                padding: "12px",
+                                fontWeight: "800",
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)"
+                              }}
+                            >
+                              <CheckCircle2 size={18} /> ✅ Aprovar Ticket (Enviar p/ Admin)
+                            </button>
+
+                            <button
+                              onClick={() => { setTicketRejeitandoId(t.id); setMotivoRejeicaoInput(""); }}
+                              style={{
+                                flex: 1,
+                                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                                color: "#ef4444",
+                                border: "1px solid rgba(239, 68, 68, 0.4)",
+                                borderRadius: "12px",
+                                padding: "12px",
+                                fontWeight: "800",
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px"
+                              }}
+                            >
+                              <XCircle size={18} /> ❌ Rejeitar Ticket
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{
+                            backgroundColor: "rgba(239, 68, 68, 0.08)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            borderRadius: "14px",
+                            padding: "14px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "10px"
+                          }}>
+                            <div style={{ fontSize: "12px", fontWeight: "800", color: "#f87171" }}>
+                              Motivo da Rejeição do Ticket #{t.id}:
+                            </div>
+                            <input 
+                              type="text"
+                              className={styles.input}
+                              placeholder="Digite por que este ticket está sendo rejeitado..."
+                              value={motivoRejeicaoInput}
+                              onChange={(e) => setMotivoRejeicaoInput(e.target.value)}
+                              autoFocus
+                            />
+                            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                              <button
+                                onClick={() => setTicketRejeitandoId(null)}
+                                style={{
+                                  padding: "8px 14px", borderRadius: "10px",
+                                  border: "1px solid #334155", backgroundColor: "transparent",
+                                  color: "#94a3b8", fontSize: "12px", fontWeight: "700", cursor: "pointer"
+                                }}
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => handleConfirmarRejeicao(t.id)}
+                                style={{
+                                  padding: "8px 16px", borderRadius: "10px",
+                                  border: "none", backgroundColor: "#ef4444",
+                                  color: "#FFF", fontSize: "12px", fontWeight: "800", cursor: "pointer"
+                                }}
+                              >
+                                Confirmar Rejeição
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* BARRA DE RE-APROVAÇÃO PARA REJEITADOS */}
+                    {subAbaCorreio === "rejeitados" && (
+                      <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid #1e293b", display: "flex", justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => handleReavaliarTicket(t.id)}
+                          style={{
+                            backgroundColor: "rgba(59, 130, 246, 0.15)",
+                            color: "#3b82f6",
+                            border: "1px solid rgba(59, 130, 246, 0.35)",
+                            borderRadius: "10px",
+                            padding: "8px 14px",
+                            fontWeight: "800",
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <RotateCcw size={14} /> 🔄 Reavaliar e Aprovar Ticket
+                        </button>
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2 & 3: LISTA DE MEUS TICKETS OU GESTÃO ADMIN ATIVOS */}
       {(abaAtiva === "meus_tickets" || abaAtiva === "todos") && (
         <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
           
@@ -600,221 +1027,339 @@ export default function TicketsModule({ user, isOpen, onClose }) {
                     fontWeight: "700", cursor: "pointer"
                   }}
                 >
-                  ✕ Limpar Filtros
+                  Limpar Filtros
                 </button>
               )}
             </div>
           </div>
 
-          {/* GRID DE CARDS DE TICKETS */}
-          <div className={styles.ticketsGrid}>
+          {/* LISTAGEM DOS TICKETS */}
+          <div className={styles.ticketsList}>
             {listagemTicketsExibida().length === 0 ? (
-              <div style={{ padding: "36px", textAlign: "center", backgroundColor: "#0f172a", borderRadius: "18px", border: "1px solid #1e293b", color: "#94a3b8" }}>
-                <Ticket size={32} color="#64748b" style={{ marginBottom: "8px" }} />
-                <p style={{ fontSize: "14px", fontWeight: "700", margin: 0 }}>Nenhum ticket encontrado com os filtros aplicados.</p>
+              <div className={styles.emptyWrap}>
+                <Ticket size={40} color="#64748b" />
+                <h4 style={{ color: "#f8fafc", margin: "8px 0 4px 0" }}>Nenhum ticket encontrado</h4>
+                <p style={{ fontSize: "13px", color: "#94a3b8" }}>
+                  Tente alterar os filtros de busca ou abra uma nova solicitação.
+                </p>
               </div>
             ) : (
               listagemTicketsExibida().map((t) => {
-                const mensagensThread = t.mensagens || [];
+                const badgeSt = getBadgeStatusStyle(t.status);
 
                 return (
                   <div key={t.id} className={styles.ticketCard}>
-                    
-                    {/* CABEÇALHO DO TICKET */}
-                    <div className={styles.ticketHeader}>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                          <span className={styles.ticketId}>{t.id}</span>
-                          <span className={styles.badge} style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#cbd5e1", border: "1px solid #334155" }}>
-                            {t.tipoLabel}
-                          </span>
-                          <span className={styles.badge} style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#cbd5e1", border: "1px solid #334155" }}>
-                            {t.prioridadeLabel}
-                          </span>
-                        </div>
-
-                        <h4 className={styles.ticketTitle}>{t.titulo}</h4>
-                        <p style={{ fontSize: "11.5px", color: "#64748b", margin: "4px 0 0 0" }}>
-                          👤 <strong>{t.usuarioNome}</strong> ({t.usuarioEmail}) • ⏰ {t.dataCriacao}
-                        </p>
+                    {/* CABEÇALHO DO CARD */}
+                    <div className={styles.ticketCardHeader}>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                        <span className={styles.ticketId}>{t.id}</span>
+                        <span className={styles.typeBadge}>{t.tipoLabel}</span>
+                        <span className={styles.prioridadeBadge}>{t.prioridadeLabel}</span>
                       </div>
 
-                      {/* STATUS BADGE */}
-                      <span className={`${styles.badge} ${
-                        t.status === "Resolvido" 
-                          ? styles.statusResolvido 
-                          : t.status === "Em Análise" 
-                          ? styles.statusAnalise 
-                          : styles.statusAberto
-                      }`}>
-                        {t.status === "Resolvido" ? "🟢 Resolvido" : t.status === "Em Análise" ? "🔵 Em Análise" : "🟡 Aberto"}
-                      </span>
-                    </div>
-
-                    {/* DESCRIÇÃO DA SOLICITAÇÃO INICIAL */}
-                    <div>
-                      <p style={{ fontSize: "11px", fontWeight: "800", color: "#94a3b8", marginBottom: "4px", textTransform: "uppercase" }}>
-                        📝 Relato Inicial do Aluno:
-                      </p>
-                      <p className={styles.ticketDesc}>{t.descricao}</p>
-                    </div>
-
-                    {/* ANEXO DE IMAGEM/VÍDEO SE HOUVER */}
-                    {t.anexoUrl && (
-                      <div>
-                        <p style={{ fontSize: "11px", fontWeight: "800", color: "#38bdf8", marginBottom: "4px", textTransform: "uppercase" }}>
-                          📎 Arquivo Anexado pelo Aluno:
-                        </p>
-                        <div className={styles.previewWrap}>
-                          {t.anexoTipo === "video" ? (
-                            <video src={t.anexoUrl} controls className={styles.previewVideo} />
-                          ) : (
-                            <img src={t.anexoUrl} alt="Anexo do ticket" className={styles.previewImg} />
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* HISTÓRICO DE MENSAGENS E CHAT DE CONVERSA */}
-                    {mensagensThread.length > 0 && (
-                      <div className={styles.messagesThread}>
-                        <p style={{ fontSize: "11px", fontWeight: "800", color: "#a855f7", margin: "0 0 4px 0", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "6px" }}>
-                          💬 Histórico de Mensagens ({mensagensThread.length}):
-                        </p>
-                        {mensagensThread.map((msg) => (
-                          <div key={msg.id} className={`${styles.msgBubble} ${msg.role === "admin" ? styles.msgAdmin : styles.msgAluno}`}>
-                            <div className={styles.msgHeader}>
-                              <span className={msg.role === "admin" ? styles.msgAutorAdmin : styles.msgAutorAluno}>
-                                {msg.role === "admin" ? "🛡️ Equipe DevHub (Admin)" : `👤 ${msg.autor}`}
-                              </span>
-                              <span style={{ color: "#64748b", fontSize: "10.5px" }}>{msg.data}</span>
-                            </div>
-                            <div style={{ whiteSpace: "pre-line" }}>{msg.texto}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* CAMPOS DE RESPOSTA E ENVIAR MENSAGEM */}
-                    <div style={{ marginTop: "6px" }}>
-                      <p style={{ fontSize: "11.5px", fontWeight: "800", color: "#3b82f6", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        💬 Escrever Mensagem na Conversa:
-                      </p>
-                      
-                      <div className={styles.replyForm}>
-                        <input 
-                          type="text"
-                          placeholder="Digite sua mensagem e clique em Enviar ou pressione Enter..."
-                          className={styles.replyInput}
-                          value={mensagemInputs[t.id] || ""}
-                          onChange={(e) => setMensagemInputs({ ...mensagemInputs, [t.id]: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleEnviarMensagem(t.id);
-                            }
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span 
+                          style={{
+                            backgroundColor: badgeSt.bg,
+                            color: badgeSt.color,
+                            border: `1px solid ${badgeSt.border}`,
+                            fontSize: "11px",
+                            fontWeight: "800",
+                            padding: "4px 12px",
+                            borderRadius: "12px"
                           }}
-                        />
-
-                        <button 
-                          type="button"
-                          className={styles.btnReplySend}
-                          onClick={() => handleEnviarMensagem(t.id)}
                         >
-                          <Send size={15} /> Enviar Mensagem
-                        </button>
-                      </div>
-                    </div>
+                          {badgeSt.label}
+                        </span>
 
-                    {/* AÇÕES DE STATUS E RESOLUÇÃO DO TICKET */}
-                    <div className={styles.adminControlBar}>
-                      {t.status === "Resolvido" && (
-                        <div style={{
-                          width: "100%", padding: "10px 14px", borderRadius: "12px",
-                          backgroundColor: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)",
-                          color: "#10b981", fontSize: "12px", fontWeight: "700", display: "flex",
-                          alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px"
-                        }}>
-                          <span>🟢 Este ticket foi marcado como Resolvido! Se o problema persistir, você pode reabri-lo.</span>
-                        </div>
-                      )}
-
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", width: "100%", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                          {t.status === "Resolvido" && (
-                            <button
-                              onClick={() => handleReabrirTicket(t.id)}
-                              style={{
-                                padding: "7px 14px", borderRadius: "10px",
-                                backgroundColor: "rgba(59,130,246,0.2)", color: "#38bdf8",
-                                border: "1px solid rgba(59,130,246,0.4)", fontWeight: "800",
-                                cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px"
-                              }}
-                            >
-                              <RotateCcw size={14} /> Reabrir Ticket
-                            </button>
-                          )}
-
+                        {isAdmin && (
                           <button
                             onClick={() => handleExcluirTicket(t.id)}
                             style={{
-                              padding: "7px 14px", borderRadius: "10px",
-                              backgroundColor: "rgba(239, 68, 68, 0.15)", color: "#ef4444",
-                              border: "1px solid rgba(239, 68, 68, 0.3)", fontWeight: "700",
-                              cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px"
+                              background: "transparent", border: "none",
+                              color: "#ef4444", cursor: "pointer", padding: "4px"
                             }}
+                            title="Excluir Ticket"
                           >
-                            <Trash2 size={14} /> Excluir Ticket
+                            <Trash2 size={16} />
                           </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <h4 className={styles.ticketTitle}>{t.titulo}</h4>
+
+                    <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span><User size={13} style={{ display: "inline", marginRight: "4px" }} /> {t.usuarioNome} ({t.usuarioEmail})</span>
+                      <span>•</span>
+                      <span><Clock size={13} style={{ display: "inline", marginRight: "4px" }} /> {t.dataCriacao}</span>
+                    </div>
+
+                    <div className={styles.descricaoBox}>
+                      <span style={{ fontSize: "10.5px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
+                        📄 Relato do Aluno:
+                      </span>
+                      {t.descricao}
+                    </div>
+
+                    {/* ANEXO SE HOUVER */}
+                    {t.anexoUrl && (
+                      <div style={{ marginTop: "12px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
+                          📎 Anexo Enviado:
+                        </span>
+                        {t.anexoTipo === "video" ? (
+                          <video src={t.anexoUrl} controls className={styles.previewVideo} style={{ maxHeight: "200px" }} />
+                        ) : (
+                          <img src={t.anexoUrl} alt="Anexo do ticket" className={styles.previewImg} style={{ maxHeight: "200px" }} />
+                        )}
+                      </div>
+                    )}
+
+                    {/* MOTIVO DE REJEIÇÃO EXIBIDO AO ALUNO */}
+                    {t.status === "Rejeitado" && t.motivoRejeicao && (
+                      <div style={{
+                        marginTop: "12px",
+                        backgroundColor: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        color: "#f87171",
+                        padding: "12px 14px",
+                        borderRadius: "12px",
+                        fontSize: "12.5px"
+                      }}>
+                        <strong>Motivo da Rejeição:</strong> {t.motivoRejeicao}
+                      </div>
+                    )}
+
+                    {/* THREAD DE MENSAGENS / RESPOSTAS */}
+                    <div style={{ marginTop: "20px" }}>
+                      {/* Header do histórico */}
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: "8px",
+                        marginBottom: "14px", paddingBottom: "12px",
+                        borderBottom: "1px solid rgba(255,255,255,0.07)"
+                      }}>
+                        <div style={{
+                          width: "28px", height: "28px", borderRadius: "8px",
+                          background: "rgba(59,130,246,0.15)",
+                          border: "1px solid rgba(59,130,246,0.3)",
+                          display: "flex", alignItems: "center", justifyContent: "center"
+                        }}>
+                          <MessageSquare size={14} color="#3b82f6" />
                         </div>
+                        <span style={{ fontSize: "13px", fontWeight: "800", color: "#cbd5e1" }}>
+                          Histórico de Atendimento
+                        </span>
+                        {t.mensagens?.length > 0 && (
+                          <span style={{
+                            background: "rgba(59,130,246,0.2)", color: "#38bdf8",
+                            border: "1px solid rgba(59,130,246,0.35)",
+                            fontSize: "11px", fontWeight: "800",
+                            padding: "2px 8px", borderRadius: "20px"
+                          }}>
+                            {t.mensagens.length}
+                          </span>
+                        )}
+                      </div>
 
-                        {isAdmin && abaAtiva === "todos" && (
-                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                            <button
-                              onClick={() => handleAlterarStatus(t.id, "Aberto")}
+                      {/* Mensagens */}
+                      {t.mensagens && t.mensagens.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
+                          {t.mensagens.map((msg) => {
+                            const isMsgAdmin = msg.role === "admin";
+                            const isSystem = msg.autor === "Sistema DevHub";
+
+                            if (isSystem) {
+                              return (
+                                <div key={msg.id} style={{
+                                  display: "flex", alignItems: "center", gap: "10px",
+                                  padding: "10px 14px",
+                                  background: "rgba(16,185,129,0.08)",
+                                  border: "1px solid rgba(16,185,129,0.2)",
+                                  borderRadius: "12px"
+                                }}>
+                                  <CheckCircle size={14} color="#10b981" style={{ flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <span style={{ fontSize: "12.5px", color: "#6ee7b7", fontWeight: "600" }}>
+                                      {msg.texto}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: "10.5px", color: "#475569", whiteSpace: "nowrap" }}>{msg.data}</span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div key={msg.id} style={{
+                                display: "flex",
+                                flexDirection: isMsgAdmin ? "row-reverse" : "row",
+                                gap: "10px", alignItems: "flex-start"
+                              }}>
+                                {/* Avatar */}
+                                <div style={{
+                                  width: "34px", height: "34px", borderRadius: "10px", flexShrink: 0,
+                                  background: isMsgAdmin
+                                    ? "linear-gradient(135deg, #7c3aed, #a855f7)"
+                                    : "linear-gradient(135deg, #1d4ed8, #3b82f6)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: "13px", fontWeight: "900", color: "#fff",
+                                  boxShadow: isMsgAdmin ? "0 4px 12px rgba(168,85,247,0.35)" : "0 4px 12px rgba(59,130,246,0.3)"
+                                }}>
+                                  {isMsgAdmin ? "🛡️" : msg.autor.charAt(0).toUpperCase()}
+                                </div>
+
+                                {/* Bolha */}
+                                <div style={{ maxWidth: "75%", display: "flex", flexDirection: "column", gap: "4px" }}>
+                                  <div style={{
+                                    display: "flex", alignItems: "center", gap: "6px",
+                                    flexDirection: isMsgAdmin ? "row-reverse" : "row"
+                                  }}>
+                                    <span style={{
+                                      fontSize: "11.5px", fontWeight: "800",
+                                      color: isMsgAdmin ? "#c084fc" : "#38bdf8"
+                                    }}>
+                                      {isMsgAdmin ? "🛡️ Suporte DevHub" : msg.autor}
+                                    </span>
+                                    <span style={{ fontSize: "10.5px", color: "#475569" }}>{msg.data}</span>
+                                  </div>
+                                  <div style={{
+                                    padding: "11px 15px",
+                                    borderRadius: isMsgAdmin ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
+                                    background: isMsgAdmin
+                                      ? "linear-gradient(135deg, rgba(124,58,237,0.2), rgba(168,85,247,0.15))"
+                                      : "rgba(30,41,59,0.9)",
+                                    border: isMsgAdmin
+                                      ? "1px solid rgba(168,85,247,0.3)"
+                                      : "1px solid rgba(51,65,85,0.8)",
+                                    fontSize: "13px", color: "#e2e8f0", lineHeight: "1.6",
+                                    boxShadow: isMsgAdmin
+                                      ? "0 4px 16px rgba(124,58,237,0.15)"
+                                      : "0 2px 8px rgba(0,0,0,0.2)"
+                                  }}>
+                                    {msg.texto}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: "flex", flexDirection: "column", alignItems: "center",
+                          padding: "20px", gap: "8px", opacity: 0.5
+                        }}>
+                          <MessageSquare size={22} color="#475569" />
+                          <span style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>
+                            Nenhuma resposta ainda
+                          </span>
+                        </div>
+                      )}
+
+                      {/* CONTROLES: STATUS + RESPOSTA */}
+                      <div style={{
+                        borderTop: "1px solid rgba(255,255,255,0.07)",
+                        paddingTop: "14px",
+                        display: "flex", flexDirection: "column", gap: "12px"
+                      }}>
+                        {/* Botões de Status (Admin) */}
+                        {isAdmin && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <span style={{
+                              fontSize: "11px", fontWeight: "700", color: "#64748b",
+                              textTransform: "uppercase", letterSpacing: "0.06em"
+                            }}>
+                              Status:
+                            </span>
+                            {[
+                              { label: "Aberto", color: "#f59e0b", bg: "rgba(245,158,11,0.15)", glow: "rgba(245,158,11,0.3)", emoji: "🟡" },
+                              { label: "Em Análise", color: "#a855f7", bg: "rgba(168,85,247,0.15)", glow: "rgba(168,85,247,0.3)", emoji: "🔵" },
+                              { label: "Resolvido", color: "#10b981", bg: "rgba(16,185,129,0.15)", glow: "rgba(16,185,129,0.3)", emoji: "✅" }
+                            ].map(({ label, color, bg, glow, emoji }) => {
+                              const isActive = t.status === label;
+                              return (
+                                <button
+                                  key={label}
+                                  onClick={() => handleAlterarStatus(t.id, label)}
+                                  style={{
+                                    padding: "6px 14px",
+                                    borderRadius: "20px",
+                                    border: `1px solid ${isActive ? color : "rgba(255,255,255,0.1)"}`,
+                                    background: isActive ? bg : "transparent",
+                                    color: isActive ? color : "#64748b",
+                                    fontSize: "11.5px", fontWeight: "800", cursor: "pointer",
+                                    display: "flex", alignItems: "center", gap: "5px",
+                                    transition: "all 0.2s ease",
+                                    boxShadow: isActive ? `0 0 12px ${glow}` : "none"
+                                  }}
+                                >
+                                  {emoji} {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Input de Resposta */}
+                        {t.status !== "Resolvido" && t.status !== "Rejeitado" && (
+                          <div style={{
+                            display: "flex", gap: "8px", alignItems: "center",
+                            background: "rgba(15,23,42,0.6)",
+                            border: "1px solid rgba(51,65,85,0.8)",
+                            borderRadius: "14px", padding: "6px 6px 6px 14px",
+                            transition: "border-color 0.2s ease"
+                          }}>
+                            <div style={{
+                              width: "28px", height: "28px", borderRadius: "8px",
+                              background: isAdmin
+                                ? "linear-gradient(135deg, #7c3aed, #a855f7)"
+                                : "linear-gradient(135deg, #1d4ed8, #3b82f6)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "12px", flexShrink: 0
+                            }}>
+                              {isAdmin ? "🛡️" : "💬"}
+                            </div>
+                            <input
+                              type="text"
                               style={{
-                                padding: "6px 12px", borderRadius: "8px",
-                                backgroundColor: t.status === "Aberto" ? "rgba(245,158,11,0.25)" : "#1e293b",
-                                color: "#f59e0b", border: "1px solid rgba(245,158,11,0.4)",
-                                fontWeight: "700", cursor: "pointer", fontSize: "11px"
+                                flex: 1, background: "transparent", border: "none",
+                                outline: "none", color: "#e2e8f0", fontSize: "13px",
+                                fontFamily: "inherit"
+                              }}
+                              placeholder={isAdmin ? "Escreva uma resposta oficial..." : "Adicionar comentário..."}
+                              value={mensagemInputs[t.id] || ""}
+                              onChange={(e) => setMensagemInputs({ ...mensagemInputs, [t.id]: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleEnviarMensagem(t.id);
+                              }}
+                            />
+                            <button
+                              onClick={() => handleEnviarMensagem(t.id)}
+                              style={{
+                                width: "36px", height: "36px", borderRadius: "10px",
+                                border: "none",
+                                background: mensagemInputs[t.id]?.trim()
+                                  ? "linear-gradient(135deg, #3b82f6, #2563eb)"
+                                  : "rgba(51,65,85,0.6)",
+                                color: mensagemInputs[t.id]?.trim() ? "#fff" : "#475569",
+                                cursor: mensagemInputs[t.id]?.trim() ? "pointer" : "default",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                transition: "all 0.2s ease",
+                                flexShrink: 0,
+                                boxShadow: mensagemInputs[t.id]?.trim() ? "0 4px 12px rgba(59,130,246,0.4)" : "none"
                               }}
                             >
-                              🟡 Aberto
-                            </button>
-
-                            <button
-                              onClick={() => handleAlterarStatus(t.id, "Em Análise")}
-                              style={{
-                                padding: "6px 12px", borderRadius: "8px",
-                                backgroundColor: t.status === "Em Análise" ? "rgba(59,130,246,0.25)" : "#1e293b",
-                                color: "#38bdf8", border: "1px solid rgba(59,130,246,0.4)",
-                                fontWeight: "700", cursor: "pointer", fontSize: "11px"
-                              }}
-                            >
-                              🔵 Em Análise
-                            </button>
-
-                            <button
-                              onClick={() => handleAlterarStatus(t.id, "Resolvido")}
-                              style={{
-                                padding: "6px 12px", borderRadius: "8px",
-                                backgroundColor: t.status === "Resolvido" ? "rgba(16,185,129,0.25)" : "#1e293b",
-                                color: "#10b981", border: "1px solid rgba(16,185,129,0.4)",
-                                fontWeight: "700", cursor: "pointer", fontSize: "11px"
-                              }}
-                            >
-                              🟢 Resolvido
+                              <Send size={14} />
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
-
                   </div>
                 );
               })
             )}
           </div>
+
         </div>
       )}
 
@@ -822,9 +1367,23 @@ export default function TicketsModule({ user, isOpen, onClose }) {
   );
 
   if (isOpen !== undefined) {
+    if (!isOpen) return null;
     return (
-      <div className={styles.overlay} onClick={onClose}>
-        <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
+        zIndex: 9999, display: "flex", justifyContent: "center",
+        alignItems: "center", padding: "24px"
+      }} onClick={onClose}>
+        <div style={{
+          background: "#0b0f19",
+          border: "1px solid rgba(59,130,246,0.3)",
+          width: "100%", maxWidth: "900px", maxHeight: "90vh",
+          borderRadius: "24px",
+          boxShadow: "0 25px 60px rgba(0,0,0,0.7)",
+          color: "#f8fafc", overflowY: "auto", padding: "28px",
+          display: "flex", flexDirection: "column", gap: "24px"
+        }} onClick={(e) => e.stopPropagation()}>
           {contentJSX}
         </div>
       </div>

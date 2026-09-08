@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
 import { Users, Code, Send, Mic, Video, Share2, Play, Copy, Check, MessageSquare, AlertCircle, Sparkles, RefreshCw, HelpCircle, CheckCircle2, Award, User, Terminal, Layers, Globe } from "lucide-react";
 
 export default function PairProgrammingModule({ user, isDark, colors }) {
@@ -128,7 +129,7 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
   const desafioAtual = DESAFIOS_PAIR[desafioIndex];
   const [codigo, setCodigo] = useState(desafioAtual.codigoInicial);
   const [mensagensChat, setMensagensChat] = useState([
-    { id: 1, autor: "DevHub Bot 🤖", texto: "Bem-vindos ao ambiente de Pair Programming! Conectados." }
+    { id: 1, autor: "DevHub Bot 🤖", texto: "Bem-vindos ao ambiente de Pair Programming! Conectados em tempo real." }
   ]);
   const [inputChat, setInputChat] = useState("");
   const [copiado, setCopiado] = useState(false);
@@ -138,6 +139,56 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
   const [resultadoConsole, setResultadoConsole] = useState("");
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const socketRef = useRef(null);
+
+  // Conectar ao Socket.io para sincronização simultânea de Pair Programming
+  useEffect(() => {
+    if (!salaAtiva || salaAtiva.modo !== "dupla") return;
+
+    const socket = io(apiUrl, { transports: ["websocket", "polling"] });
+    socketRef.current = socket;
+
+    socket.emit("join_room", salaAtiva.codigoSala);
+
+    socket.on("pair_code_change", (data) => {
+      if (data && data.codigo !== undefined) {
+        setCodigo(data.codigo);
+      }
+    });
+
+    socket.on("pair_chat_message", (msg) => {
+      if (msg) {
+        setMensagensChat(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      }
+    });
+
+    socket.on("pair_challenge_change", (data) => {
+      if (data && data.index !== undefined) {
+        setDesafioIndex(data.index);
+        if (DESAFIOS_PAIR[data.index]) {
+          setCodigo(DESAFIOS_PAIR[data.index].codigoInicial);
+        }
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [salaAtiva]);
+
+  const handleCodigoChange = (e) => {
+    const novoCodigo = e.target.value;
+    setCodigo(novoCodigo);
+    if (salaAtiva && salaAtiva.modo === "dupla" && socketRef.current) {
+      socketRef.current.emit("pair_code_change", {
+        sala: salaAtiva.codigoSala,
+        codigo: novoCodigo
+      });
+    }
+  };
 
   const handleMudarDesafio = () => {
     const proximoIndex = (desafioIndex + 1) % DESAFIOS_PAIR.length;
@@ -146,6 +197,13 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
     setResultadoConsole("");
     setNotificacaoMidia(`🔄 Novo desafio carregado [${DESAFIOS_PAIR[proximoIndex].tecnologia}]: ${DESAFIOS_PAIR[proximoIndex].titulo}`);
     setTimeout(() => setNotificacaoMidia(""), 4000);
+
+    if (salaAtiva && salaAtiva.modo === "dupla" && socketRef.current) {
+      socketRef.current.emit("pair_challenge_change", {
+        sala: salaAtiva.codigoSala,
+        index: proximoIndex
+      });
+    }
   };
 
   // Execução Real do Código em Tempo Real com Captura de Console
@@ -179,6 +237,7 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
 
   // Criar Sala de Pair em Dupla
   const handleCriarSala = async () => {
+    const codigoUnico = "PAIR-" + Math.floor(100000 + Math.random() * 900000);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${apiUrl}/gamificacao/pair-programming/sala`, {
@@ -187,16 +246,16 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ nomeSala: nomeNovaSala || "Pair Session DevHub" })
+        body: JSON.stringify({ nomeSala: nomeNovaSala || "Pair Session DevHub", codigoSala: codigoUnico })
       });
       if (res.ok) {
         const data = await res.json();
-        setSalaAtiva({ ...data, modo: "dupla" });
+        setSalaAtiva({ ...data, modo: "dupla", codigoSala: data.codigoSala || codigoUnico });
       } else {
-        setSalaAtiva({ modo: "dupla", codigoSala: "PAIR-" + Math.floor(100000 + Math.random() * 900000), nomeSala: nomeNovaSala || "Pair Session DevHub" });
+        setSalaAtiva({ modo: "dupla", codigoSala: codigoUnico, nomeSala: nomeNovaSala || "Pair Session DevHub" });
       }
     } catch (e) {
-      setSalaAtiva({ modo: "dupla", codigoSala: "PAIR-" + Math.floor(100000 + Math.random() * 900000), nomeSala: nomeNovaSala || "Pair Session DevHub" });
+      setSalaAtiva({ modo: "dupla", codigoSala: codigoUnico, nomeSala: nomeNovaSala || "Pair Session DevHub" });
     }
   };
 
@@ -234,7 +293,15 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
 
   const handleEnviarMensagem = () => {
     if (!inputChat.trim()) return;
-    setMensagensChat(prev => [...prev, { id: Date.now(), autor: user?.nome || "Eu", texto: inputChat }]);
+    const novaMensagem = { id: Date.now(), autor: user?.nome || "Eu", texto: inputChat.trim() };
+    if (salaAtiva && salaAtiva.modo === "dupla" && socketRef.current) {
+      socketRef.current.emit("pair_chat_message", {
+        sala: salaAtiva.codigoSala,
+        mensagem: novaMensagem
+      });
+    } else {
+      setMensagensChat(prev => [...prev, novaMensagem]);
+    }
     setInputChat("");
   };
 
@@ -525,7 +592,7 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
 
             <textarea
               value={codigo}
-              onChange={e => setCodigo(e.target.value)}
+              onChange={handleCodigoChange}
               rows={14}
               spellCheck={false}
               style={{

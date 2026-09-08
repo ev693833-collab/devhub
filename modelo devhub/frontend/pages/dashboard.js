@@ -15,12 +15,13 @@ import CodePlaygroundModule from "../components/CodePlaygroundModule";
 import FlashcardsModule from "../components/FlashcardsModule";
 import TrilhasModule from "../components/TrilhasModule";
 import AulasSection from "../components/dashboard/AulasSection";
+import VisaoGeralSection from "../components/dashboard/VisaoGeralSection";
 import NotificationCenterModal from "../components/NotificationCenterModal";
 import TicketsModule from "../components/TicketsModule";
 import { 
   BookOpen, Calendar, Trophy, FileText, CheckSquare, 
   Sparkles, ChevronLeft, ChevronRight, ChevronDown, User, Shield, Layers, Swords, Crown,
-  LogOut, Moon, Sun, Settings, Bell, Zap, Check, BookMarked, Code, BrainCircuit, Compass, LifeBuoy
+  LogOut, Moon, Sun, Settings, Bell, Zap, Check, BookMarked, Code, BrainCircuit, Compass, LifeBuoy, Home
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -32,7 +33,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   // Controle de Navegação Lateral & Perfil
-  const [abaAtiva, setAbaAtiva] = useState("aulas");
+  const [abaAtiva, setAbaAtiva] = useState("visao_geral");
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [menuAulasAberto, setMenuAulasAberto] = useState(true);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
@@ -1860,7 +1861,7 @@ export default function Dashboard() {
                         {/* Tickets & Suporte */}
                         <button
                           onClick={() => {
-                            setModalTicketsOpen(true);
+                            setAbaAtiva("tickets");
                             setUserDropdownOpen(false);
                           }}
                           style={{
@@ -2008,6 +2009,7 @@ export default function Dashboard() {
                 ...(user?.cargo === "superadmin" || user?.cargo === "super_admin" || isAdmin ? [
                   { id: "super_admin", label: "Painel Super Admin", sublabel: "Central Executiva", icon: Crown, color: "#F59E0B", badge: "VIP 👑" }
                 ] : []),
+                { id: "visao_geral", label: "Visão Geral", sublabel: "Home do Aluno", icon: Home, color: "#10B981", badge: "Início 🏠" },
                 { id: "aulas", label: "Aulas & Guia", sublabel: "Full Stack", icon: BookOpen, color: "#3B82F6", badge: `${categorias[0]?.slides?.length || 0}` },
                 { id: "agenda", label: "Calendário & Agenda", sublabel: "Aulas & Reuniões", icon: Calendar, color: "#EF4444", badge: "Ao Vivo 🔴" },
                 { id: "games", label: "Jogos DevHub", sublabel: "Catálogo de Jogos", icon: Swords, color: "#6366F1", badge: "2 Jogos 🎮" },
@@ -2020,7 +2022,8 @@ export default function Dashboard() {
                 { id: "evolucao", label: "Sua Evolução", sublabel: "Timeline", icon: Zap, color: "#EC4899", badge: "Trilha 📈" },
                 { id: "notas", label: "Notas das Provas", sublabel: "Boletim", icon: FileText, color: "#A855F7" },
                 { id: "provas-online", label: "Realizar Provas", sublabel: "Avaliações", icon: CheckSquare, color: "#EC4899" },
-                { id: "dev_ia", label: "Dev IA Tutor", sublabel: "Assistente 24/7", icon: Sparkles, color: "#6366F1", badge: "IA ⚡" }
+                { id: "dev_ia", label: "Dev IA Tutor", sublabel: "Assistente 24/7", icon: Sparkles, color: "#6366F1", badge: "IA ⚡" },
+                { id: "tickets", label: "Tickets & Suporte", sublabel: "Central de Ajuda", icon: LifeBuoy, color: "#3B82F6", badge: "Suporte 🎟️" }
               ]
                 .filter((item) => isModuloLiberado(item.id))
                 .map((item) => {
@@ -2312,102 +2315,9 @@ export default function Dashboard() {
               </div>
             ) : (
               <>
-            {abaAtiva === "aulas" && (
-              <div style={{
-                background: isDark 
-                  ? "linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%)" 
-                  : "linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)",
-                border: `1px solid ${colors.borderCard}`,
-                borderRadius: "24px",
-                padding: "24px 28px",
-                marginBottom: "24px",
-                boxShadow: isDark ? "0 12px 30px rgba(0,0,0,0.3)" : "0 8px 24px rgba(0,0,0,0.05)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "20px"
-              }}>
-                {/* Parte Superior do Hero */}
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "16px"
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                    <div style={{
-                      width: "52px", height: "52px", borderRadius: "16px",
-                      background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "#FFF", fontSize: "24px", fontWeight: "800",
-                      boxShadow: "0 8px 20px rgba(59, 130, 246, 0.35)",
-                      flexShrink: 0
-                    }}>
-                      {(user?.avatar_url || user?.avatar) ? (
-                        <img src={user.avatar_url || user.avatar} alt="Foto" style={{ width: "100%", height: "100%", borderRadius: "16px", objectFit: "cover" }} />
-                      ) : (
-                        user?.nome ? user.nome.charAt(0).toUpperCase() : "👋"
-                      )}
-                    </div>
-                    <div>
-                      <h1 style={{ fontSize: "22px", fontWeight: "800", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                        Bem-vindo, {user ? user.nome : "Estudante"}! <span style={{ animation: "pulse 2s infinite" }}>🚀</span>
-                      </h1>
-                      <p style={{ color: colors.textSecondary, fontSize: "13.5px", margin: "4px 0 0 0" }}>
-                        Plataforma interativa DevHub — Escolha um módulo abaixo para começar os estudos.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Cards de Métricas Rápidas no Meio */}
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-
-                    <div style={{
-                      padding: "8px 14px",
-                      borderRadius: "14px",
-                      backgroundColor: isDark ? "rgba(59, 130, 246, 0.12)" : "#EFF6FF",
-                      border: `1px solid ${isDark ? "rgba(59, 130, 246, 0.25)" : "#BFDBFE"}`,
-                      display: "flex", alignItems: "center", gap: "8px"
-                    }}>
-                      <BookOpen size={16} style={{ color: "#3B82F6" }} />
-                      <div>
-                        <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Módulos</div>
-                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#3B82F6" }}>7 Módulos de Estudo</div>
-                      </div>
-                    </div>
-
-                    <div style={{
-                      padding: "8px 14px",
-                      borderRadius: "14px",
-                      backgroundColor: isDark ? "rgba(16, 185, 129, 0.12)" : "#ECFDF5",
-                      border: `1px solid ${isDark ? "rgba(16, 185, 129, 0.25)" : "#A7F3D0"}`,
-                      display: "flex", alignItems: "center", gap: "8px"
-                    }}>
-                      <Zap size={16} style={{ color: "#10B981" }} />
-                      <div>
-                        <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Status</div>
-                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#10B981" }}>Ativo 🟢</div>
-                      </div>
-                    </div>
-
-                    <div style={{
-                      padding: "8px 14px",
-                      borderRadius: "14px",
-                      backgroundColor: isDark ? "rgba(168, 85, 247, 0.12)" : "#F3E8FF",
-                      border: `1px solid ${isDark ? "rgba(168, 85, 247, 0.25)" : "#DDD6FE"}`,
-                      display: "flex", alignItems: "center", gap: "8px"
-                    }}>
-                      <Crown size={16} style={{ color: "#A855F7" }} />
-                      <div>
-                        <div style={{ fontSize: "10px", color: colors.textSecondary, fontWeight: "700", textTransform: "uppercase" }}>Trilha</div>
-                        <div style={{ fontSize: "13px", fontWeight: "800", color: "#A855F7" }}>Full Stack</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {abaAtiva === "visao_geral" && (
+              <VisaoGeralSection user={user} setAbaAtiva={setAbaAtiva} isDark={isDark} />
             )}
-
             {/* ABA 1: AULAS DE ESTUDO */}
             {abaAtiva === "aulas" && <AulasSection user={user} />}
 
@@ -3337,6 +3247,11 @@ export default function Dashboard() {
             })()}
 
             {/* ABA: PAINEL SUPER ADMIN VIP */}
+            {/* ABA TICKETS & SUPORTE */}
+            {abaAtiva === "tickets" && (
+              <TicketsModule user={user} />
+            )}
+
             {abaAtiva === "super_admin" && (
               <SuperAdminModule isDark={isDark} colors={colors} currentUser={user} />
             )}
@@ -4538,12 +4453,7 @@ export default function Dashboard() {
           onUpdateUnreadCount={(count) => setUnreadNotificacoesCount(count)}
         />
 
-        {/* MODAL DE TICKETS & SUPORTE */}
-        <TicketsModule 
-          user={user} 
-          isOpen={modalTicketsOpen} 
-          onClose={() => setModalTicketsOpen(false)} 
-        />
+
 
         </div>
     </>

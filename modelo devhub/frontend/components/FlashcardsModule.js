@@ -43,9 +43,59 @@ export default function FlashcardsModule() {
     setFlippedMap(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const eTopicoProgramacao = (top) => {
+    if (!top || typeof top !== "string") return false;
+    const lower = top.toLowerCase().trim();
+
+    const naoTecnicos = [
+      "arroz", "feijao", "feijão", "flamengo", "corinthians", "palmeiras", "vasco", "sao paulo", "são paulo",
+      "santos", "gremio", "grêmio", "inter", "botafogo", "fluminense", "futebol", "comida", "receita", "carro",
+      "fofoca", "politica", "política", "novela", "filme", "musica", "música", "amor", "namoro", "maquiagem",
+      "roupa", "sapato", "viagem", "praia", "cerveja", "churrasco", "basquete", "vôlei", "volei", "casa",
+      "jardim", "cachorro", "gato", "pet", "almoço", "jantar", "vinho", "pizza", "hamburguer", "hambúrguer"
+    ];
+
+    if (naoTecnicos.some(item => lower.includes(item))) return false;
+
+    const termosTecnicos = [
+      "js", "javascript", "ts", "typescript", "react", "next", "vue", "angular", "node", "express",
+      "python", "django", "flask", "java", "spring", "c#", ".net", "c++", "ruby", "rails", "php", "laravel",
+      "go", "golang", "rust", "swift", "kotlin", "sql", "mysql", "postgres", "postgresql", "mongodb", "redis",
+      "html", "css", "flexbox", "grid", "tailwind", "sass", "git", "github", "gitlab", "docker", "kubernetes",
+      "aws", "cloud", "api", "rest", "graphql", "json", "http", "https", "web", "frontend", "backend", "fullstack",
+      "devops", "linux", "bash", "terminal", "algoritmo", "estrutura", "array", "objeto", "funcao", "função",
+      "promise", "async", "await", "hook", "hooks", "state", "props", "redux", "zod", "jwt", "auth", "autenticacao",
+      "banco de dados", "query", "crud", "orm", "prisma", "sequelize", "oo", "poo", "dry", "solid", "clean code",
+      "design pattern", "tdd", "ci/cd", "microservicos", "microserviços", "security", "segurança", "teste", "codigo", "código"
+    ];
+
+    return termosTecnicos.some(termo => lower.includes(termo));
+  };
+
   const handleGenerate = async (e) => {
     e.preventDefault();
     if (!topico.trim()) return;
+
+    const top = topico.trim();
+    const eTecnico = eTopicoProgramacao(top);
+
+    const cardAviso = [
+      {
+        id: 1,
+        pergunta: `⚠️ "${top}" não é um assunto de Programação`,
+        resposta: `A DevIA é uma tutora focada estritamente em Programação e Tecnologia. Por favor, insira um assunto de TI como JavaScript, React, SQL, Python, Git ou Docker para gerar seus flashcards.`,
+        categoria: "DevIA 🤖",
+        dificuldade: "Aviso"
+      }
+    ];
+
+    // Se o usuário digitou algo fora de TI (ex: arroz e feijão, flamengo), exibe o aviso do Tutor DevIA
+    if (!eTecnico) {
+      setCards(cardAviso);
+      setFlippedMap({});
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -53,10 +103,10 @@ export default function FlashcardsModule() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const res = await axios.post(
         `${apiUrl}/dev-ia/flashcards/generate`,
-        { topico: topico.trim() },
+        { topico: top },
         { 
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 5000
+          timeout: 7000
         }
       );
 
@@ -65,14 +115,17 @@ export default function FlashcardsModule() {
         setFlippedMap({});
       }
     } catch (err) {
-      console.warn("Gerando flashcards via gerador rápido:", err);
-      const top = topico.trim();
-      setCards([
-        { id: 1, pergunta: `Qual a principal finalidade de ${top}?`, resposta: `${top} é utilizado para otimizar a estrutura do código, modularizar a lógica e garantir alta escalabilidade no projeto.`, categoria: "Conceito Básico", dificuldade: "Fácil" },
-        { id: 2, pergunta: `Qual a diferença entre execuções síncronas e assíncronas em ${top}?`, resposta: "Execuções assíncronas evitam o bloqueio da interface do usuário processando requisições em segundo plano.", categoria: "Performance", dificuldade: "Médio" },
-        { id: 3, pergunta: `Qual a principal regra de boas práticas ao codificar em ${top}?`, resposta: "Aplicar princípios de Clean Code (DRY e responsabilidade única) e utilizar nomes descritivos de variáveis.", categoria: "Boas Práticas", dificuldade: "Fácil" },
-        { id: 4, pergunta: `Como garantir a captura de exceções e erros comuns em ${top}?`, resposta: "Utilizando blocos try/catch/finally e validando os dados recebidos antes de executá-los.", categoria: "Segurança", dificuldade: "Médio" }
-      ]);
+      console.warn("Gerando flashcards via gerador seguro:", err);
+      if (!eTecnico) {
+        setCards(cardAviso);
+      } else {
+        setCards([
+          { id: 1, pergunta: `Qual a principal finalidade de ${top} na programação?`, resposta: `${top} é utilizado para estruturar a lógica da aplicação, otimizar o fluxo de dados e garantir manutenibilidade do código.`, categoria: "Conceito Básico", dificuldade: "Fácil" },
+          { id: 2, pergunta: `Quais as melhores práticas ao codificar em ${top}?`, resposta: "Aplicar o princípio DRY (Don't Repeat Yourself), nomear funções e variáveis declarativamente e isolar responsabilidades.", categoria: "Boas Práticas", dificuldade: "Médio" },
+          { id: 3, pergunta: `Como funciona o controle de exceções e erros em ${top}?`, resposta: "Utilizando blocos try/catch/finally e validando os tipos de dados de entrada antes do processamento.", categoria: "Segurança", dificuldade: "Médio" },
+          { id: 4, pergunta: `Qual a diferença entre execuções síncronas e assíncronas em ${top}?`, resposta: "Operações assíncronas evitam o travamento da interface do usuário processando requisições em segundo plano.", categoria: "Performance", dificuldade: "Médio" }
+        ]);
+      }
       setFlippedMap({});
     } finally {
       setLoading(false);
