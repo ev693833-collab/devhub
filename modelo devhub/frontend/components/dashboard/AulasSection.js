@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import styles from "./AulasSection.module.css";
-import StudentGamificationHeader from "../StudentGamificationHeader";
 import { 
   BookOpen, Code, Layers, Sparkles, CheckCircle2, Copy, Check, 
-  Lightbulb, Shield, Database, Cpu, Terminal, ArrowRight, Play, Tv, Clock, Film, X 
+  Lightbulb, Shield, Database, Cpu, Terminal, ArrowRight
 } from "lucide-react";
 
 export default function AulasSection({ user }) {
@@ -26,7 +25,7 @@ export default function AulasSection({ user }) {
     }
   }, []);
 
-  const toggleAulaAssistida = (aulaId) => {
+  const toggleAulaAssistida = async (aulaId) => {
     const proximo = { ...aulasAssistidas, [aulaId]: !aulasAssistidas[aulaId] };
     setAulasAssistidas(proximo);
     localStorage.setItem("devhub_aulas_video_assistidas", JSON.stringify(proximo));
@@ -34,6 +33,31 @@ export default function AulasSection({ user }) {
     // Se concluiu a aula agora, recompensa com evento de estudo (+50 XP) e acende o fogo!
     if (proximo[aulaId]) {
       window.dispatchEvent(new CustomEvent("devhub_estudo_realizado"));
+
+      // Registrar/Atualizar presença do aluno no backend
+      if (user && (user.email || user.nome)) {
+        try {
+          const totalConcluidas = Object.values(proximo).filter(Boolean).length;
+          const apiHost = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+          await fetch(`${apiHost}/frequencia`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.id,
+              nome: user.nome || "Estudante DevHub",
+              email: user.email || "aluno@devhub.com",
+              aulasAssistidas: totalConcluidas,
+              totalAulas: 10,
+              frequenciaPct: Math.min(100, Math.round((totalConcluidas / 10) * 100)),
+              statusBadge: totalConcluidas >= 3 ? "⚡ Presença Regular" : "⏳ Iniciando Presença",
+              statusColor: totalConcluidas >= 3 ? "#10B981" : "#F59E0B",
+              ultimaPresenca: new Date().toLocaleDateString("pt-BR")
+            })
+          });
+        } catch (err) {
+          console.warn("Aviso ao sincronizar presença no backend:", err);
+        }
+      }
     }
   };
 
@@ -450,9 +474,6 @@ async function autenticarEGerarToken(senhaDigitada, senhaHashBanco, usuarioObj) 
 
   return (
     <div className={styles.container}>
-      {/* Dashboard Gamificado no Topo */}
-      <StudentGamificationHeader user={user} />
-
       {/* Banner Principal de Boas-vindas */}
       <div className={styles.headerBanner}>
         <h2 className={styles.mainTitle}>
@@ -501,73 +522,10 @@ async function autenticarEGerarToken(senhaDigitada, senhaHashBanco, usuarioObj) 
                       <span className={styles.nivelBadge} style={{ background: mod.bgBadge, color: mod.cor }}>
                         Nível: {mod.nivel}
                       </span>
-                      {totalVideoAulas > 0 && (
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: assistidasNoModulo === totalVideoAulas ? '#10b981' : '#38bdf8', background: 'rgba(255,255,255,0.06)', padding: '3px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          🎥 {assistidasNoModulo}/{totalVideoAulas} Videoaulas Assistidas {assistidasNoModulo === totalVideoAulas ? '✓' : ''}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* SEÇÃO DEDICADA DE VIDEOAULAS DO MÓDULO */}
-              {mod.videoAulas && mod.videoAulas.length > 0 && (
-                <div style={{ backgroundColor: '#090d16', padding: '18px', borderRadius: '16px', border: `1px solid ${mod.cor}33` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: mod.cor, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Tv size={18} /> 🎥 Videoaulas Interativas do Módulo (+50 XP cada)
-                    </h4>
-                    <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 700 }}>
-                      Assista ao vídeo e clique em "Marcar como Concluída" para acumular XP!
-                    </span>
-                  </div>
-
-                  <div className={styles.videosGrid}>
-                    {mod.videoAulas.map((video) => {
-                      const isConcluida = !!aulasAssistidas[video.id];
-                      return (
-                        <div key={video.id} className={styles.videoCard} style={{ borderColor: isConcluida ? 'rgba(16,185,129,0.4)' : undefined }}>
-                          <div className={styles.videoCardHeader}>
-                            <div>
-                              <h5 className={styles.videoTitle}>{video.titulo}</h5>
-                              <p className={styles.videoDesc}>{video.descricao}</p>
-                            </div>
-                          </div>
-
-                          <div className={styles.videoFooter}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700 }}>
-                              <Clock size={14} color="#94a3b8" /> {video.duracao}
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <button
-                                className={styles.btnWatch}
-                                onClick={() => setVideoModal({ video, modCor: mod.cor })}
-                              >
-                                <Play size={14} fill="#FFF" /> Assistir Aula
-                              </button>
-
-                              <button
-                                className={styles.btnCheckDone}
-                                onClick={() => toggleAulaAssistida(video.id)}
-                                style={{
-                                  backgroundColor: isConcluida ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)',
-                                  color: isConcluida ? '#10b981' : '#cbd5e1',
-                                  borderColor: isConcluida ? '#10b981' : 'rgba(255,255,255,0.1)'
-                                }}
-                              >
-                                {isConcluida ? <CheckCircle2 size={14} color="#10b981" /> : <Check size={14} />}
-                                {isConcluida ? '✓ Concluída (+50 XP)' : 'Concluir'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Explicação Conceitual Profunda */}
               <div className={styles.explanationSection} style={{ borderLeftColor: mod.cor }}>
@@ -615,56 +573,6 @@ async function autenticarEGerarToken(senhaDigitada, senhaHashBanco, usuarioObj) 
           );
         })}
       </div>
-
-      {/* MODAL PLAYER DE VIDEOAULA INTERATIVA */}
-      {videoModal && (
-        <div className={styles.modalOverlay} onClick={() => setVideoModal(null)}>
-          <div className={styles.modalPlayerContent} onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', backgroundColor: '#0f172a' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Film size={20} color={videoModal.modCor} />
-                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
-                  {videoModal.video.titulo}
-                </h4>
-              </div>
-              <button
-                onClick={() => setVideoModal(null)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
-                title="Fechar Player"
-              >
-                <X size={22} />
-              </button>
-            </div>
-
-            <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
-              <iframe
-                src={`${videoModal.video.embedUrl}?autoplay=1&rel=0`}
-                title={videoModal.video.titulo}
-                className={styles.playerIframe}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-
-            <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#090d16', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ fontSize: '0.88rem', color: '#cbd5e1' }}>
-                {videoModal.video.descricao}
-              </div>
-
-              <button
-                className={styles.btnWatch}
-                style={{ backgroundColor: aulasAssistidas[videoModal.video.id] ? '#10b981' : '#3b82f6' }}
-                onClick={() => {
-                  toggleAulaAssistida(videoModal.video.id);
-                }}
-              >
-                {aulasAssistidas[videoModal.video.id] ? <CheckCircle2 size={16} /> : <Check size={16} />}
-                {aulasAssistidas[videoModal.video.id] ? "✓ Concluída (+50 XP)" : "Marcar como Concluída (+50 XP)"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

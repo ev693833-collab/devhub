@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { io } from "socket.io-client";
 import { Swords, Trophy, Clock, Play, CheckCircle, Send, XCircle, Check, X, Shield, Sparkles, PlusCircle, Inbox, Users, Code, GraduationCap, AlertTriangle, HelpCircle, Terminal } from "lucide-react";
 import styles from "./BatalhaCodigoModule.module.css";
 
@@ -430,15 +431,15 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
 
   useEffect(() => {
     if (modalCriarSalaOpen) {
-      if (alunosOnlineList.length > 0) {
-        if (!oponenteSelecionado || !alunosOnlineList.includes(oponenteSelecionado)) {
-          setOponenteSelecionado(alunosOnlineList[0]);
-        }
-      } else {
-        setOponenteSelecionado("");
+      const disponiveis = alunosCadastrados.length > 0 ? alunosCadastrados : ["Nicholas Araujo", "Gabriel Costa", "Mariana Souza"];
+      const oponentes = disponiveis.filter(n => !user?.nome || n.toLowerCase().trim() !== user.nome.toLowerCase().trim());
+      const listaFinal = oponentes.length > 0 ? oponentes : disponiveis;
+
+      if (!oponenteSelecionado || !listaFinal.includes(oponenteSelecionado)) {
+        setOponenteSelecionado(listaFinal[0]);
       }
     }
-  }, [modalCriarSalaOpen, alunosOnlineList]);
+  }, [modalCriarSalaOpen, alunosCadastrados, user]);
 
   // Notificação Pop-up Temporária Toast
   const [toastNotificacao, setToastNotificacao] = useState(null);
@@ -649,11 +650,57 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
     }
   };
 
+  const socketRef = useRef(null);
+
+  // Efeito WebSockets em tempo real para Batalhas 1v1 PvP
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const socket = io(apiUrl, { transports: ["websocket", "polling"] });
+    socketRef.current = socket;
+
+    socket.on("battle_invite_received", (data) => {
+      if (data && user?.nome) {
+        const meuNomeLower = user.nome.toLowerCase().trim();
+        if (data.destinatarioNome?.toLowerCase().trim() === meuNomeLower) {
+          setToastNotificacao({
+            id: Date.now(),
+            remetenteNome: data.remetenteNome,
+            desafioId: data.desafioId
+          });
+        }
+      }
+    });
+
+    socket.on("battle_accepted", (data) => {
+      if (data && user?.nome) {
+        const meuNomeLower = user.nome.toLowerCase().trim();
+        if (data.remetenteNome?.toLowerCase().trim() === meuNomeLower && !emBatalha) {
+          const desafioEncontrado = desafios.find(d => d.id === data.desafioId) || sortearDesafioAleatorio(desafios);
+          setDesafioAtual(desafioEncontrado);
+          setCodigoSolucao(desafioEncontrado?.codigoInicial || "");
+          setOponenteDuelo(data.destinatarioNome || "Oponente");
+          setTempoSegundos(0);
+          setResultadoBatalha(null);
+          setErroValidacaoCodigo(null);
+          setLogsConsoleBatalha([]);
+          setModalInboxOpen(false);
+          setEmBatalha(true);
+        }
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user, desafios, emBatalha]);
+
   // Criar Sala & Enviar Convite (Com SORTEIO REAL DE TEMA ALEATÓRIO)
   const handleCriarSalaEEnviarConvite = (e) => {
     e.preventDefault();
     const meunome = user?.nome || "Estudante";
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+    const oponenteAlvo = oponenteSelecionado || (alunosCadastrados.length > 0 ? alunosCadastrados[0] : "Nicholas Araujo");
 
     let finalDesafioId = desafioSelecionadoId;
     if (finalDesafioId === "random" || !finalDesafioId) {
@@ -663,24 +710,32 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
       finalDesafioId = parseInt(finalDesafioId);
     }
 
+    if (socketRef.current) {
+      socketRef.current.emit("battle_invite", {
+        remetenteNome: meunome,
+        destinatarioNome: oponenteAlvo,
+        desafioId: finalDesafioId
+      });
+    }
+
     fetch(`${apiUrl}/batalhas/convites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         remetenteNome: meunome,
-        destinatarioNome: oponenteSelecionado,
+        destinatarioNome: oponenteAlvo,
         desafioId: finalDesafioId
       })
     })
       .then(res => res.json())
       .then(data => {
-        setConviteEnviadoSucesso(`Solicitação de X1 enviada com sucesso para ${oponenteSelecionado}! Aguardando oponente aceitar...`);
+        setConviteEnviadoSucesso(`Solicitação de X1 enviada com sucesso para ${oponenteAlvo}! Aguardando oponente aceitar...`);
         setModalCriarSalaOpen(false);
         setTimeout(() => setConviteEnviadoSucesso(null), 5000);
         carregarBatalhas();
       })
       .catch(() => {
-        setConviteEnviadoSucesso(`Solicitação de X1 enviada com sucesso para ${oponenteSelecionado}! Aguardando oponente aceitar...`);
+        setConviteEnviadoSucesso(`Solicitação de X1 enviada com sucesso para ${oponenteAlvo}! Aguardando oponente aceitar...`);
         setModalCriarSalaOpen(false);
         setTimeout(() => setConviteEnviadoSucesso(null), 5000);
       });
@@ -688,9 +743,18 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
 
   // Responder Convite (Aceitar / Recusar)
   const handleResponderConvite = (conviteId, resposta) => {
+    const conviteAlvo = convites.find(c => c.id === conviteId || c.id === parseInt(conviteId)) || toastNotificacao;
     setConvites(prev => prev.filter(c => c.id !== conviteId && c.id !== parseInt(conviteId)));
     if (toastNotificacao?.id === conviteId || toastNotificacao?.id === parseInt(conviteId)) {
       setToastNotificacao(null);
+    }
+
+    if (resposta === "aceito" && socketRef.current) {
+      socketRef.current.emit("battle_accept", {
+        remetenteNome: conviteAlvo?.remetenteNome,
+        destinatarioNome: user?.nome,
+        desafioId: conviteAlvo?.desafioId
+      });
     }
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -703,7 +767,7 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
       .then(res => res.json())
       .then(data => {
         if (resposta === "aceito") {
-          const convite = convites.find(c => c.id === conviteId || c.id === parseInt(conviteId)) || convites[0];
+          const convite = conviteAlvo || convites[0];
           let desafio = desafios.find(d => d.id === convite?.desafioId);
           if (!desafio || convite?.desafioId === "random") {
             desafio = sortearDesafioAleatorio(desafios);
@@ -1190,44 +1254,36 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
               </div>
               <div>
                 <h3 style={{ fontSize: "1.3rem", fontWeight: "800", margin: 0 }}>🏠 Criar Sala de Duelo 1v1</h3>
-                <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>Selecione um aluno online no sistema para enviar a solicitação</div>
+                {/* 1. SELETOR DE ALUNOS PARA O DUELO */}
               </div>
             </div>
 
             <form onSubmit={handleCriarSalaEEnviarConvite} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-              {/* 1. SELETOR DE ALUNOS ONLINE */}
               <div>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.88rem", fontWeight: "700", color: "#cbd5e1", marginBottom: "8px" }}>
                   <GraduationCap size={16} color="#10b981" />
-                  <span>1. Selecione o Oponente (Alunos Online no Sistema):</span>
+                  <span>1. Selecione o Oponente para o Duelo 1v1:</span>
                 </label>
                 <select
                   value={oponenteSelecionado}
                   onChange={(e) => setOponenteSelecionado(e.target.value)}
                   style={{
-                    width: "100%", padding: "14px", borderRadius: "14px",
-                    background: "#0f121d", color: "#ffffff",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    fontSize: "0.95rem", fontWeight: "600", outline: "none"
+                    width: "100%", padding: "14px 16px", borderRadius: "14px",
+                    backgroundColor: "#1e293b", color: "#f8fafc",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    fontSize: "0.95rem", fontWeight: "600", outline: "none",
+                    cursor: "pointer"
                   }}
                 >
-                  {alunosOnlineList.length > 0 ? (
-                    alunosOnlineList.map((nome, i) => (
-                      <option key={i} value={nome} style={{ background: "#171c2c", color: "#ffffff", padding: "10px" }}>
-                        🟢 {nome} (Online Agora)
+                  {alunosCadastrados.map((nome, i) => {
+                    const estaOnline = alunosOnlineList.includes(nome);
+                    return (
+                      <option key={i} value={nome} style={{ backgroundColor: "#1e293b", color: "#f8fafc", padding: "10px" }}>
+                        {estaOnline ? `🟢 ${nome} (Online Agora)` : `👤 ${nome} (Aluno Cadastrado)`}
                       </option>
-                    ))
-                  ) : (
-                    <option value="" disabled style={{ background: "#171c2c", color: "#94a3b8", padding: "10px" }}>
-                      ⚠️ Nenhum outro aluno online no momento
-                    </option>
-                  )}
+                    );
+                  })}
                 </select>
-                {alunosOnlineList.length === 0 && (
-                  <div style={{ marginTop: "8px", padding: "10px 14px", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "10px", fontSize: "0.82rem", color: "#fca5a5" }}>
-                    ⚠️ Nenhum outro aluno está online no sistema no momento para receber a solicitação.
-                  </div>
-                )}
               </div>
 
               {/* 2. SELETOR DE DESAFIOS DE CÓDIGO DIVERSIFICADOS + DESAFIO SURPRESA */}
@@ -1240,17 +1296,18 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
                   value={desafioSelecionadoId}
                   onChange={(e) => setDesafioSelecionadoId(e.target.value)}
                   style={{
-                    width: "100%", padding: "14px", borderRadius: "14px",
-                    background: "#0f121d", color: "#ffffff",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    fontSize: "0.95rem", fontWeight: "600", outline: "none"
+                    width: "100%", padding: "14px 16px", borderRadius: "14px",
+                    backgroundColor: "#1e293b", color: "#f8fafc",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    fontSize: "0.95rem", fontWeight: "600", outline: "none",
+                    cursor: "pointer"
                   }}
                 >
-                  <option value="random" style={{ background: "#171c2c", color: "#f59e0b", fontWeight: "800", padding: "10px" }}>
+                  <option value="random" style={{ backgroundColor: "#1e293b", color: "#f59e0b", fontWeight: "800", padding: "10px" }}>
                     🎲 Desafio Surpresa (Tema Aleatório Sortear na Hora)
                   </option>
                   {desafios.map((d) => (
-                    <option key={d.id} value={d.id} style={{ background: "#171c2c", color: "#ffffff", padding: "10px" }}>
+                    <option key={d.id} value={d.id} style={{ backgroundColor: "#1e293b", color: "#ffffff", padding: "10px" }}>
                       ⚡ Desafio #{d.id}: {d.titulo} [{d.tecnologia || d.categoria}]
                     </option>
                   ))}
@@ -1260,23 +1317,23 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
               <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
                 <button
                   type="submit"
-                  disabled={!oponenteSelecionado || alunosOnlineList.length === 0}
+                  disabled={!oponenteSelecionado}
                   style={{
                     flex: 1, padding: "14px",
-                    background: (!oponenteSelecionado || alunosOnlineList.length === 0)
+                    background: !oponenteSelecionado
                       ? "#334155"
                       : "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                    color: (!oponenteSelecionado || alunosOnlineList.length === 0) ? "#94a3b8" : "#FFF",
+                    color: !oponenteSelecionado ? "#94a3b8" : "#FFF",
                     border: "none", borderRadius: "14px",
                     fontWeight: "800", fontSize: "1rem",
-                    cursor: (!oponenteSelecionado || alunosOnlineList.length === 0) ? "not-allowed" : "pointer",
+                    cursor: !oponenteSelecionado ? "not-allowed" : "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                    boxShadow: (!oponenteSelecionado || alunosOnlineList.length === 0) ? "none" : "0 4px 18px rgba(239, 68, 68, 0.4)",
-                    opacity: (!oponenteSelecionado || alunosOnlineList.length === 0) ? 0.6 : 1
+                    boxShadow: !oponenteSelecionado ? "none" : "0 4px 18px rgba(239, 68, 68, 0.4)",
+                    opacity: !oponenteSelecionado ? 0.6 : 1
                   }}
                 >
                   <Send size={18} />
-                  <span>🚀 Enviar Solicitação de X1</span>
+                  <span>⚔️ Enviar Solicitação de Duelo X1</span>
                 </button>
               </div>
             </form>

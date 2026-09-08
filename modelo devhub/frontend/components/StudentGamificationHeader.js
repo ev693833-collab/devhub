@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flame, Award, Zap, Check, X, Code, Crown, AlertCircle, Sparkles, ArrowRight } from "lucide-react";
+import { Flame, Award, Zap, Check, X, Code, Crown, AlertCircle, Sparkles, ArrowRight, BookOpen } from "lucide-react";
 import styles from "./StudentGamificationHeader.module.css";
 
 export default function StudentGamificationHeader({ user }) {
@@ -179,7 +179,93 @@ export default function StudentGamificationHeader({ user }) {
   };
 
   return (
-    <div className={`${styles.card} ${estudouHojeState ? styles.cardAcesa : ""}`}>
+    <>
+      {/* Banner Principal de Boas-Vindas */}
+      <div style={{
+        background: "linear-gradient(135deg, rgba(23, 28, 44, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)",
+        border: "1px solid rgba(255, 255, 255, 0.12)",
+        borderRadius: "24px",
+        padding: "20px 24px",
+        marginBottom: "20px",
+        boxShadow: "0 12px 30px rgba(0, 0, 0, 0.3)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "16px"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{
+            width: "52px", height: "52px", borderRadius: "16px",
+            background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#FFF", fontSize: "24px", fontWeight: "800",
+            boxShadow: "0 8px 20px rgba(59, 130, 246, 0.35)",
+            flexShrink: 0
+          }}>
+            {(user?.avatar_url || user?.avatar) ? (
+              <img src={user.avatar_url || user.avatar} alt="Foto" style={{ width: "100%", height: "100%", borderRadius: "16px", objectFit: "cover" }} />
+            ) : (
+              user?.nome ? user.nome.charAt(0).toUpperCase() : "👋"
+            )}
+          </div>
+          <div>
+            <h1 style={{ fontSize: "22px", fontWeight: "800", margin: 0, display: "flex", alignItems: "center", gap: "8px", color: "#FFF" }}>
+              Bem-vindo, {user ? user.nome : "Estudante"}! <span style={{ animation: "pulse 2s infinite" }}>🚀</span>
+            </h1>
+            <p style={{ color: "#94a3b8", fontSize: "13.5px", margin: "4px 0 0 0" }}>
+              Plataforma interativa DevHub — Escolha um módulo abaixo para começar os estudos.
+            </p>
+          </div>
+        </div>
+
+        {/* Cards de Métricas Rápidas no Meio */}
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <div style={{
+            padding: "8px 14px",
+            borderRadius: "14px",
+            backgroundColor: "rgba(59, 130, 246, 0.12)",
+            border: "1px solid rgba(59, 130, 246, 0.25)",
+            display: "flex", alignItems: "center", gap: "8px"
+          }}>
+            <BookOpen size={16} style={{ color: "#3B82F6" }} />
+            <div>
+              <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "700", textTransform: "uppercase" }}>Módulos</div>
+              <div style={{ fontSize: "13px", fontWeight: "800", color: "#3B82F6" }}>7 Módulos de Estudo</div>
+            </div>
+          </div>
+
+          <div style={{
+            padding: "8px 14px",
+            borderRadius: "14px",
+            backgroundColor: "rgba(16, 185, 129, 0.12)",
+            border: "1px solid rgba(16, 185, 129, 0.25)",
+            display: "flex", alignItems: "center", gap: "8px"
+          }}>
+            <Zap size={16} style={{ color: "#10B981" }} />
+            <div>
+              <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "700", textTransform: "uppercase" }}>Status</div>
+              <div style={{ fontSize: "13px", fontWeight: "800", color: "#10B981" }}>Ativo 🟢</div>
+            </div>
+          </div>
+
+          <div style={{
+            padding: "8px 14px",
+            borderRadius: "14px",
+            backgroundColor: "rgba(168, 85, 247, 0.12)",
+            border: "1px solid rgba(168, 85, 247, 0.25)",
+            display: "flex", alignItems: "center", gap: "8px"
+          }}>
+            <Crown size={16} style={{ color: "#A855F7" }} />
+            <div>
+              <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "700", textTransform: "uppercase" }}>Trilha</div>
+              <div style={{ fontSize: "13px", fontWeight: "800", color: "#A855F7" }}>Full Stack</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`${styles.card} ${estudouHojeState ? styles.cardAcesa : ""}`}>
       {/* Topo: Saudação e Badges de Nível / Streak */}
       <div className={styles.topRow}>
         <div>
@@ -344,5 +430,6 @@ export default function StudentGamificationHeader({ user }) {
         </div>
       </div>
     </div>
+    </>
   );
 }
