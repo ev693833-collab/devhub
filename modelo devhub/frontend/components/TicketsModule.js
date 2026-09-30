@@ -1686,7 +1686,6 @@ export default function TicketsModule({ user, isOpen, onClose, modoAdmin = false
                           </option>
                         ))}
                       </select>
-                    </div>
                   </td>
 
                   <td className={styles.tableCell} style={{ color: "#ea580c", fontWeight: "800" }}>{t.prazo || "25/10/2026"}</td>

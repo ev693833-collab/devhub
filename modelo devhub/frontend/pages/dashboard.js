@@ -2591,6 +2591,7 @@ export default function Dashboard() {
               height: "fit-content",
               maxHeight: "calc(100vh - 110px)",
               overflowY: "auto",
+              overflowX: "hidden",
               position: "sticky",
               top: "85px",
               boxShadow: isDark ? "0 16px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 10px 30px rgba(0,0,0,0.06)",
@@ -2946,8 +2947,10 @@ export default function Dashboard() {
                 const raw = typeof window !== "undefined" ? localStorage.getItem("devhub_anuncios_globais") : null;
                 if (raw) {
                   const lista = JSON.parse(raw);
-                  if (lista && lista.length > 0) {
-                    const top = lista[0];
+                  // Filtra anúncios expirados
+                  const listaValida = lista.filter(a => !a.expiresAt || Date.now() < a.expiresAt);
+                  if (listaValida && listaValida.length > 0) {
+                    const top = listaValida[0];
                     return (
                       <div style={{
                         padding: "14px 20px",
@@ -6273,83 +6276,7 @@ export default function Dashboard() {
         {/* ===================================================================
             BALÃO FLUTUANTE & MODAL GRANDE DA DEV IA TUTOR
            =================================================================== */}
-        {/* Modal / Tela Grande da Dev IA */}
-        {modalDevIaOpen && (
-          <div
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setModalDevIaOpen(false);
-            }}
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "100vw",
-              height: "100vh",
-              backgroundColor: "rgba(10, 15, 30, 0.8)",
-              backdropFilter: "blur(10px)",
-              zIndex: 99990,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "20px"
-            }}
-          >
-            <div style={{
-              width: "100%",
-              maxWidth: "1350px",
-              height: "calc(100vh - 40px)",
-              maxHeight: "920px",
-              backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
-              borderRadius: "24px",
-              border: `1.5px solid ${isDark ? "rgba(168, 85, 247, 0.4)" : "#E2E8F0"}`,
-              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.7), 0 0 45px rgba(99, 102, 241, 0.35)",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              position: "relative"
-            }}>
-              <DevIaModule user={user} isFloating={false} onClose={() => setModalDevIaOpen(false)} />
-            </div>
-          </div>
-        )}
 
-        {/* Botão de Balão Flutuante (FAB) - Sempre Visível no Canto Inferior */}
-        <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 99999 }}>
-          <button
-            onClick={() => setModalDevIaOpen(prev => !prev)}
-            style={{
-              width: "60px",
-              height: "60px",
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
-              color: "#ffffff",
-              border: "2px solid rgba(255, 255, 255, 0.3)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              boxShadow: "0 8px 25px rgba(99, 102, 241, 0.6), 0 0 25px rgba(168, 85, 247, 0.5)",
-              transition: "all 0.25s ease",
-              transform: modalDevIaOpen ? "scale(1.05)" : "scale(1)"
-            }}
-            title={modalDevIaOpen ? "Fechar Dev IA (X)" : "Abrir Dev IA — Guia do DevHub 🤖"}
-          >
-            {modalDevIaOpen ? <X size={28} /> : <Sparkles size={28} />}
-            {!modalDevIaOpen && (
-              <span style={{
-                position: "absolute",
-                top: "2px",
-                right: "2px",
-                width: "14px",
-                height: "14px",
-                backgroundColor: "#10b981",
-                borderRadius: "50%",
-                border: "2px solid #0f121d",
-                boxShadow: "0 0 8px #10b981"
-              }} />
-            )}
-          </button>
-        </div>
 
         {/* MODAL PARA CRIAR CHAMADA INSTANTÂNEA AO VIVO */}
         {modalChamadaInstantaneaOpen && (

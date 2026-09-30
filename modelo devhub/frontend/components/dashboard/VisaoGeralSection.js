@@ -3,7 +3,7 @@ import styles from "./VisaoGeralSection.module.css";
 import StudentGamificationHeader from "../StudentGamificationHeader";
 import { 
   Sparkles, Flame, Trophy, Calendar, 
-  BookOpen, Compass, Code, Swords, BrainCircuit, 
+  BookOpen, Code, Swords, 
   ArrowRight, Bell, Shield, CheckCircle2, Star, Clock, Home, ArrowLeft
 } from "lucide-react";
 
@@ -124,28 +124,12 @@ export default function VisaoGeralSection({ user, setAbaAtiva, isDark, agendaAul
       bgIcon: "rgba(59, 130, 246, 0.16)"
     },
     {
-      id: "trilhas",
-      titulo: "Trilhas de Carreira",
-      subtitulo: "Roadmaps do iniciante ao sênior",
-      icon: Compass,
-      color: "#10B981",
-      bgIcon: "rgba(16, 185, 129, 0.16)"
-    },
-    {
       id: "caderno",
       titulo: "Caderno de Notas",
       subtitulo: "Anotações e blocos de código",
       icon: Code,
       color: "#8B5CF6",
       bgIcon: "rgba(139, 92, 246, 0.16)"
-    },
-    {
-      id: "dev_ia",
-      titulo: "DevIA Tutor 24/7",
-      subtitulo: "Assistente inteligente de código",
-      icon: BrainCircuit,
-      color: "#F59E0B",
-      bgIcon: "rgba(245, 158, 11, 0.16)"
     }
   ];
 

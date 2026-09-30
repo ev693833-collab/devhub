@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  Code, Play, Eye, Sparkles, Terminal, User, ShoppingBag, DollarSign, CheckCircle2, AlertCircle, RefreshCw, Copy, Check, Table, HelpCircle, Layers, Inbox, Trash2, BookOpen, ShieldCheck, Cpu, ArrowLeft, Star, FileCode, CheckSquare, Award, Flame
+  Code, Play, Eye, Sparkles, Terminal, User, ShoppingBag, DollarSign, CheckCircle2, AlertCircle, RefreshCw, Copy, Check, Table, HelpCircle, Layers, Inbox, Trash2, BookOpen, ShieldCheck, Cpu, ArrowLeft, Star, FileCode, CheckSquare, Award, Flame, Search, ChevronLeft, ChevronRight
 } from "lucide-react";
 
 // CATÁLOGO DOS 9 PROJETOS DO MUNDO REAL COM VALIDAÇÃO E TESTES AUTOMATIZADOS (SISTEMA JUSTO)
@@ -410,6 +410,10 @@ const resultado = {
 export default function MiniSistemasModule({ user, isDark, colors, initialProjetoId }) {
   const [projetoSelecionadoId, setProjetoSelecionadoId] = useState(initialProjetoId || null);
   const [filtroNivel, setFiltroNivel] = useState("Todos");
+  const [buscaTermo, setBuscaTermo] = useState("");
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const ITENS_POR_PAGINA = 4;
+
   const [codigoText, setCodigoText] = useState("");
   const [analiseStatus, setAnaliseStatus] = useState(null);
   const [dadosResultado, setDadosResultado] = useState(null);
@@ -433,11 +437,34 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
     return PROJETOS_REAIS.find(p => p.id === projetoSelecionadoId) || null;
   }, [projetoSelecionadoId]);
 
-  // Filtragem dos projetos no catálogo
+  // Filtragem dos projetos no catálogo por nível e busca
   const projetosFiltrados = useMemo(() => {
-    if (filtroNivel === "Todos") return PROJETOS_REAIS;
-    return PROJETOS_REAIS.filter(p => p.nivelTag === filtroNivel);
-  }, [filtroNivel]);
+    return PROJETOS_REAIS.filter(p => {
+      const bateNivel = filtroNivel === "Todos" || p.nivelTag === filtroNivel;
+      const bateBusca = !buscaTermo || 
+        p.titulo.toLowerCase().includes(buscaTermo.toLowerCase()) ||
+        p.categoria.toLowerCase().includes(buscaTermo.toLowerCase()) ||
+        p.descricao.toLowerCase().includes(buscaTermo.toLowerCase());
+      return bateNivel && bateBusca;
+    });
+  }, [filtroNivel, buscaTermo]);
+
+  const totalPaginas = Math.max(1, Math.ceil(projetosFiltrados.length / ITENS_POR_PAGINA));
+
+  const projetosExibidos = useMemo(() => {
+    const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
+    return projetosFiltrados.slice(inicio, inicio + ITENS_POR_PAGINA);
+  }, [projetosFiltrados, paginaAtual]);
+
+  const handleTrocarNivel = (nivel) => {
+    setFiltroNivel(nivel);
+    setPaginaAtual(1);
+  };
+
+  const handleTrocarBusca = (e) => {
+    setBuscaTermo(e.target.value);
+    setPaginaAtual(1);
+  };
 
   // Abrir um projeto específico
   const abrirProjeto = (proj) => {
@@ -609,38 +636,67 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
       {/* VISTA 1: CATÁLOGO DE PROJETOS REAIS */}
       {!projetoSelecionadoId && (
         <div>
-          {/* Filtros de Nível */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
-            <span style={{ fontSize: "14px", fontWeight: "700", color: isDark ? "#F8FAFC" : "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Layers size={16} color="#10B981" /> Catálogo de Projetos:
-            </span>
+          {/* Filtros de Nível + Busca Compacta */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "15px", fontWeight: "800", color: isDark ? "#F8FAFC" : "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Layers size={18} color="#10B981" /> Catálogo de Projetos:
+              </span>
+              <span style={{ fontSize: "11.5px", fontWeight: "700", color: "#10B981", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", padding: "2px 8px", borderRadius: "12px" }}>
+                {projetosFiltrados.length} disponíveis
+              </span>
+            </div>
 
-            <div style={{ display: "flex", gap: "6px" }}>
-              {["Todos", "Iniciante", "Intermediário", "Avançado"].map((nivel) => (
-                <button
-                  key={nivel}
-                  onClick={() => setFiltroNivel(nivel)}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              {/* Campo de Busca Rápida */}
+              <div style={{ position: "relative", minWidth: "210px" }}>
+                <Search size={14} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: isDark ? "#64748B" : "#94A3B8" }} />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou tech..."
+                  value={buscaTermo}
+                  onChange={handleTrocarBusca}
                   style={{
-                    padding: "5px 12px",
-                    borderRadius: "16px",
-                    border: filtroNivel === nivel ? "1px solid #10B981" : `1px solid ${isDark ? "#334155" : "#E2E8F0"}`,
-                    background: filtroNivel === nivel ? "rgba(16, 185, 129, 0.15)" : (isDark ? "#1E293B" : "#F1F5F9"),
-                    color: filtroNivel === nivel ? "#10B981" : (isDark ? "#94A3B8" : "#475569"),
+                    width: "100%",
+                    padding: "6px 12px 6px 30px",
+                    borderRadius: "14px",
+                    border: `1px solid ${isDark ? "#334155" : "#CBD5E1"}`,
+                    background: isDark ? "#0F172A" : "#FFFFFF",
+                    color: isDark ? "#F8FAFC" : "#0F172A",
                     fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease"
+                    outline: "none"
                   }}
-                >
-                  {nivel}
-                </button>
-              ))}
+                />
+              </div>
+
+              {/* Abas de Nível */}
+              <div style={{ display: "flex", gap: "6px" }}>
+                {["Todos", "Iniciante", "Intermediário", "Avançado"].map((nivel) => (
+                  <button
+                    key={nivel}
+                    onClick={() => handleTrocarNivel(nivel)}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: "16px",
+                      border: filtroNivel === nivel ? "1.5px solid #10B981" : `1px solid ${isDark ? "#334155" : "#E2E8F0"}`,
+                      background: filtroNivel === nivel ? "rgba(16, 185, 129, 0.18)" : (isDark ? "#1E293B" : "#F1F5F9"),
+                      color: filtroNivel === nivel ? "#10B981" : (isDark ? "#94A3B8" : "#475569"),
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    {nivel}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Grid dos Cards dos 9 Projetos */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
-            {projetosFiltrados.map((proj) => {
+          {/* Grid Limpo (Máximo 4 Cards por Página para Visual Clean e Organizado) */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+            {projetosExibidos.map((proj) => {
               const estaConcluido = projetosConcluidosIds.includes(proj.id);
               return (
                 <div
@@ -649,64 +705,70 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
                   style={{
                     background: isDark ? "#0F172A" : "#FFFFFF",
                     border: `1px solid ${estaConcluido ? "#10B981" : (isDark ? "#1E293B" : "#E2E8F0")}`,
-                    borderRadius: "14px",
-                    padding: "16px",
+                    borderRadius: "16px",
+                    padding: "18px",
                     display: "flex",
                     flexDirection: "column",
-                    justifySpaceBetween: "space-between",
-                    gap: "12px",
+                    justifyContent: "space-between",
+                    gap: "14px",
                     cursor: "pointer",
-                    transition: "all 0.2s ease",
+                    transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                    boxShadow: isDark ? "0 4px 14px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.04)"
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = "#10B981";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(16,185,129,0.2)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = estaConcluido ? "#10B981" : (isDark ? "#1E293B" : "#E2E8F0");
+                    e.currentTarget.style.transform = "none";
+                    e.currentTarget.style.boxShadow = isDark ? "0 4px 14px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.04)";
                   }}
                 >
                   <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "22px" }}>{proj.icone}</span>
+                        <span style={{ fontSize: "24px" }}>{proj.icone}</span>
                         <span style={{ fontSize: "11px", fontWeight: "700", color: "#6366F1" }}>
                           {proj.categoria}
                         </span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         {estaConcluido && (
-                          <span style={{ fontSize: "10px", fontWeight: "800", background: "rgba(16,185,129,0.15)", color: "#10B981", padding: "2px 6px", borderRadius: "6px", border: "1px solid rgba(16,185,129,0.3)" }}>
+                          <span style={{ fontSize: "10px", fontWeight: "800", background: "rgba(16,185,129,0.15)", color: "#10B981", padding: "3px 8px", borderRadius: "8px", border: "1px solid rgba(16,185,129,0.3)" }}>
                             Concluído
                           </span>
                         )}
-                        <span style={{ fontSize: "10px", fontWeight: "700", backgroundColor: `${proj.corNivel}18`, color: proj.corNivel, border: `1px solid ${proj.corNivel}33`, padding: "2px 6px", borderRadius: "6px" }}>
+                        <span style={{ fontSize: "10px", fontWeight: "700", backgroundColor: `${proj.corNivel}18`, color: proj.corNivel, border: `1px solid ${proj.corNivel}33`, padding: "3px 8px", borderRadius: "8px" }}>
                           {proj.nivelTag}
                         </span>
                       </div>
                     </div>
 
-                    <h3 style={{ fontSize: "15px", fontWeight: "800", margin: "0 0 4px 0", color: isDark ? "#F8FAFC" : "#0F172A" }}>
+                    <h3 style={{ fontSize: "15px", fontWeight: "800", margin: "0 0 6px 0", color: isDark ? "#F8FAFC" : "#0F172A" }}>
                       {proj.titulo}
                     </h3>
 
                     <p style={{
-                      fontSize: "12.5px", color: isDark ? "#94A3B8" : "#64748B", margin: 0, lineHeight: 1.4,
+                      fontSize: "12.5px", color: isDark ? "#94A3B8" : "#64748B", margin: 0, lineHeight: 1.45,
                       display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden"
                     }}>
                       {proj.descricao}
                     </p>
                   </div>
 
-                  <div style={{ paddingTop: "10px", borderTop: `1px solid ${isDark ? "#1E293B" : "#F1F5F9"}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "11.5px", color: isDark ? "#64748B" : "#94A3B8" }}>
-                      {proj.requisitos.length} Requisitos
+                  <div style={{ paddingTop: "12px", borderTop: `1px solid ${isDark ? "#1E293B" : "#F1F5F9"}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "11.5px", color: isDark ? "#64748B" : "#94A3B8", fontWeight: "600" }}>
+                      {proj.requisitos.length} Requisitos Técnicos
                     </span>
 
                     <button style={{
-                      padding: "6px 12px", borderRadius: "8px", border: "none",
+                      padding: "7px 14px", borderRadius: "10px", border: "none",
                       background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
                       color: "#FFF", fontSize: "12px", fontWeight: "700", cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: "4px"
+                      display: "flex", alignItems: "center", gap: "6px",
+                      boxShadow: "0 4px 12px rgba(16,185,129,0.3)"
                     }}>
                       Abrir Desafio →
                     </button>
@@ -715,6 +777,81 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
               );
             })}
           </div>
+
+          {/* Mensagem se não houver projetos no filtro */}
+          {projetosExibidos.length === 0 && (
+            <div style={{
+              padding: "36px", textAlign: "center", borderRadius: "16px",
+              background: isDark ? "#0F172A" : "#F8FAFC", border: `1px solid ${isDark ? "#1E293B" : "#E2E8F0"}`,
+              color: isDark ? "#94A3B8" : "#64748B", margin: "20px 0"
+            }}>
+              <p style={{ margin: 0, fontWeight: "700" }}>Nenhum projeto encontrado com os filtros selecionados.</p>
+            </div>
+          )}
+
+          {/* Barra de Paginação Elegante */}
+          {totalPaginas > 1 && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginTop: "20px",
+              padding: "12px 18px",
+              borderRadius: "14px",
+              background: isDark ? "#0F172A" : "#F8FAFC",
+              border: `1px solid ${isDark ? "#1E293B" : "#E2E8F0"}`
+            }}>
+              <span style={{ fontSize: "12.5px", color: isDark ? "#94A3B8" : "#64748B", fontWeight: "600" }}>
+                Exibindo <strong style={{ color: "#10B981" }}>{projetosExibidos.length}</strong> de {projetosFiltrados.length} projetos
+              </span>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  disabled={paginaAtual === 1}
+                  onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "10px",
+                    border: `1px solid ${isDark ? "#334155" : "#CBD5E1"}`,
+                    background: paginaAtual === 1 ? (isDark ? "#0F172A" : "#F8FAFC") : (isDark ? "#1E293B" : "#FFFFFF"),
+                    color: paginaAtual === 1 ? (isDark ? "#475569" : "#94A3B8") : (isDark ? "#F8FAFC" : "#0F172A"),
+                    cursor: paginaAtual === 1 ? "not-allowed" : "pointer",
+                    fontWeight: "700",
+                    fontSize: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                >
+                  <ChevronLeft size={14} /> Anterior
+                </button>
+
+                <span style={{ fontSize: "12.5px", fontWeight: "700", color: isDark ? "#F8FAFC" : "#0F172A", padding: "0 4px" }}>
+                  Página <strong style={{ color: "#10B981" }}>{paginaAtual}</strong> de {totalPaginas}
+                </span>
+
+                <button
+                  disabled={paginaAtual === totalPaginas}
+                  onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "10px",
+                    border: `1px solid ${isDark ? "#334155" : "#CBD5E1"}`,
+                    background: paginaAtual === totalPaginas ? (isDark ? "#0F172A" : "#F8FAFC") : (isDark ? "#1E293B" : "#FFFFFF"),
+                    color: paginaAtual === totalPaginas ? (isDark ? "#475569" : "#94A3B8") : (isDark ? "#F8FAFC" : "#0F172A"),
+                    cursor: paginaAtual === totalPaginas ? "not-allowed" : "pointer",
+                    fontWeight: "700",
+                    fontSize: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                >
+                  Próximo <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
