@@ -2,17 +2,24 @@ import React, { useState, useEffect } from "react";
 import styles from "./AulasSection.module.css";
 import { 
   BookOpen, Code, Layers, Sparkles, CheckCircle2, Copy, Check, 
-  Lightbulb, Shield, Database, Cpu, Terminal, ArrowRight
+  Lightbulb, Shield, Database, Cpu, Terminal, ArrowRight, ChevronDown, ChevronUp, FileCode, Play, Tv, Award, Zap, ExternalLink, Flame, X, HelpCircle, AlertTriangle
 } from "lucide-react";
 
 export default function AulasSection({ user }) {
   const [moduloAtivo, setModuloAtivo] = useState("todos");
   const [copiadoIdx, setCopiadoIdx] = useState(null);
+  const [codigoExpandido, setCodigoExpandido] = useState({});
+
+  const toggleCodigoExpandido = (idx) => {
+    setCodigoExpandido(prev => ({ ...prev, [idx]: prev[idx] === undefined ? false : !prev[idx] }));
+  };
 
   // Estado para armazenar o progresso de videoaulas assistidas do aluno
   const [aulasAssistidas, setAulasAssistidas] = useState({});
   // Estado para o modal do player de vídeo
   const [videoModal, setVideoModal] = useState(null);
+  // Estado para o Desafio de Atenção (Quiz para acender o fogo!)
+  const [quizModal, setQuizModal] = useState(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -25,6 +32,101 @@ export default function AulasSection({ user }) {
     }
   }, []);
 
+  const BANCO_QUIZ_ATENCAO = {
+    "v-html-1": {
+      pergunta: "Qual tag HTML5 é a estrutura semântica correta para delimitar o conteúdo principal da página?",
+      opcoes: ["<main>", "<div>", "<section>", "<span>"],
+      correta: 0
+    },
+    "v-html-2": {
+      pergunta: "Qual propriedade CSS Flexbox alinha os elementos ao longo do eixo principal?",
+      opcoes: ["justify-content", "align-items", "flex-direction", "grid-template-columns"],
+      correta: 0
+    },
+    "v-js-1": {
+      pergunta: "Qual destes métodos funcionais do ES6 retorna um NOVO array com os itens transformados?",
+      opcoes: [".map()", ".forEach()", ".push()", ".unshift()"],
+      correta: 0
+    },
+    "v-js-2": {
+      pergunta: "Qual palavra-chave é utilizada em funções assíncronas para aguardar a resolução de uma Promise?",
+      opcoes: ["await", "defer", "pause", "resolve"],
+      correta: 0
+    },
+    "v-git-1": {
+      pergunta: "Qual comando do Git exibe o estado atual dos arquivos modificados no diretório?",
+      opcoes: ["git status", "git commit", "git push", "git init"],
+      correta: 0
+    },
+    "v-git-2": {
+      pergunta: "Como mesclar alterações de uma branch secundária para a branch atual no Git?",
+      opcoes: ["git merge <nome-da-branch>", "git checkout -b", "git clone", "git status"],
+      correta: 0
+    },
+    "v-react-1": {
+      pergunta: "Qual Hook do React é utilizado para armazenar estado reativo local em componentes funcionais?",
+      opcoes: ["useState", "useEffect", "useMemo", "useCallback"],
+      correta: 0
+    },
+    "v-react-2": {
+      pergunta: "O que é Server-Side Rendering (SSR) no ecossistema Next.js?",
+      opcoes: ["Renderização do HTML final no servidor a cada requisição", "Compilação no navegador do cliente", "Execução no banco de dados", "Um plugin do VS Code"],
+      correta: 0
+    }
+  };
+
+  const clicarConcluirAula = (aulaId, tituloAula) => {
+    // Se já foi concluída, permite desmarcar diretamente
+    if (aulasAssistidas[aulaId]) {
+      toggleAulaAssistida(aulaId);
+      return;
+    }
+
+    // Se ainda NÃO foi concluída, EXIGE O DESAFIO DE ATENÇÃO (Validação de Conhecimento Técnico)!
+    const quizData = BANCO_QUIZ_ATENCAO[aulaId] || {
+      pergunta: `O que é fundamental para validar a atenção na videoaula "${tituloAula}"?`,
+      opcoes: [
+        "Compreender a sintaxe prática e aplicar o conceito no código",
+        "Apenas deixar o vídeo rodando no mudo sem assistir",
+        "Fechar a página antes de entender o conceito",
+        "Copiar código sem testar"
+      ],
+      correta: 0
+    };
+
+    setQuizModal({
+      aulaId,
+      tituloAula,
+      quiz: quizData,
+      opcaoSelecionada: null,
+      erroMsg: null,
+      sucesso: false
+    });
+  };
+
+  const confirmarRespostaQuiz = (aulaId) => {
+    if (!quizModal || quizModal.opcaoSelecionada === null) {
+      setQuizModal(prev => ({ ...prev, erroMsg: "⚠️ Selecione uma opção para comprovar seu aprendizado!" }));
+      return;
+    }
+
+    if (quizModal.opcaoSelecionada !== quizModal.quiz.correta) {
+      setQuizModal(prev => ({
+        ...prev,
+        erroMsg: "❌ Resposta incorreta! Preste atenção na aula e tente novamente para acender sua chama de estudo."
+      }));
+      return;
+    }
+
+    // Resposta Correta! Marca a aula e alimenta a chama de estudo
+    setQuizModal(prev => ({ ...prev, sucesso: true, erroMsg: null }));
+
+    setTimeout(() => {
+      toggleAulaAssistida(aulaId);
+      setQuizModal(null);
+    }, 1200);
+  };
+
   const toggleAulaAssistida = async (aulaId) => {
     const proximo = { ...aulasAssistidas, [aulaId]: !aulasAssistidas[aulaId] };
     setAulasAssistidas(proximo);
@@ -33,6 +135,7 @@ export default function AulasSection({ user }) {
     // Se concluiu a aula agora, recompensa com evento de estudo (+50 XP) e acende o fogo!
     if (proximo[aulaId]) {
       window.dispatchEvent(new CustomEvent("devhub_estudo_realizado"));
+      window.dispatchEvent(new CustomEvent("devhub_aula_assistida"));
 
       // Registrar/Atualizar presença do aluno no backend
       if (user && (user.email || user.nome)) {
@@ -74,14 +177,14 @@ export default function AulasSection({ user }) {
           id: "v-html-1",
           titulo: "🎥 HTML5 Semântico: Estrutura Profissional & Acessibilidade",
           duracao: "18 min",
-          embedUrl: "https://www.youtube.com/embed/QFAw0qL2aCg",
+          embedUrl: "https://www.youtube.com/embed/epDCjksKMok",
           descricao: "Aprenda a estruturar páginas web com as tags <header>, <nav>, <main>, <article> e <footer>."
         },
         {
           id: "v-html-2",
           titulo: "🎨 CSS Flexbox & CSS Grid: Criando Layouts Responsivos do Zero",
           duracao: "24 min",
-          embedUrl: "https://www.youtube.com/embed/E6CdIawP3W4",
+          embedUrl: "https://www.youtube.com/embed/E6CdIawP3mI",
           descricao: "Dominando alinhamentos unidimensionais com Flexbox e sistemas bidimensionais com CSS Grid."
         }
       ],
@@ -140,14 +243,14 @@ O CSS3 complementa a estrutura controlando o estilo, responsividade e layout vis
           id: "v-js-1",
           titulo: "⚡ JavaScript ES6+: Métodos de Array (.map, .filter, .reduce)",
           duracao: "20 min",
-          embedUrl: "https://www.youtube.com/embed/HN1UjzRSLuo",
+          embedUrl: "https://www.youtube.com/embed/qZtT0_mB278",
           descricao: "Aprenda a manipular coleções de dados de forma declarativa e imutável."
         },
         {
           id: "v-js-2",
           titulo: "🔗 Async/Await, Promises & Tratamento de Erros no JavaScript",
           duracao: "25 min",
-          embedUrl: "https://www.youtube.com/embed/7v15pW-9gOQ",
+          embedUrl: "https://www.youtube.com/embed/7V8bwLh12zU",
           descricao: "Entenda o Event Loop, requisições HTTP com fetch e tratamento com try/catch."
         }
       ],
@@ -196,14 +299,14 @@ const buscarEstudantesDevHub = async (urlApi) => {
           id: "v-git-1",
           titulo: "🐙 Git & GitHub do Zero: Commits, Repositórios e Push",
           duracao: "19 min",
-          embedUrl: "https://www.youtube.com/embed/kB5e-gTAl_s",
+          embedUrl: "https://www.youtube.com/embed/6CydGHlBYyU",
           descricao: "Passo a passo completo para versionar seu código e publicar projetos no GitHub."
         },
         {
           id: "v-git-2",
           titulo: "🌿 Working with Branches, Pull Requests & Merging",
           duracao: "16 min",
-          embedUrl: "https://www.youtube.com/embed/kB5e-gTAl_s",
+          embedUrl: "https://www.youtube.com/embed/kB5e-gTAle8",
           descricao: "Aprenda a trabalhar em equipe usando branches paralelas e Pull Requests de Code Review."
         }
       ],
@@ -245,14 +348,14 @@ git pull origin main`,
           id: "v-react-1",
           titulo: "⚛️ React.js Fundamentos: Componentes, Props e useState",
           duracao: "28 min",
-          embedUrl: "https://www.youtube.com/embed/er_P0v_bJ2w",
+          embedUrl: "https://www.youtube.com/embed/2G_mWfG0DZE",
           descricao: "Entenda a renderização reativa do React e gerenciamento de estado local."
         },
         {
           id: "v-react-2",
           titulo: "🚀 Next.js 15: Server Components, Pages Router e Performance",
           duracao: "22 min",
-          embedUrl: "https://www.youtube.com/embed/er_P0v_bJ2w",
+          embedUrl: "https://www.youtube.com/embed/Sklc_fQBmcs",
           descricao: "Aprenda a construir aplicações web ultrarrápidas com Next.js e SSR."
         }
       ],
@@ -303,14 +406,14 @@ export default function ContadorDevCoins({ usuarioId }) {
           id: "v-node-1",
           titulo: "🟢 Node.js & Express: Criando sua Primeira API RESTful",
           duracao: "26 min",
-          embedUrl: "https://www.youtube.com/embed/vYEk6jStQ9Q",
+          embedUrl: "https://www.youtube.com/embed/vYek4N56e4A",
           descricao: "Aprenda a criar rotas GET, POST, PUT e DELETE com Express e Node.js."
         },
         {
           id: "v-node-2",
           titulo: "🛡️ Middlewares de Autenticação e Arquitetura Limpa (MVC)",
           duracao: "20 min",
-          embedUrl: "https://www.youtube.com/embed/vYEk6jStQ9Q",
+          embedUrl: "https://www.youtube.com/embed/LLqq6FeXucg",
           descricao: "Organizando controllers, rotas e middlewares de validação no servidor."
         }
       ],
@@ -358,7 +461,7 @@ module.exports = router;`,
           id: "v-db-1",
           titulo: "🗄️ MySQL & SQL do Zero: Tabelas, Chaves e Inserções",
           duracao: "25 min",
-          embedUrl: "https://www.youtube.com/embed/Ofktsne-utM",
+          embedUrl: "https://www.youtube.com/embed/Cz3WcZLRaWc",
           descricao: "Aprenda a modelar dados em tabelas relacionais com chaves primárias e estrangeiras."
         },
         {
@@ -416,14 +519,14 @@ HAVING media_aluno >= 7.0;`,
           id: "v-jwt-1",
           titulo: "🔒 Hashing de Senhas com Bcrypt e Geração de JWT Token",
           duracao: "27 min",
-          embedUrl: "https://www.youtube.com/embed/K5KAc5CoCuk",
+          embedUrl: "https://www.youtube.com/embed/mbsmsi7l3r4",
           descricao: "Aprenda a proteger senhas de usuários e emitir tokens JWT seguros com expiração."
         },
         {
           id: "v-jwt-2",
           titulo: "🛡️ Protegendo APIs Web: CORS, HTTPS e Token Security",
           duracao: "18 min",
-          embedUrl: "https://www.youtube.com/embed/K5KAc5CoCuk",
+          embedUrl: "https://www.youtube.com/embed/PAY5eIe69e0",
           descricao: "Boas práticas de segurança da informação para impedir ataques em produção."
         }
       ],
@@ -472,16 +575,33 @@ async function autenticarEGerarToken(senhaDigitada, senhaHashBanco, usuarioObj) 
     setTimeout(() => setCopiadoIdx(null), 2000);
   };
 
+  const totalConcluidasTotal = Object.values(aulasAssistidas).filter(Boolean).length;
+
   return (
     <div className={styles.container}>
       {/* Banner Principal de Boas-vindas */}
       <div className={styles.headerBanner}>
         <h2 className={styles.mainTitle}>
-          <BookOpen size={28} color="#3b82f6" /> Guia de Estudo & Videoaulas Práticas Full Stack
+          <BookOpen size={28} color="#3B82F6" /> Guia de Estudo & Videoaulas Práticas Full Stack
         </h2>
         <p className={styles.subtitle}>
-          Explore abaixo os conceitos fundamentais, assista a videoaulas dedicadas, consulte resumos de engenharia e copie códigos prontos para praticar no DevHub.
+          Explore os conceitos fundamentais, assista a videoaulas dedicadas, consulte resumos de engenharia e copie códigos prontos para praticar no DevHub.
         </p>
+
+        <div className={styles.headerPills}>
+          <span className={styles.pillStat}>
+            <Layers size={14} color="#38BDF8" /> 7 Módulos de Engenharia
+          </span>
+          <span className={styles.pillStat}>
+            <Tv size={14} color="#10B981" /> 14 Videoaulas Práticas HD
+          </span>
+          <span className={styles.pillStat}>
+            <Code size={14} color="#EAB308" /> Exemplos de Código Copiáveis
+          </span>
+          <span className={styles.pillStat} style={{ borderColor: "#10B981", color: "#10B981", background: "rgba(16, 185, 129, 0.1)" }}>
+            <CheckCircle2 size={14} color="#10B981" /> {totalConcluidasTotal} / 14 Aulas Concluídas (+{totalConcluidasTotal * 50} XP)
+          </span>
+        </div>
       </div>
 
       {/* Barra de Filtro de Módulos (Separados por Assunto) */}
@@ -504,76 +624,343 @@ async function autenticarEGerarToken(senhaDigitada, senhaHashBanco, usuarioObj) 
       </div>
 
       {/* Lista dos Cards de Tópicos Detalhados */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
         {modulosFiltrados.map((mod, idx) => {
           const totalVideoAulas = mod.videoAulas?.length || 0;
           const assistidasNoModulo = mod.videoAulas?.filter(v => aulasAssistidas[v.id])?.length || 0;
 
           return (
             <div key={mod.id} id={`topico-slide-${idx}`} className={styles.topicCard}>
+              {/* Header do Módulo */}
               <div className={styles.topicHeader}>
                 <div className={styles.topicTitleGroup}>
-                  <div className={styles.iconCircle} style={{ background: mod.bgBadge }}>
+                  <div className={styles.iconCircle} style={{ background: mod.bgBadge, borderColor: `${mod.cor}55` }}>
                     {mod.emoji}
                   </div>
                   <div>
                     <h3 className={styles.topicTitle}>{mod.titulo}</h3>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 6, alignItems: 'center' }}>
                       <span className={styles.nivelBadge} style={{ background: mod.bgBadge, color: mod.cor }}>
                         Nível: {mod.nivel}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: '700' }}>
+                        🎥 {assistidasNoModulo} / {totalVideoAulas} aulas concluídas
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Grid de Videoaulas Práticas do Módulo */}
+              {mod.videoAulas && mod.videoAulas.length > 0 && (
+                <div>
+                  <div className={styles.videoSectionHeader}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px", color: "#F8FAFC" }}>
+                      <Tv size={18} color={mod.cor} /> Videoaulas Práticas ({mod.videoAulas.length})
+                    </span>
+                    <span style={{ fontSize: "0.78rem", color: "#94A3B8" }}>
+                      Ganhe +50 XP a cada aula assistida!
+                    </span>
+                  </div>
+
+                  <div className={styles.videosGrid}>
+                    {mod.videoAulas.map((video) => {
+                      const foiConcluida = !!aulasAssistidas[video.id];
+
+                      return (
+                        <div key={video.id} className={styles.videoCard}>
+                          <div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                              <span style={{ fontSize: "0.75rem", fontWeight: "800", color: mod.cor, backgroundColor: mod.bgBadge, padding: "2px 8px", borderRadius: "6px" }}>
+                                ⏱️ {video.duracao}
+                              </span>
+                              {foiConcluida && (
+                                <span style={{ fontSize: "0.75rem", fontWeight: "900", color: "#10B981" }}>
+                                  ✅ Assistida (+50 XP)
+                                </span>
+                              )}
+                            </div>
+                            <h4 className={styles.videoTitle}>{video.titulo}</h4>
+                            <p className={styles.videoDesc}>{video.descricao}</p>
+                          </div>
+
+                          <div className={styles.videoFooter}>
+                            <button
+                              className={styles.btnWatch}
+                              onClick={() => setVideoModal(video)}
+                            >
+                              <Play size={14} fill="#FFF" /> Assistir Aula
+                            </button>
+
+                            <button
+                              className={foiConcluida ? styles.btnCheckDone : styles.btnCheckPending}
+                              onClick={() => clicarConcluirAula(video.id, video.titulo)}
+                            >
+                              <CheckCircle2 size={15} color={foiConcluida ? "#10B981" : "#94A3B8"} />
+                              {foiConcluida ? "Concluída" : "Marcar Aula"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Explicação Conceitual Profunda */}
               <div className={styles.explanationSection} style={{ borderLeftColor: mod.cor }}>
-                <div style={{ fontWeight: 800, color: mod.cor, marginBottom: 6, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  📖 Explicação do Conceito:
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, color: mod.cor, marginBottom: 8, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  <Sparkles size={16} color={mod.cor} />
+                  <span>Explicação do Conceito</span>
                 </div>
                 <p style={{ margin: 0, whiteSpace: 'pre-line' }}>{mod.explicacaoCompleta}</p>
               </div>
 
-              {/* Grid de Pontos-Chave & Boas Práticas */}
+              {/* Grid de Pontos-Chave & Regras de Engenharia */}
               <div>
-                <h5 style={{ margin: '0 0 10px 0', color: '#cbd5e1', fontSize: '0.9rem', fontWeight: 700 }}>
-                  🔑 Pontos-Chave & Regras de Engenharia:
+                <h5 style={{ margin: '4px 0 12px 0', color: '#F8FAFC', fontSize: '0.94rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🔑</span> Pontos-Chave & Regras de Engenharia:
                 </h5>
                 <div className={styles.keyPointsGrid}>
-                  {mod.pontosChave.map((ponto, pIdx) => (
-                    <div key={pIdx} className={styles.keyPointItem}>
-                      <CheckCircle2 size={16} color={mod.cor} style={{ flexShrink: 0, marginTop: 2 }} />
-                      <span>{ponto}</span>
-                    </div>
-                  ))}
+                  {mod.pontosChave.map((ponto, pIdx) => {
+                    const partes = ponto.split(":");
+                    const temTitulo = partes.length > 1;
+                    const tituloPonto = temTitulo ? partes[0].trim() : "";
+                    const descPonto = temTitulo ? partes.slice(1).join(":").trim() : ponto;
+
+                    return (
+                      <div key={pIdx} className={styles.keyPointItem}>
+                        <div className={styles.keyPointHeader}>
+                          <CheckCircle2 size={16} color={mod.cor} style={{ flexShrink: 0 }} />
+                          <span>{tituloPonto || descPonto}</span>
+                        </div>
+                        {temTitulo && (
+                          <div className={styles.keyPointDesc}>
+                            {descPonto}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Bloco de Exemplo de Código Profissional */}
               <div>
                 <div className={styles.codeBlockHeader}>
-                  <span><Code size={14} style={{ display: 'inline', marginRight: 6 }} /> Exemplo de Código Completo</span>
-                  <button className={styles.btnCopy} onClick={() => handleCopiarCodigo(mod.codigoExemplo, idx)}>
-                    {copiadoIdx === idx ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                    {copiadoIdx === idx ? "Copiado!" : "Copiar Código"}
-                  </button>
+                  <div className={styles.codeHeaderTitle}>
+                    <div className={styles.macDots}>
+                      <span className={styles.macDot} style={{ background: '#ef4444' }} />
+                      <span className={styles.macDot} style={{ background: '#f59e0b' }} />
+                      <span className={styles.macDot} style={{ background: '#10b981' }} />
+                    </div>
+                    <span style={{ marginLeft: 6, display: 'flex', alignItems: 'center', gap: 6, color: '#f8fafc' }}>
+                      <FileCode size={15} color="#38bdf8" />
+                      Exemplo de Código Prático
+                    </span>
+                  </div>
+
+                  <div className={styles.codeHeaderActions}>
+                    <button className={styles.toggleBtn} onClick={() => toggleCodigoExpandido(idx)}>
+                      {codigoExpandido[idx] === true ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      <span>{codigoExpandido[idx] === true ? "Recolher" : "Expandir"}</span>
+                    </button>
+                    <button className={styles.btnCopy} onClick={() => handleCopiarCodigo(mod.codigoExemplo, idx)}>
+                      {copiadoIdx === idx ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                      <span>{copiadoIdx === idx ? "Copiado!" : "Copiar"}</span>
+                    </button>
+                  </div>
                 </div>
-                <pre className={styles.codeTextarea}>
-                  <code>{mod.codigoExemplo}</code>
-                </pre>
+
+                {codigoExpandido[idx] !== true && (
+                  <pre className={styles.codeTextarea}>
+                    <code>{mod.codigoExemplo}</code>
+                  </pre>
+                )}
               </div>
 
               {/* Caixa de Dica de Tech Lead IA */}
               <div className={styles.tipBox}>
-                <Lightbulb size={20} style={{ flexShrink: 0, marginTop: 2 }} />
-                <div>{mod.dicaSenior}</div>
+                <Lightbulb size={22} color="#fbbf24" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <strong style={{ color: '#fbbf24', display: 'block', marginBottom: 2, fontWeight: "900" }}>Dica de Tech Lead:</strong>
+                  {mod.dicaSenior.replace("💡 Dica de Tech Lead: ", "").replace("⚡ Dica de Performance: ", "")}
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Modal do Player de Videoaula */}
+      {videoModal && (
+        <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setVideoModal(null); }}>
+          <div className={styles.modalPlayerContent}>
+            <div className={styles.modalPlayerHeader}>
+              <div>
+                <h3 style={{ fontSize: "1rem", fontWeight: "900", color: "#FFF", margin: 0 }}>
+                  {videoModal.titulo}
+                </h3>
+                <span style={{ fontSize: "0.8rem", color: "#94A3B8" }}>
+                  ⏱️ Duração: {videoModal.duracao}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <button
+                  onClick={() => {
+                    const rawId = (videoModal.embedUrl || "").split("/embed/")[1] || "";
+                    const videoId = rawId.split("?")[0];
+                    window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(239, 68, 68, 0.2)",
+                    color: "#EF4444",
+                    border: "1px solid rgba(239, 68, 68, 0.4)",
+                    fontWeight: "800",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <ExternalLink size={14} /> 📺 Abrir no YouTube
+                </button>
+                <button
+                  onClick={() => setVideoModal(null)}
+                  style={{ border: "none", backgroundColor: "transparent", color: "#94A3B8", fontSize: "1.2rem", cursor: "pointer", fontWeight: "900" }}
+                >✕</button>
+              </div>
+            </div>
+
+            <iframe
+              className={styles.playerIframe}
+              src={`${(videoModal.embedUrl || "").replace("youtube-nocookie.com", "www.youtube.com").split("?")[0]}?rel=0&modestbranding=1`}
+              title={videoModal.titulo}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+
+            <div style={{ padding: "12px 20px", backgroundColor: "#0F172A", borderTop: "1px solid rgba(255, 255, 255, 0.08)", fontSize: "12px", color: "#94A3B8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>💡 Se o YouTube bloquear a exibição embutida no seu navegador, clique em <strong style={{ color: "#EF4444" }}>📺 Abrir no YouTube</strong> para assistir normalmente.</span>
+              <button
+                onClick={() => {
+                  const vm = videoModal;
+                  setVideoModal(null);
+                  clicarConcluirAula(vm.id, vm.titulo);
+                }}
+                style={{ backgroundColor: "#10B981", color: "#FFF", border: "none", padding: "6px 14px", borderRadius: "8px", fontWeight: "800", cursor: "pointer" }}
+              >
+                ⚡ Responder Desafio de Atenção (+140 XP)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal do Desafio de Atenção para Acender a Chama de Estudo */}
+      {quizModal && (
+        <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setQuizModal(null); }}>
+          <div style={{
+            background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+            border: "1.5px solid #F59E0B",
+            borderRadius: "20px",
+            padding: "28px",
+            maxWidth: "520px",
+            width: "90%",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(245, 158, 11, 0.25)",
+            color: "#FFF"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <Flame style={{ color: "#F59E0B", width: 26, height: 26 }} />
+                <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 900, color: "#F59E0B" }}>
+                  Desafio de Atenção — Acender o Fogo 🔥
+                </h3>
+              </div>
+              <button onClick={() => setQuizModal(null)} style={{ background: "none", border: "none", color: "#94A3B8", fontSize: "1.2rem", cursor: "pointer" }}>✕</button>
+            </div>
+
+            <p style={{ fontSize: "0.88rem", color: "#CBD5E1", margin: "0 0 16px 0", lineHeight: 1.5 }}>
+              Para comprovar sua atenção e <strong>abastecer o Combustível da sua Chama (+30% 🔥)</strong>, responda à pergunta sobre a videoaula:
+            </p>
+
+            <div style={{ background: "rgba(30, 41, 59, 0.6)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "16px" }}>
+              <strong style={{ fontSize: "0.95rem", color: "#FFF", display: "block", marginBottom: "12px" }}>
+                ❓ {quizModal.quiz.pergunta}
+              </strong>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {quizModal.quiz.opcoes.map((opcao, idx) => (
+                  <label
+                    key={idx}
+                    onClick={() => setQuizModal(prev => ({ ...prev, opcaoSelecionada: idx, erroMsg: null }))}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      border: quizModal.opcaoSelecionada === idx ? "2px solid #F59E0B" : "1px solid rgba(255,255,255,0.1)",
+                      backgroundColor: quizModal.opcaoSelecionada === idx ? "rgba(245, 158, 11, 0.15)" : "rgba(15, 23, 42, 0.4)",
+                      color: quizModal.opcaoSelecionada === idx ? "#F59E0B" : "#CBD5E1",
+                      cursor: "pointer",
+                      fontWeight: quizModal.opcaoSelecionada === idx ? "800" : "500",
+                      fontSize: "0.88rem"
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="quiz_opcao"
+                      checked={quizModal.opcaoSelecionada === idx}
+                      onChange={() => {}}
+                      style={{ accentColor: "#F59E0B" }}
+                    />
+                    <span>{opcao}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {quizModal.erroMsg && (
+              <div style={{ color: "#EF4444", fontSize: "0.85rem", fontWeight: 700, marginBottom: "14px" }}>
+                {quizModal.erroMsg}
+              </div>
+            )}
+
+            {quizModal.sucesso && (
+              <div style={{ color: "#10B981", fontSize: "0.95rem", fontWeight: 900, marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                ⚡ RESPOSTA CORRETA! Fogo Alimentado (+30% Combustível 🔥) +140 XP!
+              </div>
+            )}
+
+            <button
+              onClick={() => confirmarRespostaQuiz(quizModal.aulaId)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "12px",
+                border: "none",
+                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                color: "#FFF",
+                fontWeight: 900,
+                fontSize: "0.95rem",
+                cursor: "pointer",
+                boxShadow: "0 4px 20px rgba(245, 158, 11, 0.4)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              <Flame size={18} /> Confirmar Resposta & Alimentar Chama 🔥
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

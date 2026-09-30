@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Trophy, Medal, Award, Flame, Code, Sparkles, User, Star } from "lucide-react";
+import styles from "./HallDaFamaModule.module.css";
+import { Trophy, Medal, Award, Flame, Code, Sparkles, User, Star, Crown, Zap, BookOpen, Swords, CheckCircle2, Info, HelpCircle } from "lucide-react";
 
-export default function HallDaFamaModule({ isDark, colors }) {
-  const [categoria, setCategoria] = useState("geral"); // "geral" | "melhorFrontend" | "melhorBackend" | "melhorLogica" | "maiorEvolucao"
+export default function HallDaFamaModule({ isDark, colors, user }) {
+  const [categoria, setCategoria] = useState("geral");
   const [dadosHall, setDadosHall] = useState({
     geral: [],
     melhorFrontend: [],
@@ -11,21 +12,149 @@ export default function HallDaFamaModule({ isDark, colors }) {
     maiorEvolucao: []
   });
   const [loading, setLoading] = useState(true);
+  const [mostrarGuia, setMostrarGuia] = useState(true);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
   useEffect(() => {
     carregarHall();
-  }, []);
+
+    const handleAtualizar = () => {
+      carregarHall();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("devhub_estudo_realizado", handleAtualizar);
+      window.addEventListener("devhub_aula_assistida", handleAtualizar);
+      window.addEventListener("devhub_batalha_concluida", handleAtualizar);
+      window.addEventListener("devhub_gamificacao_update", handleAtualizar);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("devhub_estudo_realizado", handleAtualizar);
+        window.removeEventListener("devhub_aula_assistida", handleAtualizar);
+        window.removeEventListener("devhub_batalha_concluida", handleAtualizar);
+        window.removeEventListener("devhub_gamificacao_update", handleAtualizar);
+      }
+    };
+  }, [user]);
 
   const carregarHall = async () => {
     try {
       setLoading(true);
+      let data = { geral: [], melhorFrontend: [], melhorBackend: [], melhorLogica: [], maiorEvolucao: [] };
+      
       const res = await fetch(`${apiUrl}/gamificacao/hall-da-fama`);
       if (res.ok) {
-        const data = await res.json();
-        setDadosHall(data);
+        data = await res.json();
       }
+
+      // Sincronizar dados do usuário logado localmente para garantir fogo aceso dinâmico!
+      if (typeof window !== "undefined") {
+        let currentUser = user;
+        if (!currentUser) {
+          try {
+            const raw = localStorage.getItem("userData");
+            if (raw) currentUser = JSON.parse(raw);
+          } catch (e) {}
+        }
+
+        const nomeUser = currentUser?.nome || "Você";
+        const emailUser = currentUser?.email || "aluno@devhub.com";
+
+        // Calcular total de atividades do aluno logado
+        let totalAulas = 0;
+        let totalProvas = 0;
+        let totalDuelos = 0;
+        let totalNotas = 0;
+
+        try {
+          const rawAulas = localStorage.getItem("devhub_aulas_video_assistidas");
+          if (rawAulas) {
+            const parsed = JSON.parse(rawAulas);
+            totalAulas = Object.values(parsed || {}).filter(Boolean).length;
+          }
+        } catch (e) {}
+
+        try {
+          const rawProvas = localStorage.getItem("devhub_provas_concluidas") || localStorage.getItem("devhub_notas_alunos");
+          if (rawProvas) {
+            const parsed = JSON.parse(rawProvas);
+            if (Array.isArray(parsed)) totalProvas = parsed.length;
+          }
+        } catch (e) {}
+
+        try {
+          const rawDuelos = localStorage.getItem("devhub_duelos_historico") || localStorage.getItem("devhub_batalhas_concluidas");
+          if (rawDuelos) {
+            const parsed = JSON.parse(rawDuelos);
+            if (Array.isArray(parsed)) totalDuelos = parsed.length;
+          }
+        } catch (e) {}
+
+        try {
+          const rawNotas = localStorage.getItem("devhub_caderno_anotacoes");
+          if (rawNotas) {
+            const parsed = JSON.parse(rawNotas);
+            if (Array.isArray(parsed)) totalNotas = parsed.length;
+          }
+        } catch (e) {}
+
+        const totalAtividades = totalAulas + totalProvas + totalDuelos + totalNotas;
+
+        // Calcular título e chamas com base na quantidade/média de atividades concluídas
+        let fogoSemanas = 0;
+        let titulo = "💀 Chama Apagada";
+
+        if (totalAtividades >= 5) {
+          fogoSemanas = 3;
+          titulo = "👑 Mestre do Fogo";
+        } else if (totalAtividades >= 3) {
+          fogoSemanas = 2;
+          titulo = "⚡ Dev Incandescente";
+        } else if (totalAtividades >= 1) {
+          fogoSemanas = 1;
+          titulo = "🔥 Chama Acesa";
+        }
+
+        const xpCalculado = 100 + totalAulas * 140 + totalProvas * 200 + totalDuelos * 300 + totalNotas * 100;
+
+        // Atualizar ou inserir aluno logado na lista
+        if (Array.isArray(data.geral)) {
+          const userIndex = data.geral.findIndex(
+            a => a.nome?.toLowerCase() === nomeUser.toLowerCase() || (a.email && a.email.toLowerCase() === emailUser.toLowerCase())
+          );
+
+          const objAluno = {
+            posicao: 1,
+            nome: nomeUser,
+            email: emailUser,
+            xp: Math.max(xpCalculado, data.geral[userIndex]?.xp || 0),
+            fogoSemanas: Math.max(fogoSemanas, data.geral[userIndex]?.fogoSemanas || 1),
+            titulo: totalAtividades > 0 ? titulo : (data.geral[userIndex]?.titulo || titulo),
+            desafios: totalAtividades,
+            batalhas: totalDuelos
+          };
+
+          if (userIndex >= 0) {
+            data.geral[userIndex] = { ...data.geral[userIndex], ...objAluno };
+          } else {
+            data.geral.push(objAluno);
+          }
+
+          // Re-ordenar ranking por semanas em chamas e XP
+          data.geral.sort((a, b) => b.fogoSemanas - a.fogoSemanas || b.xp - a.xp);
+          data.geral = data.geral.map((item, idx) => ({ ...item, posicao: idx + 1 }));
+
+          data.melhorFrontend = [...data.geral].sort((a, b) => b.fogoSemanas - a.fogoSemanas);
+          data.melhorBackend = [...data.geral].sort((a, b) => b.xp - a.xp);
+          data.melhorLogica = [...data.geral];
+          data.maiorEvolucao = [...data.geral].slice().reverse();
+        }
+      }
+
+      setDadosHall(data);
     } catch (e) {
       console.error("Erro ao carregar Hall da Fama:", e);
     } finally {
@@ -33,141 +162,244 @@ export default function HallDaFamaModule({ isDark, colors }) {
     }
   };
 
-  const listaAtual = dadosHall[categoria] || [];
-  const top3 = listaAtual.slice(0, 3);
-  const restante = listaAtual.slice(3);
+  const listaAtual = Array.isArray(dadosHall?.[categoria])
+    ? dadosHall[categoria]
+    : (Array.isArray(dadosHall) ? dadosHall : []);
+  const top3 = Array.isArray(listaAtual) ? listaAtual.slice(0, 3) : [];
+  const restante = Array.isArray(listaAtual) ? listaAtual.slice(3) : [];
 
   const CATEGORIAS = [
-    { id: "geral", nome: "Mestres do Fogo 🔥", desc: "Os alunos com a maior sequência de chamas semanas acesas" },
-    { id: "melhorFrontend", nome: "Maior Foco Semanal ⚡", desc: "Líderes em constância de estudo" },
-    { id: "melhorBackend", nome: "Maiores Pontuadores 👑", desc: "Ranking por XP acumulado" },
-    { id: "maiorEvolucao", nome: "Chamas Mais Longas 🚀", desc: "Sequências ininterruptas de estudo" }
+    { id: "geral", nome: "Destaques Gerais", desc: "Os alunos com a maior constância de estudos" },
+    { id: "melhorFrontend", nome: "Maior Foco Semanal", desc: "Líderes em constância de estudo" },
+    { id: "melhorBackend", nome: "Maiores Pontuadores", desc: "Ranking por atividades acumuladas" },
+    { id: "maiorEvolucao", nome: "Sequências Acadêmicas", desc: "Sequências ininterruptas de estudo" }
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
-      {/* Header */}
+    <div className={styles.container}>
+      {/* HEADER PRINCIPAL */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h2 style={{ fontSize: "22px", fontWeight: "900", display: "flex", alignItems: "center", gap: "10px", margin: "0 0 6px 0" }}>
-            🏆 Hall da Fama — Fogo de Estudo DevHub
+          <h2 className={styles.headerTitle}>
+            Ranking & Desempenho Técnico
           </h2>
-          <p style={{ color: colors?.textSecondary || "#94A3B8", fontSize: "14px", margin: 0 }}>
-            Reconhecimento dos alunos com a maior sequência e constância semanal de estudo (Chamas Acesas 🔥).
+          <p className={styles.headerDesc}>
+            Acompanhe os alunos em destaque por engajamento técnico e constância de estudos semanal.
           </p>
         </div>
 
-        {/* Abas de Categorias */}
-        <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px", maxWidth: "100%" }}>
-          {CATEGORIAS.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setCategoria(cat.id)}
-              style={{
-                padding: "10px 16px", borderRadius: "12px", fontSize: "13px", fontWeight: "800", cursor: "pointer", whitespace: "nowrap",
-                border: categoria === cat.id ? "1.5px solid #F59E0B" : `1px solid ${colors?.borderCard || "rgba(255,255,255,0.1)"}`,
-                backgroundColor: categoria === cat.id ? "rgba(245,158,11,0.15)" : (colors?.bgCard || "#1E293B"),
-                color: categoria === cat.id ? "#F59E0B" : (colors?.textSecondary || "#94A3B8"),
-                transition: "all 0.2s"
-              }}
-            >
-              {cat.nome}
-            </button>
-          ))}
+        {/* ABAS DE CATEGORIAS */}
+        <div className={styles.categoryBar}>
+          {CATEGORIAS.map(cat => {
+            const isActive = categoria === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setCategoria(cat.id)}
+                className={styles.categoryBtn}
+                style={{
+                  border: isActive ? "1.5px solid #3B82F6" : "1px solid rgba(255,255,255,0.12)",
+                  background: isActive
+                    ? "linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.15) 100%)"
+                    : "rgba(30, 41, 59, 0.6)",
+                  color: isActive ? "#60A5FA" : "#94A3B8",
+                  boxShadow: isActive ? "0 4px 20px rgba(59, 130, 246, 0.3)" : "none"
+                }}
+              >
+                {cat.nome}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Pódio 3D dos Top 3 */}
+      {/* PAINEL EXPLICATIVO: MÉTRICA DE CONSTÂNCIA */}
+      <div style={{
+        background: "linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)",
+        border: "1px solid rgba(59, 130, 246, 0.3)",
+        borderRadius: "16px",
+        padding: "20px 24px",
+        backdropFilter: "blur(16px)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.3)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", cursor: "pointer" }} onClick={() => setMostrarGuia(!mostrarGuia)}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Award style={{ color: "#3B82F6", width: 22, height: 22 }} />
+            <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 800, color: "#FFF" }}>
+              Métrica de Constância & Frequência Semanal
+            </h3>
+          </div>
+          <span style={{ fontSize: "0.85rem", color: "#3B82F6", fontWeight: 700 }}>
+            {mostrarGuia ? "Ocultar Guia ▲" : "Ver Regras de Frequência ▼"}
+          </span>
+        </div>
+
+        {mostrarGuia && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "12px" }}>
+            <p style={{ margin: 0, fontSize: "0.88rem", color: "#CBD5E1", lineHeight: 1.5 }}>
+              Para manter a <strong>presença ativa</strong> no ciclo acadêmico, o aluno deve concluir módulos ou atividades práticas na plataforma durante a semana.
+            </p>
+
+            {/* TABELA DE CRITÉRIOS DE FREQUÊNCIA */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
+              <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.25)", padding: "12px 16px", borderRadius: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: "#EF4444", fontSize: "0.9rem" }}>
+                  Inativo na Semana
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "#94A3B8", marginTop: "4px" }}>
+                  0 atividades concluídas na semana.
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", padding: "12px 16px", borderRadius: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: "#F59E0B", fontSize: "0.9rem" }}>
+                  Frequência Ativa (1 sem)
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "#CBD5E1", marginTop: "4px" }}>
+                  <strong>1 a 2 Atividades</strong> concluídas (Videoaula ou Exercício).
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", padding: "12px 16px", borderRadius: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: "#3B82F6", fontSize: "0.9rem" }}>
+                  Frequência Alta (2 sem)
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "#CBD5E1", marginTop: "4px" }}>
+                  <strong>3 a 4 Atividades</strong> (Aulas + Prática no Executor + Prova).
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "12px 16px", borderRadius: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, color: "#10B981", fontSize: "0.9rem" }}>
+                  Constância Excepcional (3+ sem)
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "#CBD5E1", marginTop: "4px" }}>
+                  <strong>5+ Atividades</strong> ou +500 pontos acumulados no ciclo semanal.
+                </div>
+              </div>
+            </div>
+
+            {/* LISTA DE ATIVIDADES QUE REGISTRAM PRESENÇA */}
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "4px", fontSize: "0.82rem", color: "#94A3B8" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,255,255,0.05)", padding: "6px 12px", borderRadius: "8px" }}>
+                <BookOpen style={{ width: 14, height: 14, color: "#3B82F6" }} /> 1 Videoaula Assistida = Registra Presença
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,255,255,0.05)", padding: "6px 12px", borderRadius: "8px" }}>
+                <Code style={{ width: 14, height: 14, color: "#10B981" }} /> 1 Laboratório Prático Concluído = Registra Presença
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,255,255,0.05)", padding: "6px 12px", borderRadius: "8px" }}>
+                <CheckCircle2 style={{ width: 14, height: 14, color: "#10B981" }} /> 1 Prova Online Concluída = Acende o Fogo
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* PÓDIO 3D DOS TOP 3 (3D ESPORTS STAGE) */}
       {top3.length > 0 && (
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px", alignItems: "end",
-          padding: "24px", borderRadius: "24px", background: isDark ? "linear-gradient(180deg, rgba(245,158,11,0.08) 0%, rgba(30,41,59,0.5) 100%)" : "#FFF",
-          border: `1px dashed ${colors?.borderCard || "rgba(255,255,255,0.1)"}`
-        }}>
-          {/* 2º Lugar */}
-          {top3[1] && (
-            <div style={{ textAlign: "center", order: 1 }}>
-              <div style={{ fontSize: "28px", marginBottom: "6px" }}>🥈</div>
-              <div style={{
-                backgroundColor: colors?.bgCard || "#1E293B", border: "2px solid #94A3B8", borderRadius: "18px", padding: "20px",
-                boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
-              }}>
-                <strong style={{ fontSize: "16px", display: "block" }}>{top3[1].nome}</strong>
-                <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: "700" }}>{top3[1].titulo || "Dev Incandescente"}</span>
-                <div style={{ marginTop: "10px", fontSize: "15px", fontWeight: "900", color: "#F59E0B" }}>
-                  🔥 {top3[1].fogoSemanas || top3[1].desafios || 1} Semanas em Chamas
-                </div>
-                <div style={{ fontSize: "12px", color: "#818cf8", fontWeight: "700", marginTop: "4px" }}>⚡ {top3[1].xp} XP Total</div>
-              </div>
-            </div>
-          )}
+        <div className={styles.podiumWrapper}>
+          <div className={styles.podiumContainer}>
+            {/* 2º LUGAR - PRATA (ESQUERDA) */}
+            {top3[1] && (
+              <div className={`${styles.podiumCard} ${styles.podiumCardSilver}`}>
+                <div className={styles.podiumBoxSilver}>
+                  <div className={styles.avatarCircleSilver}>
+                    <span>{top3[1]?.nome?.charAt(0)?.toUpperCase() || "2"}</span>
+                  </div>
+                  <strong className={styles.userName}>{top3[1]?.nome || "Aluno"}</strong>
+                  <span className={styles.userTitle}>{top3[1]?.titulo || "Frequência Alta"}</span>
 
-          {/* 1º Lugar (Destaque Central) */}
-          {top3[0] && (
-            <div style={{ textAlign: "center", order: 2 }}>
-              <div style={{ fontSize: "36px", marginBottom: "6px" }}>👑</div>
-              <div style={{
-                background: "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(217,119,6,0.15))", border: "2px solid #F59E0B", borderRadius: "20px", padding: "24px",
-                boxShadow: "0 12px 30px rgba(245,158,11,0.3)"
-              }}>
-                <strong style={{ fontSize: "18px", display: "block", color: "#F59E0B" }}>{top3[0].nome}</strong>
-                <span style={{ fontSize: "13px", color: "#FBBF24", fontWeight: "800" }}>{top3[0].titulo || "👑 Mestre do Fogo"}</span>
-                <div style={{ marginTop: "12px", fontSize: "18px", fontWeight: "900", color: "#F59E0B" }}>
-                  🔥 {top3[0].fogoSemanas || top3[0].desafios || 1} Semanas Incandescente!
+                  <div className={styles.flameStreak}>
+                    {top3[1]?.fogoSemanas || top3[1]?.desafios || 1} Semanas Consecutivas
+                  </div>
+                  <div className={styles.xpBadge}>{top3[1]?.xp || 0} Pontos</div>
                 </div>
-                <div style={{ fontSize: "13px", color: "#38bdf8", fontWeight: "800", marginTop: "4px" }}>⚡ {top3[0].xp} XP Total</div>
+                <div className={styles.pedestalSilver}>2º LUGAR</div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* 3º Lugar */}
-          {top3[2] && (
-            <div style={{ textAlign: "center", order: 3 }}>
-              <div style={{ fontSize: "28px", marginBottom: "6px" }}>🥉</div>
-              <div style={{
-                backgroundColor: colors?.bgCard || "#1E293B", border: "2px solid #D97706", borderRadius: "18px", padding: "20px",
-                boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
-              }}>
-                <strong style={{ fontSize: "16px", display: "block" }}>{top3[2].nome}</strong>
-                <span style={{ fontSize: "12px", color: "#D97706", fontWeight: "700" }}>{top3[2].titulo || "Chama Ativa"}</span>
-                <div style={{ marginTop: "10px", fontSize: "15px", fontWeight: "900", color: "#F59E0B" }}>
-                  🔥 {top3[2].fogoSemanas || top3[2].desafios || 1} Semanas em Chamas
+            {/* 1º LUGAR - DESTAQUE PRINCIPAL */}
+            {top3[0] && (
+              <div className={`${styles.podiumCard} ${styles.podiumCardGold}`}>
+                <div className={styles.podiumBoxGold}>
+                  <div className={styles.avatarCircleGold}>
+                    <span>{top3[0]?.nome?.charAt(0)?.toUpperCase() || "1"}</span>
+                  </div>
+                  <strong className={styles.userNameGold}>{top3[0]?.nome || "Aluno"}</strong>
+                  <span className={styles.userTitleGold}>{top3[0]?.titulo || "Constância Excepcional"}</span>
+
+                  <div className={styles.flameStreakGold}>
+                    {top3[0]?.fogoSemanas || top3[0]?.desafios || 1} Semanas Consecutivas
+                  </div>
+                  <div className={styles.xpBadgeGold}>{top3[0]?.xp || 0} Pontos</div>
                 </div>
-                <div style={{ fontSize: "12px", color: "#818cf8", fontWeight: "700", marginTop: "4px" }}>⚡ {top3[2].xp} XP Total</div>
+                <div className={styles.pedestalGold}>1º LUGAR DESTAQUE</div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* 3º LUGAR - BRONZE */}
+            {top3[2] && (
+              <div className={`${styles.podiumCard} ${styles.podiumCardBronze}`}>
+                <div className={styles.podiumBoxBronze}>
+                  <div className={styles.avatarCircleBronze}>
+                    <span>{top3[2]?.nome?.charAt(0)?.toUpperCase() || "3"}</span>
+                  </div>
+                  <strong className={styles.userName}>{top3[2]?.nome || "Aluno"}</strong>
+                  <span className={styles.userTitleBronze}>{top3[2]?.titulo || "Frequência Ativa"}</span>
+
+                  <div className={styles.flameStreak}>
+                    {top3[2]?.fogoSemanas || top3[2]?.desafios || 1} Semanas Consecutivas
+                  </div>
+                  <div className={styles.xpBadge}>{top3[2]?.xp || 0} Pontos</div>
+                </div>
+                <div className={styles.pedestalBronze}>3º LUGAR</div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Tabela do Restante da Classificação */}
-      <div style={{ backgroundColor: colors?.bgCard || "#1E293B", borderRadius: "20px", border: `1px solid ${colors?.borderCard || "rgba(255,255,255,0.1)"}`, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "14px" }}>
+      {/* TABELA DE CLASSIFICAÇÃO (#4 A #10+) */}
+      <div className={styles.tableWrapper}>
+        <table className={styles.leaderTable}>
           <thead>
-            <tr style={{ borderBottom: `1px solid ${colors?.borderCard || "rgba(255,255,255,0.1)"}`, color: colors?.textSecondary || "#94A3B8" }}>
-              <th style={{ padding: "16px 20px" }}>Posição</th>
-              <th style={{ padding: "16px 20px" }}>Aluno</th>
-              <th style={{ padding: "16px 20px" }}>Título de Fogo</th>
-              <th style={{ padding: "16px 20px" }}>Sequência de Fogo (Semanas 🔥)</th>
-              <th style={{ padding: "16px 20px", textAlign: "right" }}>XP Total</th>
+            <tr className={styles.tableHeader}>
+              <th>Posição</th>
+              <th>Aluno</th>
+              <th>Título de Fogo</th>
+              <th>Sequência de Fogo (Semanas 🔥)</th>
+              <th style={{ textAlign: "right" }}>XP Total</th>
             </tr>
           </thead>
           <tbody>
-            {restante.map((aluno, index) => (
-              <tr key={index} style={{ borderBottom: `1px solid ${colors?.borderCard || "rgba(255,255,255,0.05)"}` }}>
-                <td style={{ padding: "16px 20px", fontWeight: "800", color: colors?.textSecondary }}>#{index + 4}</td>
-                <td style={{ padding: "16px 20px", fontWeight: "700" }}>{aluno.nome}</td>
-                <td style={{ padding: "16px 20px" }}>
-                  <span style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "10px", backgroundColor: "rgba(245,158,11,0.12)", color: "#F59E0B", fontWeight: "800" }}>
-                    {aluno.titulo}
-                  </span>
-                </td>
-                <td style={{ padding: "16px 20px", fontWeight: "800", color: "#F59E0B" }}>
-                  🔥 {aluno.fogoSemanas || aluno.desafios || 1} Semanas Incandescente
-                </td>
-                <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: "900", color: "#38bdf8" }}>{aluno.xp} XP</td>
-              </tr>
-            ))}
+            {restante.map((aluno, index) => {
+              if (!aluno) return null;
+              const isApagada = (aluno?.titulo || "").toLowerCase().includes("apagada");
+              return (
+                <tr key={index} className={styles.tableRow}>
+                  <td className={styles.rankNumber}>#{index + 4}</td>
+                  <td>
+                    <div className={styles.studentCell}>
+                      <div className={styles.studentAvatar}>
+                        {aluno?.nome?.charAt(0)?.toUpperCase() || "D"}
+                      </div>
+                      <span className={styles.studentName}>{aluno?.nome || "Aluno"}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`${styles.titleBadge} ${isApagada ? styles.titleBadgeOff : styles.titleBadgeActive}`}>
+                      {aluno?.titulo || "Chama Ativa"}
+                    </span>
+                  </td>
+                  <td>
+                    <div className={styles.streakCell}>
+                      🔥 {aluno?.fogoSemanas || aluno?.desafios || 1} Semanas Incandescente
+                    </div>
+                  </td>
+                  <td className={styles.xpCell}>{aluno?.xp || 0} XP</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

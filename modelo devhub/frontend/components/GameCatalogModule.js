@@ -1,10 +1,11 @@
 import { useState } from "react";
+import styles from "./GameCatalogModule.module.css";
 import BatalhaCodigoModule from "./BatalhaCodigoModule";
 import PairProgrammingModule from "./PairProgrammingModule";
 import MiniSistemasModule from "./MiniSistemasModule";
 
-export default function GameCatalogModule({ user, isDark, colors, relatorioAlunos }) {
-  const [jogoAtivo, setJogoAtivo] = useState(null);
+export default function GameCatalogModule({ user, isDark, colors, relatorioAlunos, initialJogo, targetProjetoId }) {
+  const [jogoAtivo, setJogoAtivo] = useState(initialJogo || null);
   const [hoveredCard, setHoveredCard] = useState(null);
 
   const backBtnStyle = {
@@ -51,7 +52,7 @@ export default function GameCatalogModule({ user, isDark, colors, relatorioAluno
         <button style={backBtnStyle} onClick={() => setJogoAtivo(null)}>
           ← Voltar ao Catálogo
         </button>
-        <MiniSistemasModule user={user} isDark={isDark} colors={colors} />
+        <MiniSistemasModule user={user} isDark={isDark} colors={colors} initialProjetoId={targetProjetoId} />
       </div>
     );
   }

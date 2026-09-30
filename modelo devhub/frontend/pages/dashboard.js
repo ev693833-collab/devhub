@@ -16,12 +16,14 @@ import FlashcardsModule from "../components/FlashcardsModule";
 import TrilhasModule from "../components/TrilhasModule";
 import AulasSection from "../components/dashboard/AulasSection";
 import VisaoGeralSection from "../components/dashboard/VisaoGeralSection";
+import ModuleHubLauncher from "../components/ModuleHubLauncher";
 import NotificationCenterModal from "../components/NotificationCenterModal";
 import TicketsModule from "../components/TicketsModule";
 import { 
   BookOpen, Calendar, Trophy, FileText, CheckSquare, 
   Sparkles, ChevronLeft, ChevronRight, ChevronDown, User, Shield, Layers, Swords, Crown,
-  LogOut, Moon, Sun, Settings, Bell, Zap, Check, BookMarked, Code, BrainCircuit, Compass, LifeBuoy, Home
+  LogOut, Moon, Sun, Settings, Bell, Zap, Check, BookMarked, Code, BrainCircuit, Compass, LifeBuoy, Home, X,
+  HelpCircle, Megaphone, Award, Terminal, BarChart3
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -32,13 +34,76 @@ export default function Dashboard() {
   const [theme, setTheme] = useState("dark");
   const [loading, setLoading] = useState(true);
 
-  // Controle de Navegação Lateral & Perfil
-  const [abaAtiva, setAbaAtiva] = useState("visao_geral");
+  const [abaAtiva, setAbaAtiva] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const salva = localStorage.getItem("devhub_aba_ativa");
+        if (salva) return salva;
+      } catch (e) {}
+    }
+    return "inicio";
+  });
+
+  const [abaSubProvas, setAbaSubProvas] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const salva = localStorage.getItem("devhub_aba_sub_provas");
+        if (salva) return salva;
+      } catch (e) {}
+    }
+    return "provas";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && abaAtiva) {
+      try {
+        localStorage.setItem("devhub_aba_ativa", abaAtiva);
+      } catch (e) {}
+    }
+  }, [abaAtiva]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && abaSubProvas) {
+      try {
+        localStorage.setItem("devhub_aba_sub_provas", abaSubProvas);
+      } catch (e) {}
+    }
+  }, [abaSubProvas]);
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
-  const [menuAulasAberto, setMenuAulasAberto] = useState(true);
+  const [menuAulasAberto, setMenuAulasAberto] = useState(false);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
   const [modalNotificacoesOpen, setModalNotificacoesOpen] = useState(false);
   const [modalTicketsOpen, setModalTicketsOpen] = useState(false);
+  const [modalDevIaOpen, setModalDevIaOpen] = useState(false);
+
+  useEffect(() => {
+    const handleAbrirIa = () => setModalDevIaOpen(true);
+    if (typeof window !== "undefined") {
+      window.addEventListener("devhub_abrir_ia", handleAbrirIa);
+      return () => window.removeEventListener("devhub_abrir_ia", handleAbrirIa);
+    }
+  }, []);
+
+  // Estado e ouvinte do Modo Manutenção Global
+  const [manutencaoState, setManutencaoState] = useState({ ativo: false, mensagem: "" });
+
+  useEffect(() => {
+    const checkManutencao = () => {
+      if (typeof window !== "undefined") {
+        try {
+          const saved = localStorage.getItem("devhub_manutencao");
+          if (saved) {
+            setManutencaoState(JSON.parse(saved));
+          } else {
+            setManutencaoState({ ativo: false, mensagem: "" });
+          }
+        } catch (e) {}
+      }
+    };
+    checkManutencao();
+    window.addEventListener("devhub_manutencao_update", checkManutencao);
+    return () => window.removeEventListener("devhub_manutencao_update", checkManutencao);
+  }, []);
   const [unreadNotificacoesCount, setUnreadNotificacoesCount] = useState(0);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
@@ -114,6 +179,192 @@ export default function Dashboard() {
   const [modalAgendaOpen, setModalAgendaOpen] = useState(false);
   const [aulaEmEdicaoId, setAulaEmEdicaoId] = useState(null);
 
+  // ===== SALA DE VÍDEOCHAMADA NATIVA, CHECK-IN & RELATÓRIOS DE PRESENÇA =====
+  const [reuniaoAtivaVideo, setReuniaoAtivaVideo] = useState(null);
+  const [modalPresencasAula, setModalPresencasAula] = useState(null);
+  const [listaPresencasAula, setListaPresencasAula] = useState([]);
+  const [carregandoPresencas, setCarregandoPresencas] = useState(false);
+  const [repriseAulaModal, setRepriseAulaModal] = useState(null);
+  const [servidorVideo, setServidorVideo] = useState("element");
+
+  // ===== LIVE CHAT DA SALA DE VÍDEO =====
+  const [chatMensagens, setChatMensagens] = useState([
+    { id: 1, autor: "DevHub Bot 🤖", texto: "💬 Chat ao vivo ativo! Todos os participantes podem enviar mensagens aqui.", hora: "Agora" }
+  ]);
+  const [novoTextoChat, setNovoTextoChat] = useState("");
+  const [chatPainelAberto, setChatPainelAberto] = useState(true);
+
+  const handleEnviarMensagemChat = (e) => {
+    e.preventDefault();
+    if (!novoTextoChat.trim()) return;
+    const agora = new Date();
+    const horaStr = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+    const novaMsg = {
+      id: Date.now(),
+      autor: user?.nome || "Participante",
+      texto: novoTextoChat.trim(),
+      hora: horaStr
+    };
+    setChatMensagens(prev => [...prev, novaMsg]);
+    setNovoTextoChat("");
+  };
+
+  const obterUrlVideoChamada = (reuniao, srv = servidorVideo) => {
+    if (!reuniao) return "";
+    const nomeBruto = reuniao.sala_nome || `devhub-aula-${reuniao.id}`;
+    // Limpar caracteres especiais para evitar salas trancadas ou hashes quebrados
+    const salaLimpa = nomeBruto.replace(/[^a-zA-Z0-9\-_]/g, "_");
+    const userNome = user?.nome ? encodeURIComponent(user.nome) : "Aluno_DevHub";
+
+    let domain = "meet.element.io";
+    if (srv === "riot") domain = "jitsi.riot.im";
+    if (srv === "jitsi") domain = "meet.jit.si";
+    if (srv === "8x8") domain = "8x8.vc";
+
+    return `https://${domain}/${salaLimpa}#config.prejoinPageEnabled=false&config.enableWelcomePage=false&config.enableClosePage=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.requireDisplayName=false&config.openVideobridgeUrlWithOpenChat=true&config.enableChat=true&userInfo.displayName="${userNome}"`;
+  };
+
+  // Fechar o modal de vídeo automaticamente se a chamada for encerrada no player
+  useEffect(() => {
+    const handleJitsiMessage = (event) => {
+      try {
+        if (!event.data) return;
+        let data = event.data;
+        if (typeof data === "string") {
+          try { data = JSON.parse(event.data); } catch (e) {}
+        }
+        if (
+          data?.type === "readyToClose" ||
+          data?.event === "videoConferenceLeft" ||
+          data?.postMessage === "readyToClose" ||
+          data?.action === "hangup"
+        ) {
+          setReuniaoAtivaVideo(null);
+        }
+      } catch (err) {}
+    };
+
+    window.addEventListener("message", handleJitsiMessage);
+    return () => window.removeEventListener("message", handleJitsiMessage);
+  }, []);
+
+  // Modal de Chamada Instantânea
+  const [modalChamadaInstantaneaOpen, setModalChamadaInstantaneaOpen] = useState(false);
+  const [formInstantaneaTitulo, setFormInstantaneaTitulo] = useState("🔴 Chamada Ao Vivo");
+
+  const handleAbrirChamadaInstantanea = () => {
+    const agora = new Date();
+    const horaStr = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+    setFormInstantaneaTitulo(`🔴 Chamada Ao Vivo — ${horaStr}`);
+    setModalChamadaInstantaneaOpen(true);
+  };
+
+  const handleConfirmarChamadaInstantanea = async (e) => {
+    e.preventDefault();
+    const agora = new Date();
+    const dataHoje = agora.toLocaleDateString("pt-BR");
+    const horaInicioStr = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+    const horaFimDate = new Date(agora.getTime() + 2 * 60 * 60 * 1000);
+    const horaFimStr = `${String(horaFimDate.getHours()).padStart(2, '0')}:${String(horaFimDate.getMinutes()).padStart(2, '0')}`;
+    const salaNome = `devhub-live-room-${Date.now()}`;
+
+    const novaReuniao = {
+      id: Date.now(),
+      titulo: formInstantaneaTitulo || `🔴 Chamada Ao Vivo — ${horaInicioStr}`,
+      descricao: "Transmissão ao vivo iniciada no DevHub.",
+      data_reuniao: dataHoje,
+      data: dataHoje,
+      horario_inicio: horaInicioStr,
+      horario_fim: horaFimStr,
+      horario: `${horaInicioStr} - ${horaFimStr}`,
+      instrutor: user?.nome || "Enzo Vieira (DevHub Master)",
+      status: "Ao Vivo 🔴",
+      status_cor: "#EF4444",
+      statusCor: "#EF4444",
+      link: `https://meet.jit.si/${salaNome}`,
+      sala_nome: salaNome,
+      base_nome: user?.base || "ContabHub",
+      carga_horaria: "2h",
+      icone: "🔴"
+    };
+
+    const listaAtualizada = [novaReuniao, ...agendaAulas];
+    await salvarAgendaLS(listaAtualizada, novaReuniao);
+    setModalChamadaInstantaneaOpen(false);
+    handleEntrarVideoChamada(novaReuniao);
+  };
+
+  // Entrar na Sala de VídeoChamada (com Check-in automático)
+  const handleEntrarVideoChamada = async (aula) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    try {
+      await fetch(`${apiUrl}/reunioes/checkin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reuniao_id: aula.id,
+          user_id: user?.id || user?.uid || "user-1",
+          user_nome: user?.nome || user?.name || "Aluno DevHub",
+          user_email: user?.email || "aluno@devhub.com",
+          base_nome: user?.base || aula.base_nome || "ContabHub",
+          tipo_presenca: "🟢 Presente ao Vivo"
+        })
+      });
+    } catch (err) {
+      console.error("Erro ao registrar presença ao vivo:", err);
+    }
+
+    if (aula.link && (aula.link.includes("zoom.us") || aula.link.includes("meet.google") || aula.link.includes("youtube.com"))) {
+      window.open(aula.link, "_blank");
+    } else {
+      setReuniaoAtivaVideo(aula);
+    }
+  };
+
+  // Ver Relatório de Presenças da Aula
+  const handleVerPresencas = async (aula) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    setModalPresencasAula(aula);
+    setCarregandoPresencas(true);
+    try {
+      const res = await fetch(`${apiUrl}/reunioes/presencas/${aula.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setListaPresencasAula(data);
+      } else {
+        setListaPresencasAula([]);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar relatório de presenças:", err);
+      setListaPresencasAula([]);
+    } finally {
+      setCarregandoPresencas(false);
+    }
+  };
+
+  // Abrir Modal de Reprise (Assistir Gravação + Check-in)
+  const handleAbrirReprise = async (aula) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    setRepriseAulaModal(aula);
+    try {
+      await fetch(`${apiUrl}/reunioes/checkin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reuniao_id: aula.id,
+          user_id: user?.id || user?.uid || "user-1",
+          user_nome: user?.nome || user?.name || "Aluno DevHub",
+          user_email: user?.email || "aluno@devhub.com",
+          base_nome: user?.base || aula.base_nome || "ContabHub",
+          tipo_presenca: "📹 Assistiu Reprise"
+        })
+      });
+    } catch (err) {
+      console.error("Erro ao registrar presença na reprise:", err);
+    }
+  };
+
+
   // Lista de Administradores cadastrados (Dropdown)
   const [listaAdmins, setListaAdmins] = useState([
     "Enzo Vieira (DevHub Master)",
@@ -151,6 +402,9 @@ export default function Dashboard() {
   // Estados de PDF
   const [pdfUploadData, setPdfUploadData] = useState(null);   // base64 do PDF
   const [pdfUploadNome, setPdfUploadNome] = useState("");     // nome do arquivo
+  const [pdfVisualizarModal, setPdfVisualizarModal] = useState(null); // { id, titulo, pdfData, pdfNome }
+  const [pdfModoResposta, setPdfModoResposta] = useState(false);
+  const [pdfTextoResposta, setPdfTextoResposta] = useState("");
 
   // ===== GERADOR DE PROVAS DIÁRIAS (2 PROVAS POR DIA + ROTAÇÃO SEMANAL) =====
   const obterProvasDiarias = () => {
@@ -741,6 +995,22 @@ export default function Dashboard() {
       return novaLista;
     });
 
+    // Atualizar Streak (Manter o fogo aceso!)
+    try {
+      const hojeStr = new Date().toLocaleDateString("pt-BR");
+      let diasAtuais = 1;
+      const rawStreak = localStorage.getItem("devhub_streak_info");
+      if (rawStreak) {
+        const info = JSON.parse(rawStreak);
+        if (info.ultimaData !== hojeStr) {
+          diasAtuais = (info.dias || 0) + 1;
+        } else {
+          diasAtuais = info.dias || 1;
+        }
+      }
+      localStorage.setItem("devhub_streak_info", JSON.stringify({ dias: diasAtuais, ultimaData: hojeStr }));
+    } catch (e) {}
+
     setModalProvaConcluida({
       titulo: provaEmAndamento.titulo,
       nota: notaCalculada,
@@ -752,6 +1022,7 @@ export default function Dashboard() {
     if (typeof window !== 'undefined') {
       window.__provaEmAndamento = false;
       window.dispatchEvent(new Event("devhub_estudo_realizado"));
+      window.dispatchEvent(new Event("devhub_gamificacao_update"));
     }
   };
 
@@ -929,6 +1200,10 @@ export default function Dashboard() {
   const [formStatus, setFormStatus] = useState("Agendada 📅");
   const [formLink, setFormLink] = useState("");
   const [formIcone, setFormIcone] = useState("📅");
+  const [formBaseNome, setFormBaseNome] = useState("Todas as Bases");
+  const [formCargaHoraria, setFormCargaHoraria] = useState("2h");
+  const [formLinkGravacao, setFormLinkGravacao] = useState("");
+  const [formPlataforma, setFormPlataforma] = useState("nativa");
 
   // Conversores para a Mini Agendinha (Seletor de Data input type="date")
   const toIsoDate = (dataStr) => {
@@ -960,6 +1235,7 @@ export default function Dashboard() {
       const userData = localStorage.getItem("userData");
 
       if (!token || !userData) {
+        setLoading(false);
         router.push("/");
         return;
       }
@@ -989,7 +1265,7 @@ export default function Dashboard() {
               }
 
               // 2. Estudantes Cadastrados no Banco para Frequência e Relatório de Notas (por ID)
-              const estudantesDoBanco = data.filter((u) => u.cargo === "usuario" || u.cargo === "estudante" || !u.cargo.includes("admin"));
+              const estudantesDoBanco = data.filter((u) => u.cargo === "usuario" || u.cargo === "estudante" || !(u.cargo && String(u.cargo).toLowerCase().includes("admin")));
 
               // Sincronizar Frequência nas Aulas/Provas
               setRelatorioAlunos(prevAlunos => {
@@ -1086,10 +1362,12 @@ export default function Dashboard() {
             }
           });
       } catch (err) {
-        router.push("/");
-      } finally {
         setLoading(false);
+        router.push("/");
+        return;
       }
+      // Libera loading imediatamente após parsear usuário (fetches secundários são em paralelo)
+      setLoading(false);
     }
   }, [router]);
 
@@ -1106,25 +1384,26 @@ export default function Dashboard() {
     router.push("/");
   };
 
-  const isSuperAdmin = user && (user.cargo === "super_admin" || user.cargo === "superadmin");
-  const isAdmin = user && (user.cargo === "admin" || user.cargo === "super_admin" || user.cargo === "superadmin");
+  const userCargoLower = (user?.cargo || "").toLowerCase();
+  const isSuperAdmin = Boolean(user && (userCargoLower === "super_admin" || userCargoLower === "superadmin" || user.is_super_admin || (user.email && user.email.toLowerCase().includes("superadmin"))));
+  const isAdmin = Boolean(user && (isSuperAdmin || userCargoLower === "admin" || user.is_admin));
 
   // Helper para rótulo do cargo
   const getCargoInfo = (role) => {
-    switch (role) {
-      case "super_admin":
-        return { label: "Super Admin 👑", desc: "Gestão do Sistema", bg: "rgba(168, 85, 247, 0.2)", color: "#c084fc", border: "#a855f7" };
-      case "admin":
-        return { label: "Administrador 🛡️", desc: "Gerenciamento de Aulas & Relatórios", bg: "rgba(59, 130, 246, 0.2)", color: "#60a5fa", border: "#3b82f6" };
-      default:
-        return { label: "Estudante 👤", desc: "Acesso às Aulas", bg: "rgba(16, 185, 129, 0.2)", color: "#34d399", border: "#10b981" };
+    const roleLower = (role || "").toLowerCase();
+    if (roleLower === "super_admin" || roleLower === "superadmin") {
+      return { label: "Super Admin 👑", desc: "Gestão do Sistema", bg: "rgba(168, 85, 247, 0.2)", color: "#c084fc", border: "#a855f7" };
+    } else if (roleLower === "admin") {
+      return { label: "Administrador 🛡️", desc: "Gerenciamento de Aulas & Relatórios", bg: "rgba(59, 130, 246, 0.2)", color: "#60a5fa", border: "#3b82f6" };
+    } else {
+      return { label: "Estudante 👤", desc: "Acesso às Aulas", bg: "rgba(16, 185, 129, 0.2)", color: "#34d399", border: "#10b981" };
     }
   };
 
   // Verifica se o módulo está liberado para o aluno logado
   const isModuloLiberado = (abaId) => {
     if (!user) return true;
-    if (abaId === "super_admin") return user.cargo === "superadmin" || user.cargo === "super_admin" || user.cargo === "admin";
+    if (abaId === "super_admin") return isSuperAdmin;
 
     const mapaModulo = {
       aulas: "Aulas",
@@ -1199,7 +1478,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (abaAtiva && !isModuloLiberado(abaAtiva)) {
+    if (abaAtiva && abaAtiva !== "aulas" && !isModuloLiberado(abaAtiva)) {
       setAbaAtiva("aulas");
     }
   }, [abaAtiva, user]);
@@ -1222,6 +1501,10 @@ export default function Dashboard() {
     setFormStatus("Agendada 📅");
     setFormLink("");
     setFormIcone("📅");
+    setFormBaseNome(user?.base || "Todas as Bases");
+    setFormCargaHoraria("2h");
+    setFormLinkGravacao("");
+    setFormPlataforma("nativa");
     setModalAgendaOpen(true);
   };
 
@@ -1230,12 +1513,20 @@ export default function Dashboard() {
     setAulaEmEdicaoId(aula.id);
     setFormTitulo(aula.titulo);
     setFormDescricao(aula.descricao);
-    setFormData(aula.data);
+    setFormData(aula.data || aula.data_reuniao);
     setFormHorario(aula.horario);
     setFormInstrutor(aula.instrutor);
     setFormStatus(aula.status);
     setFormLink(aula.link);
     setFormIcone(aula.icone);
+    setFormBaseNome(aula.base_nome || "Todas as Bases");
+    setFormCargaHoraria(aula.carga_horaria || "2h");
+    setFormLinkGravacao(aula.link_gravacao || "");
+    const linkStr = aula.link || "";
+    if (linkStr.includes("zoom.us")) setFormPlataforma("zoom");
+    else if (linkStr.includes("meet.google")) setFormPlataforma("meet");
+    else if (linkStr.includes("youtube")) setFormPlataforma("youtube");
+    else setFormPlataforma("nativa");
     setModalAgendaOpen(true);
   };
 
@@ -1251,6 +1542,15 @@ export default function Dashboard() {
     if (formStatus.includes("Ao Vivo")) statusCor = "#EF4444";
     if (formStatus.includes("Concluída")) statusCor = "#10B981";
 
+    const salaNome = aulaEmEdicaoId 
+      ? (agendaAulas.find(a => a.id === aulaEmEdicaoId)?.sala_nome || `devhub-aula-${aulaEmEdicaoId}`)
+      : `devhub-aula-${Date.now()}`;
+
+    let finalLink = formLink;
+    if (formPlataforma === "nativa" || !formLink) {
+      finalLink = `https://meet.jit.si/${salaNome}`;
+    }
+
     const reuniao = {
       titulo: formTitulo,
       descricao: formDescricao,
@@ -1263,7 +1563,11 @@ export default function Dashboard() {
       status: formStatus,
       status_cor: statusCor,
       statusCor,
-      link: formLink,
+      link: finalLink,
+      sala_nome: salaNome,
+      link_gravacao: formLinkGravacao,
+      base_nome: formBaseNome || "Todas as Bases",
+      carga_horaria: formCargaHoraria || "2h",
       icone: formIcone
     };
 
@@ -1413,10 +1717,11 @@ export default function Dashboard() {
   // Verificação de permissões do usuário logado (declarado acima)
 
   const relatorioAlunosFiltrados = relatorioAlunos.filter((aluno) => {
-    const isEstudante = aluno.cargo === "Estudante 👤" || !aluno.cargo.includes("Admin");
-    const pertenceAoUsuario = !user || isAdmin || (user && (aluno.id === user.id || (aluno.email && aluno.email.toLowerCase() === user.email.toLowerCase())));
-    const atendeBusca = aluno.nome.toLowerCase().includes(buscaAluno.toLowerCase()) ||
-                        aluno.email.toLowerCase().includes(buscaAluno.toLowerCase());
+    const cargoStr = String(aluno.cargo || "");
+    const isEstudante = cargoStr.includes("Estudante") || !cargoStr.toLowerCase().includes("admin");
+    const pertenceAoUsuario = !user || isAdmin || (user && (aluno.id === user.id || (aluno.email && user.email && aluno.email.toLowerCase() === user.email.toLowerCase())));
+    const atendeBusca = (aluno.nome || "").toLowerCase().includes((buscaAluno || "").toLowerCase()) ||
+                        (aluno.email || "").toLowerCase().includes((buscaAluno || "").toLowerCase());
     const atendeFiltro = filtroFrequencia === "todos" || 
                          (filtroFrequencia === "100" && aluno.frequenciaPct === 100) ||
                          (filtroFrequencia === "parcial" && aluno.frequenciaPct < 100);
@@ -1517,89 +1822,413 @@ export default function Dashboard() {
     );
   }
 
+  const isUserAdmin = isAdmin || isSuperAdmin || (user && (user.role === "admin" || user.role === "superadmin" || user.is_admin || user.is_superadmin || (user.email && user.email.toLowerCase().includes("superadmin"))));
+
+  if (manutencaoState.ativo && !isUserAdmin) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#0B0F19",
+        color: "#F8FAFC",
+        padding: "20px",
+        textAlign: "center",
+        fontFamily: "'Inter', system-ui, sans-serif"
+      }}>
+        <Head>
+          <title>Em Manutenção | DevHub</title>
+        </Head>
+        <div style={{
+          maxWidth: "550px",
+          width: "100%",
+          padding: "40px 32px",
+          borderRadius: "24px",
+          background: "linear-gradient(145deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.98))",
+          border: "1px solid rgba(239, 68, 68, 0.4)",
+          boxShadow: "0 20px 50px rgba(239, 68, 68, 0.2)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center"
+        }}>
+          <div style={{
+            width: "80px",
+            height: "80px",
+            borderRadius: "50%",
+            backgroundColor: "rgba(239, 68, 68, 0.15)",
+            border: "2px solid #ef4444",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "36px",
+            marginBottom: "24px"
+          }}>
+            🛠️
+          </div>
+
+          <h1 style={{ fontSize: "26px", fontWeight: "800", marginBottom: "12px", color: "#F8FAFC", letterSpacing: "-0.5px" }}>
+            DevHub em Manutenção
+          </h1>
+
+          <p style={{ fontSize: "15px", color: "#94A3B8", lineHeight: "1.6", marginBottom: "28px" }}>
+            {manutencaoState.mensagem || "Estamos realizando atualizações técnicas e melhorias na plataforma para você. Voltaremos em breve!"}
+          </p>
+
+          <div style={{
+            width: "100%",
+            padding: "16px",
+            borderRadius: "12px",
+            backgroundColor: "rgba(239, 68, 68, 0.08)",
+            border: "1px dashed rgba(239, 68, 68, 0.3)",
+            marginBottom: "32px",
+            fontSize: "13px",
+            color: "#fca5a5"
+          }}>
+            🔒 Acesso restrito temporariamente a administradores do sistema.
+          </div>
+
+          <div style={{ display: "flex", gap: "12px", width: "100%", justifyContent: "center" }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: "12px 24px",
+                borderRadius: "12px",
+                backgroundColor: "#ef4444",
+                color: "#ffffff",
+                border: "none",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+            >
+              🔄 Tentar Novamente
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: "12px 24px",
+                borderRadius: "12px",
+                backgroundColor: "rgba(255, 255, 255, 0.08)",
+                color: "#94A3B8",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer"
+              }}
+            >
+              🚪 Sair da Conta
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Head>
         <title>DevHub — Central de Estudos & Calendário</title>
       </Head>
 
-      <div style={{
-        minHeight: "100vh",
-        backgroundColor: colors.bgPage,
+      <div className="appBackgroundWrapper" style={{
+        minHeight: abaAtiva === "inicio" ? "auto" : "100vh",
+        backgroundColor: isDark ? "#050508" : colors.bgPage,
         color: colors.textPrimary,
         fontFamily: "system-ui, -apple-system, sans-serif",
-        transition: "all 0.3s ease"
+        transition: "all 0.3s ease",
+        position: "relative"
       }}>
         
+        {/* Banner de Super Admin Impersonate (Navegando na Base de um Aluno) */}
+        {typeof window !== "undefined" && Boolean(localStorage.getItem("superAdminReturnUser")) && (
+          <>
+            {/* Ambient Viewport Border glow */}
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              border: "2px solid rgba(245, 158, 11, 0.35)",
+              boxShadow: "inset 0 0 40px rgba(245, 158, 11, 0.12)",
+              pointerEvents: "none", zIndex: 99999
+            }} />
+
+            {/* Glowing Super Admin Banner */}
+            <div style={{
+              background: "linear-gradient(135deg, #0B0F19 0%, #17153B 35%, #2E1065 70%, #78350F 100%)",
+              color: "#FFF",
+              padding: "10px 24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontWeight: "700",
+              fontSize: "13.5px",
+              borderBottom: "1.5px solid rgba(245, 158, 11, 0.7)",
+              boxShadow: "0 8px 30px rgba(245, 158, 11, 0.35), 0 4px 15px rgba(0,0,0,0.8)",
+              position: "relative",
+              zIndex: 102,
+              backdropFilter: "blur(12px)",
+              flexWrap: "wrap",
+              gap: "10px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{
+                  width: "34px", height: "34px", borderRadius: "10px",
+                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "18px", boxShadow: "0 0 15px rgba(245, 158, 11, 0.7)",
+                  flexShrink: 0
+                }}>
+                  👑
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <span style={{
+                    background: "rgba(245, 158, 11, 0.18)",
+                    color: "#FBBF24",
+                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                    padding: "3px 10px",
+                    borderRadius: "8px",
+                    fontSize: "0.75rem",
+                    fontWeight: "900",
+                    letterSpacing: "0.5px"
+                  }}>
+                    MODO DE INSPEÇÃO SUPER ADMIN
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.9)", fontSize: "0.88rem" }}>
+                    Você está navegando na conta de: <strong style={{ color: "#FFF", textDecoration: "underline", textUnderlineOffset: "3px" }}>{user?.nome}</strong> <span style={{ color: "#FBBF24", opacity: 0.9 }}>({user?.email})</span>
+                  </span>
+                  <span style={{
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    color: "#E2E8F0",
+                    padding: "2px 8px",
+                    borderRadius: "6px",
+                    fontSize: "0.72rem",
+                    fontWeight: "800"
+                  }}>
+                    Base: {user?.base || user?.base_nome || "DevHub"}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    const returnUser = localStorage.getItem("superAdminReturnUser");
+                    const returnToken = localStorage.getItem("superAdminReturnToken");
+                    if (returnUser) localStorage.setItem("userData", returnUser);
+                    if (returnToken) localStorage.setItem("token", returnToken);
+                    localStorage.removeItem("superAdminReturnUser");
+                    localStorage.removeItem("superAdminReturnToken");
+                    window.location.href = "/super-admin";
+                  }
+                }}
+                style={{
+                  background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                  color: "#0F172A",
+                  border: "none",
+                  borderRadius: "10px",
+                  padding: "8px 18px",
+                  fontWeight: "900",
+                  fontSize: "0.82rem",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  transition: "all 0.2s ease"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px) scale(1.02)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(245, 158, 11, 0.6)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = "0 4px 14px rgba(245, 158, 11, 0.4)";
+                }}
+              >
+                <span>↩️ Sair e Voltar ao Painel Super Admin</span>
+              </button>
+            </div>
+
+            {/* Floating Live Badge at bottom right */}
+            <div style={{
+              position: "fixed", bottom: "18px", right: "24px", zIndex: 99998,
+              display: "flex", alignItems: "center", gap: "10px",
+              background: "rgba(15, 23, 42, 0.94)",
+              border: "1px solid rgba(245, 158, 11, 0.5)",
+              borderRadius: "30px", padding: "8px 18px",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(245, 158, 11, 0.25)",
+              backdropFilter: "blur(14px)",
+              pointerEvents: "none"
+            }}>
+              <span style={{
+                width: "9px", height: "9px", borderRadius: "50%",
+                background: "#10B981", boxShadow: "0 0 10px #10B981"
+              }} />
+              <span style={{ fontSize: "0.78rem", fontWeight: "800", color: "#FBBF24" }}>
+                👑 Inspeção Super Admin: Visão de {user?.nome || "Aluno"}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Banner de Aviso de Manutenção para Admins */}
+        {manutencaoState.ativo && isUserAdmin && (
+          <div style={{
+            backgroundColor: "#ef4444",
+            color: "#ffffff",
+            padding: "10px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontWeight: "600",
+            fontSize: "14px",
+            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.4)",
+            position: "relative",
+            zIndex: 101
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span>🚨 MODO DE MANUTENÇÃO ATIVO — Alunos estão bloqueados com a mensagem cadastrada. Você possui acesso VIP.</span>
+            </div>
+            <button
+              onClick={() => {
+                const novo = { ativo: false, mensagem: "" };
+                setManutencaoState(novo);
+                localStorage.setItem("devhub_manutencao", JSON.stringify(novo));
+                window.dispatchEvent(new Event("devhub_manutencao_update"));
+              }}
+              style={{
+                backgroundColor: "#ffffff",
+                color: "#ef4444",
+                border: "none",
+                padding: "6px 14px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: "800",
+                cursor: "pointer"
+              }}
+            >
+              ✅ Desativar Manutenção Agora
+            </button>
+          </div>
+        )}
+
         {/* Top Header Navbar */}
         <header style={{
           position: "sticky",
           top: 0,
           zIndex: 100,
-          backgroundColor: isDark ? "rgba(11, 15, 25, 0.9)" : "rgba(255, 255, 255, 0.9)",
-          backdropFilter: "blur(12px)",
+          backgroundColor: isDark ? "rgba(11, 15, 25, 0.97)" : "rgba(255, 255, 255, 0.97)",
           borderBottom: `1px solid ${colors.borderCard}`,
-          padding: "16px 28px"
+          padding: "14px 24px"
         }}>
-          <div style={{ maxWidth: "1350px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ maxWidth: "100%", width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             
-            <DevHubLogo size="normal" />
+            <div onClick={() => setAbaAtiva("inicio")} style={{ cursor: "pointer" }} title="Voltar ao Início">
+              <DevHubLogo size="normal" />
+            </div>
 
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              {abaAtiva !== "inicio" && (
+                <button
+                  onClick={() => setAbaAtiva("inicio")}
+                  title="Voltar à Tela Principal (Hub de Aprendizado)"
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(139, 92, 246, 0.4)",
+                    background: "linear-gradient(135deg, rgba(124, 58, 237, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)",
+                    color: "#FFFFFF",
+                    fontWeight: "800",
+                    fontSize: "0.82rem",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    boxShadow: "0 4px 14px rgba(124, 58, 237, 0.3)",
+                    transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 6px 18px rgba(124, 58, 237, 0.45)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "none";
+                    e.currentTarget.style.boxShadow = "0 4px 14px rgba(124, 58, 237, 0.3)";
+                  }}
+                >
+                  <Home size={15} color="#A855F7" />
+                  <span>Voltar ao Hub</span>
+                </button>
+              )}
               {isSuperAdmin && (
                 <button
                   onClick={() => router.push("/super-admin")}
                   style={{
                     padding: "8px 16px",
                     borderRadius: "12px",
-                    background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
-                    color: "#FFFFFF",
                     border: "none",
+                    background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
+                    color: "#FFFFFF",
+                    fontWeight: "800",
+                    fontSize: "0.82rem",
                     cursor: "pointer",
-                    fontSize: "13px",
-                    fontWeight: "700",
                     display: "flex",
                     alignItems: "center",
                     gap: "6px",
-                    boxShadow: "0 4px 14px rgba(168, 85, 247, 0.35)"
+                    boxShadow: "0 4px 14px rgba(239, 68, 68, 0.4)",
+                    transition: "all 0.2s ease"
                   }}
                 >
-                  <Crown size={15} /> Super Admin
+                  <Shield size={14} />
+                  <span>Painel Super Admin</span>
                 </button>
               )}
 
-              {/* Botão de Notificações com Sininho */}
+              {/* Botão de Notificações com Badge */}
               <button
                 onClick={() => setModalNotificacoesOpen(true)}
-                title="Central de Notificações"
                 style={{
                   position: "relative",
-                  background: isDark ? "rgba(255, 255, 255, 0.06)" : "#F1F5F9",
-                  border: `1px solid ${colors.borderCard}`,
-                  color: colors.textPrimary,
+                  width: "40px",
+                  height: "40px",
                   borderRadius: "12px",
-                  padding: "8px 12px",
+                  border: `1px solid ${colors.borderCard}`,
+                  backgroundColor: isDark ? "rgba(255, 255, 255, 0.05)" : "#F1F5F9",
+                  color: colors.textPrimary,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
                 }}
+                title="Central de Notificações"
               >
-                <Bell size={18} color="#38bdf8" />
+                <Bell size={18} />
                 {unreadNotificacoesCount > 0 && (
                   <span style={{
-                    position: "absolute", top: "-4px", right: "-4px",
-                    width: "16px", height: "16px", borderRadius: "50%",
-                    background: "#ef4444", color: "#fff", fontSize: "10px",
-                    fontWeight: "800", display: "flex", alignItems: "center",
-                    justifyContent: "center"
+                    position: "absolute",
+                    top: "-4px",
+                    right: "-4px",
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    backgroundColor: "#EF4444",
+                    color: "#FFFFFF",
+                    fontSize: "10px",
+                    fontWeight: "900",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.5)"
                   }}>
-                    {unreadNotificacoesCount}
+                    {unreadNotificacoesCount > 9 ? "9+" : unreadNotificacoesCount}
                   </span>
                 )}
               </button>
 
-              {/* Botão Principal do Usuário (Dropdown) */}
+              {/* Menu Dropdown do Usuário Logado */}
               <div style={{ position: "relative" }}>
                 <button
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
@@ -1609,132 +2238,113 @@ export default function Dashboard() {
                     gap: "10px",
                     padding: "6px 12px 6px 6px",
                     borderRadius: "14px",
-                    backgroundColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#F1F5F9",
-                    border: `1px solid ${userDropdownOpen ? "#3B82F6" : colors.borderCard}`,
+                    border: `1px solid ${colors.borderCard}`,
+                    backgroundColor: isDark ? "rgba(255, 255, 255, 0.05)" : "#F1F5F9",
                     color: colors.textPrimary,
                     cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    boxShadow: userDropdownOpen ? "0 0 0 3px rgba(59, 130, 246, 0.2)" : "none"
+                    transition: "all 0.2s ease"
                   }}
                 >
-                  {/* Avatar com Indicador Online */}
-                  <div style={{ position: "relative" }}>
-                    <div style={{
-                      width: "36px", height: "36px", borderRadius: "50%",
-                      background: "linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "#FFF", fontWeight: "700", fontSize: "14px",
-                      overflow: "hidden"
-                    }}>
-                      {(user?.avatar_url || user?.avatar) ? (
-                        <img
-                          src={user.avatar_url || user.avatar}
-                          alt="Foto"
-                          style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
-                        />
-                      ) : (
-                        user?.nome ? user.nome.charAt(0).toUpperCase() : "U"
-                      )}
-                    </div>
-                    {/* Status Online */}
-                    <span style={{
-                      width: "10px", height: "10px",
-                      borderRadius: "50%",
-                      backgroundColor: "#10B981",
-                      border: `2px solid ${isDark ? "#0B0F19" : "#FFF"}`,
-                      position: "absolute",
-                      bottom: "0", right: "0"
-                    }} />
+                  <div style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "10px",
+                    background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#FFFFFF",
+                    fontWeight: "900",
+                    fontSize: "14px"
+                  }}>
+                    {(user?.avatar_url || user?.avatar) ? (
+                      <img src={user.avatar_url || user.avatar} alt="Foto" style={{ width: "100%", height: "100%", borderRadius: "10px", objectFit: "cover" }} />
+                    ) : (
+                      user?.nome ? user.nome.charAt(0).toUpperCase() : "U"
+                    )}
                   </div>
-
-                  <div style={{ textAlign: "left", paddingRight: "4px" }}>
-                    <div style={{ fontSize: "13px", fontWeight: "700", lineHeight: "1.1", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", maxWidth: "120px" }}>
-                      {user ? user.nome.split(" ")[0] : "Usuário"}
+                  <div style={{ textAlign: "left" }}>
+                    <div style={{ fontSize: "0.85rem", fontWeight: "800", lineHeight: "1.1" }}>
+                      {user?.nome ? user.nome.split(" ")[0] : "Usuário"}
                     </div>
-                    <div style={{ fontSize: "10.5px", color: cargoInfo.color, fontWeight: "600", marginTop: "2px" }}>
-                      {cargoInfo.label.split(" ")[0]}
+                    <div style={{ fontSize: "0.72rem", color: colors.textSecondary }}>
+                      {isAdmin ? (isSuperAdmin ? "Super Admin 👑" : "Admin 🛡️") : "Estudante 👤"}
                     </div>
                   </div>
-
-                  <ChevronDown
-                    size={16}
-                    style={{
-                      transform: userDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                      color: colors.textSecondary
-                    }}
-                  />
+                  <ChevronDown size={14} style={{ transform: userDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }} />
                 </button>
 
-                {/* ===== MENU DROPDOWN ===== */}
+                {/* Dropdown Menu */}
                 {userDropdownOpen && (
                   <>
-                    {/* Overlay invisível para fechar ao clicar fora */}
                     <div
                       onClick={() => setUserDropdownOpen(false)}
-                      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }}
+                      style={{ position: "fixed", inset: 0, zIndex: 998 }}
                     />
-
                     <div style={{
                       position: "absolute",
-                      top: "calc(100% + 10px)",
+                      top: "calc(100% + 8px)",
                       right: 0,
-                      width: "260px",
-                      backgroundColor: isDark ? "#111827" : "#FFFFFF",
-                      border: `1px solid ${colors.borderCard}`,
+                      width: "240px",
                       borderRadius: "18px",
-                      boxShadow: isDark ? "0 20px 40px rgba(0, 0, 0, 0.6)" : "0 12px 30px rgba(0, 0, 0, 0.12)",
-                      padding: "12px",
-                      zIndex: 999,
-                      backdropFilter: "blur(16px)"
+                      backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                      border: `1px solid ${colors.borderCard}`,
+                      boxShadow: isDark ? "0 16px 40px rgba(0,0,0,0.8)" : "0 10px 30px rgba(0,0,0,0.15)",
+                      padding: "8px",
+                      zIndex: 999
                     }}>
-                      {/* Header do Menu */}
-                      <div style={{
-                        padding: "10px 12px",
-                        borderBottom: `1px solid ${colors.borderCard}`,
-                        marginBottom: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px"
-                      }}>
-                        <div style={{
-                          width: "42px", height: "42px", borderRadius: "50%",
-                          background: "linear-gradient(135deg, #3b82f6 0%, #a855f7 100%)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          color: "#FFF", fontWeight: "800", fontSize: "16px"
-                        }}>
-                          {(user?.avatar_url || user?.avatar) ? (
-                            <img src={user.avatar_url || user.avatar} alt="Foto" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
-                          ) : (
-                            user?.nome ? user.nome.charAt(0).toUpperCase() : "U"
-                          )}
+                      <div style={{ padding: "10px 12px", borderBottom: `1px solid ${colors.borderCard}`, marginBottom: "6px" }}>
+                        <div style={{ fontSize: "0.88rem", fontWeight: "800", color: colors.textPrimary }}>
+                          {user?.nome || "Usuário DevHub"}
                         </div>
-                        <div style={{ overflow: "hidden" }}>
-                          <div style={{ fontSize: "14px", fontWeight: "800", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                            {user ? user.nome : "Estudante DevHub"}
-                          </div>
-                          <div style={{ fontSize: "11px", color: colors.textSecondary, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                            {user ? user.email : "aluno@devhub.com"}
-                          </div>
-                          <span style={{
-                            display: "inline-block",
-                            fontSize: "10px",
-                            fontWeight: "800",
-                            padding: "2px 8px",
-                            borderRadius: "6px",
-                            backgroundColor: cargoInfo.bg,
-                            color: cargoInfo.color,
-                            border: `1px solid ${cargoInfo.border}44`,
-                            marginTop: "4px"
-                          }}>
-                            {cargoInfo.label}
-                          </span>
+                        <div style={{ fontSize: "0.75rem", color: colors.textSecondary, marginTop: "2px" }}>
+                          {user?.email || "aluno@devhub.com"}
                         </div>
                       </div>
 
-                      {/* Opções do Menu */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                        
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        {/* Voltar ao Hub / Tela Principal */}
+                        <button
+                          onClick={() => {
+                            setAbaAtiva("inicio");
+                            setUserDropdownOpen(false);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            width: "100%",
+                            padding: "10px 14px",
+                            borderRadius: "12px",
+                            border: "1px solid rgba(139, 92, 246, 0.3)",
+                            backgroundColor: "rgba(139, 92, 246, 0.12)",
+                            color: colors.textPrimary,
+                            fontSize: "13.5px",
+                            fontWeight: "800",
+                            cursor: "pointer",
+                            marginBottom: "4px",
+                            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(139, 92, 246, 0.25)";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(139, 92, 246, 0.12)";
+                            e.currentTarget.style.transform = "none";
+                          }}
+                        >
+                          <div style={{
+                            width: "30px", height: "30px", borderRadius: "9px",
+                            backgroundColor: "rgba(139, 92, 246, 0.25)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "#A855F7", flexShrink: 0
+                          }}>
+                            <Home size={16} />
+                          </div>
+                          <span>Voltar à Tela Principal</span>
+                        </button>
+
                         {/* Editar Perfil */}
                         <button
                           onClick={() => {
@@ -1744,93 +2354,79 @@ export default function Dashboard() {
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "10px",
+                            gap: "12px",
                             width: "100%",
-                            padding: "9px 12px",
-                            borderRadius: "10px",
+                            padding: "10px 14px",
+                            borderRadius: "12px",
                             border: "none",
                             backgroundColor: "transparent",
                             color: colors.textPrimary,
-                            fontSize: "13px",
-                            fontWeight: "600",
+                            fontSize: "13.5px",
+                            fontWeight: "700",
                             cursor: "pointer",
-                            transition: "background 0.2s ease"
+                            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDark ? "rgba(99, 102, 241, 0.14)" : "rgba(99, 102, 241, 0.08)";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.transform = "none";
+                          }}
                         >
-                          <User size={16} style={{ color: "#3B82F6" }} />
-                          <span>Meu Perfil & Conta</span>
+                          <div style={{
+                            width: "30px", height: "30px", borderRadius: "9px",
+                            backgroundColor: "rgba(99, 102, 241, 0.15)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "#6366F1", flexShrink: 0
+                          }}>
+                            <User size={16} />
+                          </div>
+                          <span>Editar Perfil</span>
                         </button>
 
-                        {/* Alternar Tema */}
+                        {/* Modo Escuro / Claro Toggle */}
                         <button
                           onClick={() => {
-                            toggleTheme();
+                            toggleTheme && toggleTheme();
                           }}
                           style={{
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
                             width: "100%",
-                            padding: "9px 12px",
-                            borderRadius: "10px",
+                            padding: "10px 14px",
+                            borderRadius: "12px",
                             border: "none",
                             backgroundColor: "transparent",
                             color: colors.textPrimary,
-                            fontSize: "13px",
-                            fontWeight: "600",
-                            cursor: "pointer",
-                            transition: "background 0.2s ease"
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            {isDark ? <Sun size={16} style={{ color: "#F59E0B" }} /> : <Moon size={16} style={{ color: "#6366F1" }} />}
-                            <span>Tema {isDark ? "Escuro" : "Claro"}</span>
-                          </div>
-                          <span style={{
-                            fontSize: "10px",
+                            fontSize: "13.5px",
                             fontWeight: "700",
-                            padding: "2px 6px",
-                            borderRadius: "6px",
-                            backgroundColor: isDark ? "rgba(245, 158, 11, 0.15)" : "rgba(99, 102, 241, 0.15)",
-                            color: isDark ? "#F59E0B" : "#6366F1"
-                          }}>
-                            {isDark ? "🌙 Dark" : "☀️ Light"}
-                          </span>
-                        </button>
-
-                        {/* Ir para Assistente IA */}
-                        <button
-                          onClick={() => {
-                            setAbaAtiva("dev_ia");
-                            setUserDropdownOpen(false);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                            width: "100%",
-                            padding: "9px 12px",
-                            borderRadius: "10px",
-                            border: "none",
-                            backgroundColor: "transparent",
-                            color: colors.textPrimary,
-                            fontSize: "13px",
-                            fontWeight: "600",
                             cursor: "pointer",
-                            transition: "background 0.2s ease"
+                            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDark ? "rgba(245, 158, 11, 0.14)" : "rgba(245, 158, 11, 0.08)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }}
                         >
-                          <Sparkles size={16} style={{ color: "#8B5CF6" }} />
-                          <span>Dev IA Tutor ⚡</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{
+                              width: "30px", height: "30px", borderRadius: "9px",
+                              backgroundColor: "rgba(245, 158, 11, 0.15)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: "#F59E0B", flexShrink: 0
+                            }}>
+                              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                            </div>
+                            <span>{isDark ? "Modo Claro" : "Modo Escuro"}</span>
+                          </div>
                         </button>
 
-                        {/* Ir para Arena Batalhas */}
+                        {/* Arena Batalha 1v1 */}
                         <button
                           onClick={() => {
                             setAbaAtiva("games");
@@ -1839,78 +2435,102 @@ export default function Dashboard() {
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "10px",
+                            gap: "12px",
                             width: "100%",
-                            padding: "9px 12px",
-                            borderRadius: "10px",
+                            padding: "10px 14px",
+                            borderRadius: "12px",
                             border: "none",
                             backgroundColor: "transparent",
                             color: colors.textPrimary,
-                            fontSize: "13px",
-                            fontWeight: "600",
+                            fontSize: "13.5px",
+                            fontWeight: "700",
                             cursor: "pointer",
-                            transition: "background 0.2s ease"
+                            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDark ? "rgba(239, 68, 68, 0.14)" : "rgba(239, 68, 68, 0.08)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }}
                         >
-                          <Swords size={16} style={{ color: "#EF4444" }} />
+                          <div style={{
+                            width: "30px", height: "30px", borderRadius: "9px",
+                            backgroundColor: "rgba(239, 68, 68, 0.15)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "#EF4444", flexShrink: 0
+                          }}>
+                            <Swords size={16} />
+                          </div>
                           <span>Arena Batalha 1v1</span>
                         </button>
 
                         {/* Tickets & Suporte */}
                         <button
                           onClick={() => {
-                            setAbaAtiva("tickets");
+                            setModalTicketsOpen(true);
                             setUserDropdownOpen(false);
                           }}
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "10px",
+                            gap: "12px",
                             width: "100%",
-                            padding: "9px 12px",
-                            borderRadius: "10px",
+                            padding: "10px 14px",
+                            borderRadius: "12px",
                             border: "none",
                             backgroundColor: "transparent",
                             color: colors.textPrimary,
-                            fontSize: "13px",
-                            fontWeight: "600",
+                            fontSize: "13.5px",
+                            fontWeight: "700",
                             cursor: "pointer",
-                            transition: "background 0.2s ease"
+                            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDark ? "rgba(56, 189, 248, 0.14)" : "rgba(56, 189, 248, 0.08)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }}
                         >
-                          <LifeBuoy size={16} style={{ color: "#3B82F6" }} />
-                          <span>Tickets & Suporte 🎟️</span>
+                          <div style={{
+                            width: "30px", height: "30px", borderRadius: "9px",
+                            backgroundColor: "rgba(56, 189, 248, 0.15)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            color: "#38BDF8", flexShrink: 0
+                          }}>
+                            <HelpCircle size={16} />
+                          </div>
+                          <span>Suporte & Tickets</span>
                         </button>
 
-                        <div style={{ height: "1px", backgroundColor: colors.borderCard, margin: "4px 0" }} />
-
-                        {/* Botão Sair */}
+                        {/* Botão de Logout */}
                         <button
-                          onClick={() => {
-                            setUserDropdownOpen(false);
-                            handleLogout();
-                          }}
+                          onClick={handleLogout}
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "10px",
+                            gap: "12px",
                             width: "100%",
-                            padding: "9px 12px",
-                            borderRadius: "10px",
+                            padding: "10px 14px",
+                            borderRadius: "12px",
                             border: "none",
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
+                            backgroundColor: "rgba(239, 68, 68, 0.12)",
                             color: "#EF4444",
-                            fontSize: "13px",
-                            fontWeight: "700",
+                            fontSize: "13.5px",
+                            fontWeight: "800",
                             cursor: "pointer",
-                            transition: "all 0.2s ease"
+                            marginTop: "6px",
+                            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)"}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)"}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.25)";
+                            e.currentTarget.style.boxShadow = "0 4px 14px rgba(239, 68, 68, 0.2)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.12)";
+                            e.currentTarget.style.boxShadow = "none";
+                          }}
                         >
                           <LogOut size={16} />
                           <span>Sair da Conta</span>
@@ -1924,32 +2544,59 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* BANNER GLOBAL DE MODO MANUTENÇÃO */}
+        {manutencaoState.ativo && (
+          <div style={{
+            background: "linear-gradient(135deg, #b91c1c, #7f1d1d)",
+            borderBottom: "2px solid #ef4444",
+            color: "#ffffff",
+            padding: "12px 24px",
+            textAlign: "center",
+            fontWeight: "800",
+            fontSize: "0.88rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+            boxShadow: "0 4px 20px rgba(239, 68, 68, 0.4)",
+            position: "relative",
+            zIndex: 90
+          }}>
+            <span style={{ fontSize: "1.2rem" }}>🔧</span>
+            <span><strong>AVISO DE MANUTENÇÃO DA PLATAFORMA:</strong> {manutencaoState.mensagem || "A plataforma está passando por atualizações no sistema. Voltamos em breve!"}</span>
+          </div>
+        )}
+
         {/* CONTÊINER PRINCIPAL: SIDEBAR + CONTEÚDO */}
         <div style={{
-          maxWidth: "1380px",
-          margin: "0 auto",
-          padding: "24px 20px",
-          display: "grid",
-          gridTemplateColumns: sidebarRecolhida ? "80px 1fr" : "270px 1fr",
+          width: "100%",
+          maxWidth: "100%",
+          margin: "0",
+          padding: (abaAtiva === "inicio" || abaAtiva === "super_admin") ? "0" : "20px 24px",
+          display: (abaAtiva === "inicio" || abaAtiva === "super_admin") ? "block" : "grid",
+          gridTemplateColumns: sidebarRecolhida ? "72px 1fr" : "260px 1fr",
           gap: "24px",
+          position: "relative",
+          zIndex: 1,
           transition: "grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
         }}>
 
-          {/* ===== SIDEBAR LATERAL NOVO LAYOUT MODERNO ===== */}
-          <aside style={{
-            backgroundColor: isDark ? "rgba(23, 28, 44, 0.95)" : "#FFFFFF",
-            border: `1px solid ${colors.borderCard}`,
-            borderRadius: "22px",
-            padding: sidebarRecolhida ? "18px 10px" : "20px 16px",
-            height: "fit-content",
-            maxHeight: "calc(100vh - 110px)",
-            overflowY: "auto",
-            position: "sticky",
-            top: "85px",
-            boxShadow: isDark ? "0 16px 36px rgba(0,0,0,0.4)" : "0 10px 30px rgba(0,0,0,0.06)",
-            backdropFilter: "blur(12px)",
-            transition: "all 0.3s ease"
-          }}>
+          {/* ===== SIDEBAR LATERAL NOVO LAYOUT MODERNO (EXIBIDA APENAS AO ENTRAR EM UM MÓDULO ALUNO) ===== */}
+          {abaAtiva !== "inicio" && abaAtiva !== "super_admin" && (
+            <aside style={{
+              backgroundColor: isDark ? "rgba(15, 23, 42, 0.75)" : "#FFFFFF",
+              border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"}`,
+              borderRadius: "22px",
+              padding: sidebarRecolhida ? "18px 10px" : "20px 16px",
+              height: "fit-content",
+              maxHeight: "calc(100vh - 110px)",
+              overflowY: "auto",
+              position: "sticky",
+              top: "85px",
+              boxShadow: isDark ? "0 16px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 10px 30px rgba(0,0,0,0.06)",
+              backdropFilter: "blur(18px)",
+              transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+            }}>
             {/* Header da Sidebar com botão de fechar/abrir */}
             <div style={{
               display: "flex",
@@ -1957,24 +2604,25 @@ export default function Dashboard() {
               justifyContent: sidebarRecolhida ? "center" : "space-between",
               marginBottom: "20px",
               paddingBottom: "12px",
-              borderBottom: `1px solid ${colors.borderCard}`
+              borderBottom: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"}`
             }}>
               {!sidebarRecolhida && (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span style={{
-                    width: "28px", height: "28px", borderRadius: "8px",
+                    width: "30px", height: "30px", borderRadius: "10px",
                     background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#FFF"
+                    color: "#FFF",
+                    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.4)"
                   }}>
                     <Layers size={16} />
                   </span>
                   <span style={{
                     fontSize: "12px",
-                    fontWeight: "800",
+                    fontWeight: "900",
                     color: colors.textPrimary,
                     textTransform: "uppercase",
-                    letterSpacing: "0.08em"
+                    letterSpacing: "0.09em"
                   }}>
                     Catálogo DevHub
                   </span>
@@ -1986,44 +2634,47 @@ export default function Dashboard() {
                 onClick={() => setSidebarRecolhida(!sidebarRecolhida)}
                 title={sidebarRecolhida ? "Expandir Catálogo" : "Recolher Catálogo"}
                 style={{
-                  background: isDark ? "rgba(255, 255, 255, 0.08)" : "#F1F5F9",
-                  border: `1px solid ${colors.borderCard}`,
-                  color: colors.textPrimary,
-                  borderRadius: "10px",
-                  width: "34px",
-                  height: "34px",
+                  background: sidebarRecolhida 
+                    ? "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)" 
+                    : (isDark ? "rgba(255, 255, 255, 0.08)" : "#F1F5F9"),
+                  border: sidebarRecolhida ? "1.5px solid #a855f7" : `1px solid ${isDark ? "rgba(255, 255, 255, 0.1)" : colors.borderCard}`,
+                  color: sidebarRecolhida ? "#FFFFFF" : colors.textPrimary,
+                  borderRadius: "12px",
+                  width: "36px",
+                  height: "36px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  transition: "all 0.2s ease"
+                  boxShadow: sidebarRecolhida ? "0 4px 16px rgba(99, 102, 241, 0.4)" : "none",
+                  transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                  margin: sidebarRecolhida ? "0 auto" : "0"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.05)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = sidebarRecolhida ? "0 4px 16px rgba(59, 130, 246, 0.3)" : "none";
                 }}
               >
-                {sidebarRecolhida ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                {sidebarRecolhida ? <ChevronRight size={20} /> : <ChevronLeft size={18} />}
               </button>
             </div>
 
             {/* Navegação por Itens do Catálogo */}
-            <nav style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <nav style={{ display: "flex", flexDirection: "column", gap: sidebarRecolhida ? "12px" : "8px" }}>
               {[
-                ...(user?.cargo === "superadmin" || user?.cargo === "super_admin" || isAdmin ? [
-                  { id: "super_admin", label: "Painel Super Admin", sublabel: "Central Executiva", icon: Crown, color: "#F59E0B", badge: "VIP 👑" }
-                ] : []),
-                { id: "visao_geral", label: "Visão Geral", sublabel: "Home do Aluno", icon: Home, color: "#10B981", badge: "Início 🏠" },
-                { id: "aulas", label: "Aulas & Guia", sublabel: "Full Stack", icon: BookOpen, color: "#3B82F6", badge: `${categorias[0]?.slides?.length || 0}` },
-                { id: "agenda", label: "Calendário & Agenda", sublabel: "Aulas & Reuniões", icon: Calendar, color: "#EF4444", badge: "Ao Vivo 🔴" },
-                { id: "games", label: "Jogos DevHub", sublabel: "Catálogo de Jogos", icon: Swords, color: "#6366F1", badge: "2 Jogos 🎮" },
-                { id: "caderno", label: "Caderno de Estudos", sublabel: "Anotações Dev", icon: BookMarked, color: "#818CF8", badge: "Notas 📝" },
-                { id: "playground", label: "Code Playground", sublabel: "Executor Web", icon: Code, color: "#10B981", badge: "Novo ⚡" },
-                { id: "flashcards", label: "Flashcards IA", sublabel: "Revisão Rápida", icon: BrainCircuit, color: "#F59E0B", badge: "IA 🧠" },
-                { id: "trilhas", label: "Trilhas & Badges", sublabel: "Roadmap Career", icon: Compass, color: "#06B6D4", badge: "Roadmap 🚀" },
-                { id: "mini_sistemas", label: "Mini-Sistemas", sublabel: "Laboratório Prático", icon: Layers, color: "#10B981", badge: "Prático 🧪" },
-                { id: "ranking", label: "Hall da Fama", sublabel: "Top Alunos", icon: Trophy, color: "#F59E0B", badge: "TOP 🏆" },
-                { id: "evolucao", label: "Sua Evolução", sublabel: "Timeline", icon: Zap, color: "#EC4899", badge: "Trilha 📈" },
-                { id: "notas", label: "Notas das Provas", sublabel: "Boletim", icon: FileText, color: "#A855F7" },
-                { id: "provas-online", label: "Realizar Provas", sublabel: "Avaliações", icon: CheckSquare, color: "#EC4899" },
-                { id: "dev_ia", label: "Dev IA Tutor", sublabel: "Assistente 24/7", icon: Sparkles, color: "#6366F1", badge: "IA ⚡" },
-                { id: "tickets", label: "Tickets & Suporte", sublabel: "Central de Ajuda", icon: LifeBuoy, color: "#3B82F6", badge: "Suporte 🎟️" }
+                { id: "visao_geral", label: "Visão Geral", sublabel: "Dashboard do Aluno", icon: Home, color: "#3B82F6", badge: "Dashboard" },
+                { id: "aulas", label: "Aulas & Guia", sublabel: "Formação Full Stack", icon: BookOpen, color: "#8B5CF6", badge: `${categorias[0]?.slides?.length || 0}` },
+                { id: "agenda", label: "Calendário & Agenda", sublabel: "Aulas & Reuniões", icon: Calendar, color: "#6366F1", badge: "Ao Vivo" },
+                { id: "games", label: "Laboratório Prático", sublabel: "Projetos & Exercícios", icon: Terminal, color: "#A855F7", badge: "Prática" },
+                { id: "caderno", label: "Caderno de Estudos", sublabel: "Anotações Dev", icon: BookMarked, color: "#38BDF8", badge: "Notas" },
+                { id: "playground", label: "Code Playground", sublabel: "Executor Web", icon: Code, color: "#7C3AED", badge: "Novo" },
+                { id: "ranking", label: "Ranking & Desempenho", sublabel: "Desempenho Acadêmico", icon: Award, color: "#2563EB", badge: "Ranking" },
+                { id: "evolucao", label: "Sua Evolução", sublabel: "Linha do Tempo", icon: Zap, color: "#9333EA", badge: "Trilha" },
+                { id: "provas-online", label: "Provas & Avaliações", sublabel: "Boletim & Certificados", icon: CheckSquare, color: "#06B6D4", badge: "Avaliações" }
               ]
                 .filter((item) => isModuloLiberado(item.id))
                 .map((item) => {
@@ -2032,31 +2683,64 @@ export default function Dashboard() {
 
                 if (sidebarRecolhida) {
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setAbaAtiva(item.id);
-                        if (item.id === "aulas") setMenuAulasAberto(true);
-                      }}
-                      title={`${item.label} — ${item.sublabel}`}
-                      style={{
-                        width: "44px",
-                        height: "44px",
-                        margin: "0 auto",
-                        borderRadius: "13px",
-                        border: isAtivo ? `2px solid ${item.color}` : `1px solid ${item.color}33`,
-                        background: isAtivo ? `${item.color}2E` : `${item.color}12`,
-                        color: isAtivo ? item.color : colors.textPrimary,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                        boxShadow: isAtivo ? `0 4px 14px ${item.color}40` : "none"
-                      }}
-                    >
-                      <IconComponent size={20} style={{ color: isAtivo ? item.color : (isDark ? "#cbd5e1" : "#475569") }} />
-                    </button>
+                    <div key={item.id} style={{ position: "relative", display: "flex", justifyContent: "center" }}>
+                      {/* Marcador Ativo em Neon na Lateral */}
+                      {isAtivo && (
+                        <span style={{
+                          position: "absolute",
+                          left: "-10px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          width: "4px",
+                          height: "22px",
+                          borderRadius: "4px",
+                          backgroundColor: item.color,
+                          boxShadow: `0 0 12px ${item.color}, 0 0 4px ${item.color}`,
+                          zIndex: 2
+                        }} />
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setAbaAtiva(item.id);
+                          if (item.id === "aulas") setMenuAulasAberto(true);
+                        }}
+                        title={`${item.label} — ${item.sublabel}`}
+                        style={{
+                          width: "46px",
+                          height: "46px",
+                          borderRadius: "15px",
+                          border: isAtivo ? `1.5px solid ${item.color}` : `1px solid ${item.color}44`,
+                          background: isAtivo
+                            ? `linear-gradient(135deg, ${item.color}45 0%, ${item.color}20 100%)`
+                            : (isDark ? `linear-gradient(135deg, ${item.color}15 0%, rgba(15, 23, 42, 0.6) 100%)` : `${item.color}12`),
+                          color: item.color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                          boxShadow: isAtivo 
+                            ? `0 0 24px ${item.color}60, 0 6px 18px ${item.color}35, inset 0 1px 0 rgba(255, 255, 255, 0.3)` 
+                            : `0 2px 10px rgba(0, 0, 0, 0.2)`,
+                          position: "relative"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "scale(1.16) translateY(-2px)";
+                          e.currentTarget.style.boxShadow = `0 0 24px ${item.color}88, 0 8px 20px ${item.color}45`;
+                          e.currentTarget.style.borderColor = item.color;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "none";
+                          e.currentTarget.style.boxShadow = isAtivo 
+                            ? `0 0 24px ${item.color}60, 0 6px 18px ${item.color}35, inset 0 1px 0 rgba(255, 255, 255, 0.3)` 
+                            : `0 2px 10px rgba(0, 0, 0, 0.2)`;
+                          e.currentTarget.style.borderColor = isAtivo ? item.color : `${item.color}44`;
+                        }}
+                      >
+                        <IconComponent size={21} style={{ color: item.color, filter: isAtivo ? `drop-shadow(0 0 6px ${item.color})` : "none" }} />
+                      </button>
+                    </div>
                   );
                 }
 
@@ -2067,7 +2751,6 @@ export default function Dashboard() {
                     <button
                       onClick={() => {
                         setAbaAtiva(item.id);
-                        setSidebarRecolhida(true);
                         if (isAulasItem) {
                           setMenuAulasAberto(prev => !prev);
                         } else {
@@ -2079,37 +2762,61 @@ export default function Dashboard() {
                         alignItems: "center",
                         justifyContent: "space-between",
                         width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: "14px",
-                        border: isAtivo ? `1px solid ${item.color}` : "1px solid transparent",
-                        background: isAtivo ? `${item.color}1F` : (isDark ? "rgba(255,255,255,0.02)" : "transparent"),
-                        color: isAtivo ? item.color : colors.textPrimary,
+                        padding: "12px 14px",
+                        borderRadius: "16px",
+                        border: isAtivo ? `1.5px solid ${item.color}` : `1px solid ${isDark ? "rgba(255, 255, 255, 0.07)" : "#E2E8F0"}`,
+                        borderLeft: `4px solid ${item.color}`,
+                        background: isAtivo 
+                          ? `linear-gradient(135deg, ${item.color}35 0%, rgba(15, 23, 42, 0.75) 100%)` 
+                          : (isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(241, 245, 249, 0.7)"),
+                        color: isAtivo ? "#FFFFFF" : colors.textPrimary,
                         fontWeight: isAtivo ? "800" : "600",
                         fontSize: "13.5px",
                         cursor: "pointer",
-                        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                        boxShadow: isAtivo ? `0 4px 14px ${item.color}25` : "none"
+                        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                        boxShadow: isAtivo 
+                          ? `0 0 22px ${item.color}50, 0 6px 18px ${item.color}30, inset 0 1px 0 rgba(255, 255, 255, 0.2)` 
+                          : "0 2px 8px rgba(0, 0, 0, 0.1)"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateX(5px)";
+                        e.currentTarget.style.borderColor = item.color;
+                        e.currentTarget.style.boxShadow = `0 6px 20px ${item.color}40`;
+                        e.currentTarget.style.background = isAtivo
+                          ? `linear-gradient(135deg, ${item.color}45 0%, rgba(15, 23, 42, 0.85) 100%)`
+                          : `linear-gradient(135deg, ${item.color}22 0%, rgba(30, 41, 59, 0.7) 100%)`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "none";
+                        e.currentTarget.style.borderColor = isAtivo ? item.color : (isDark ? "rgba(255, 255, 255, 0.07)" : "#E2E8F0");
+                        e.currentTarget.style.boxShadow = isAtivo 
+                          ? `0 0 22px ${item.color}50, 0 6px 18px ${item.color}30, inset 0 1px 0 rgba(255, 255, 255, 0.2)` 
+                          : "0 2px 8px rgba(0, 0, 0, 0.1)";
+                        e.currentTarget.style.background = isAtivo 
+                          ? `linear-gradient(135deg, ${item.color}35 0%, rgba(15, 23, 42, 0.75) 100%)` 
+                          : (isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(241, 245, 249, 0.7)");
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                         <div style={{
-                          width: "36px",
-                          height: "36px",
-                          borderRadius: "10px",
-                          backgroundColor: `${item.color}22`,
-                          border: `1px solid ${item.color}44`,
+                          width: "38px",
+                          height: "38px",
+                          borderRadius: "12px",
+                          background: `linear-gradient(135deg, ${item.color}45 0%, ${item.color}20 100%)`,
+                          border: `1px solid ${item.color}66`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           color: item.color,
-                          flexShrink: 0
+                          flexShrink: 0,
+                          boxShadow: `0 4px 12px ${item.color}35`
                         }}>
-                          <IconComponent size={19} />
+                          <IconComponent size={20} style={{ filter: `drop-shadow(0 0 4px ${item.color})` }} />
                         </div>
 
                         <div style={{ textAlign: "left" }}>
-                          <div style={{ fontSize: "13.5px", fontWeight: "700", lineHeight: "1.2" }}>{item.label}</div>
-                          <div style={{ fontSize: "10.5px", color: colors.textSecondary, marginTop: "2px" }}>{item.sublabel}</div>
+                          <div style={{ fontSize: "13.5px", fontWeight: "800", lineHeight: "1.2", color: isAtivo ? "#FFFFFF" : colors.textPrimary }}>{item.label}</div>
+                          <div style={{ fontSize: "11px", color: isAtivo ? `${item.color}` : colors.textSecondary, marginTop: "2px", fontWeight: "600" }}>{item.sublabel}</div>
                         </div>
                       </div>
 
@@ -2118,11 +2825,12 @@ export default function Dashboard() {
                           <span style={{
                             fontSize: "10px",
                             fontWeight: "800",
-                            padding: "3px 8px",
-                            borderRadius: "8px",
-                            backgroundColor: `${item.color}22`,
+                            padding: "4px 10px",
+                            borderRadius: "10px",
+                            background: `linear-gradient(135deg, ${item.color}30 0%, ${item.color}15 100%)`,
                             color: item.color,
-                            border: `1px solid ${item.color}44`
+                            border: `1px solid ${item.color}55`,
+                            boxShadow: `0 2px 8px ${item.color}25`
                           }}>
                             {item.badge}
                           </span>
@@ -2132,7 +2840,7 @@ export default function Dashboard() {
                             size={16}
                             style={{
                               transform: menuAulasAberto ? "rotate(180deg)" : "rotate(0deg)",
-                              transition: "transform 0.2s ease",
+                              transition: "transform 0.25s ease",
                               color: isAtivo ? item.color : colors.textSecondary
                             }}
                           />
@@ -2228,6 +2936,7 @@ export default function Dashboard() {
               })}
             </nav>
           </aside>
+          )}
 
           {/* ===== ÁREA DE CONTEÚDO PRINCIPAL ===== */}
           <main style={{ minWidth: 0 }}>
@@ -2315,8 +3024,29 @@ export default function Dashboard() {
               </div>
             ) : (
               <>
+            {abaAtiva === "inicio" && (
+              <ModuleHubLauncher
+                user={user}
+                onSelectAba={(abaId) => {
+                  if (abaId === "super_admin") {
+                    router.push("/super-admin");
+                  } else {
+                    setAbaAtiva(abaId);
+                  }
+                }}
+                onOpenPerfil={() => setModalPerfilOpen(true)}
+                onOpenTickets={() => setModalTicketsOpen(true)}
+                onOpenDevIa={() => setModalDevIaOpen(true)}
+                onOpenNotificacoes={() => setModalNotificacoesOpen(true)}
+              />
+            )}
             {abaAtiva === "visao_geral" && (
-              <VisaoGeralSection user={user} setAbaAtiva={setAbaAtiva} isDark={isDark} />
+              <VisaoGeralSection
+                user={user}
+                setAbaAtiva={(abaId) => setAbaAtiva(abaId)}
+                isDark={isDark}
+                agendaAulas={agendaAulas}
+              />
             )}
             {/* ABA 1: AULAS DE ESTUDO */}
             {abaAtiva === "aulas" && <AulasSection user={user} />}
@@ -2331,13 +3061,31 @@ export default function Dashboard() {
                       📅 Calendário da Agenda de Reuniões & Aulas
                     </h2>
                     <p style={{ color: colors.textSecondary, fontSize: "13px", marginTop: "2px" }}>
-                      {isAdmin 
-                        ? "🛡️ Modo Administrador: Clique no botão ao lado para agendar reuniões."
-                        : "Navegue pelos meses e clique nos dias para visualizar quem vai conduzir cada reunião."}
+                      Clique no botão ao lado para agendar reuniões ou selecione um dia no calendário.
                     </p>
                   </div>
 
-                  {isAdmin && (
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      onClick={handleAbrirChamadaInstantanea}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "12px",
+                        background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
+                        color: "#FFF",
+                        border: "none",
+                        fontWeight: "900",
+                        fontSize: "13.5px",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 16px rgba(239, 68, 68, 0.45)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}
+                    >
+                      ⚡ Iniciar Chamada Instantânea (Ao Vivo Agora)
+                    </button>
+
                     <button
                       onClick={() => handleAbrirNovaAula(diaSelecionado)}
                       style={{
@@ -2346,26 +3094,31 @@ export default function Dashboard() {
                         backgroundColor: "#3B82F6",
                         color: "#FFF",
                         border: "none",
-                        fontWeight: "700",
+                        fontWeight: "800",
                         fontSize: "13px",
                         cursor: "pointer",
-                        boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)"
+                        boxShadow: "0 4px 14px rgba(59, 130, 246, 0.4)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
                       }}
                     >
-                      ➕ Agendar Reunião
+                      📅 Agendar Aula Futura
                     </button>
-                  )}
+                  </div>
                 </div>
 
-                {/* SELETOR DE MÊS / ANO & GRADE DO CALENDÁRIO */}
+                {/* SELETOR DE MÊS / ANO & GRADE DO CALENDÁRIO - REDESIGN 2026 FUTURISTIC GLASSMORPHISM */}
                 <div style={{
-                  backgroundColor: colors.bgCard,
-                  border: `1px solid ${colors.borderCard}`,
-                  borderRadius: "20px",
-                  padding: "20px 24px",
-                  marginBottom: "24px"
+                  backgroundColor: isDark ? "rgba(15, 23, 42, 0.8)" : "#FFFFFF",
+                  backdropFilter: "blur(20px)",
+                  border: `1px solid ${isDark ? "rgba(59, 130, 246, 0.25)" : "#E2E8F0"}`,
+                  borderRadius: "24px",
+                  padding: "24px 28px",
+                  marginBottom: "24px",
+                  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.1)"
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px", flexWrap: "wrap", gap: "12px" }}>
                     <button
                       onClick={() => {
                         if (mesAtual === 0) {
@@ -2376,22 +3129,35 @@ export default function Dashboard() {
                         }
                       }}
                       style={{
-                        padding: "8px 14px",
-                        borderRadius: "10px",
-                        border: `1px solid ${colors.borderCard}`,
-                        backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9",
+                        padding: "10px 18px",
+                        borderRadius: "14px",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        backgroundColor: isDark ? "rgba(30, 41, 59, 0.7)" : "#F1F5F9",
                         color: colors.textPrimary,
-                        fontWeight: "700",
+                        fontWeight: "800",
                         cursor: "pointer",
-                        fontSize: "13px"
+                        fontSize: "13px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        transition: "all 0.2s ease"
                       }}
                     >
                       ◀ Mês Anterior
                     </button>
 
-                    <h3 style={{ fontSize: "18px", fontWeight: "900", color: "#3B82F6" }}>
-                      🗓️ {nomesMeses[mesAtual]} de {anoAtual}
-                    </h3>
+                    <div style={{
+                      background: "linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)",
+                      border: "1px solid rgba(59, 130, 246, 0.35)",
+                      borderRadius: "16px",
+                      padding: "8px 24px",
+                      boxShadow: "0 4px 20px rgba(59, 130, 246, 0.2)"
+                    }}>
+                      <h3 style={{ fontSize: "1.1rem", fontWeight: "900", color: "#38BDF8", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                        🗓️ {nomesMeses[mesAtual]} de {anoAtual}
+                      </h3>
+                    </div>
 
                     <button
                       onClick={() => {
@@ -2403,14 +3169,19 @@ export default function Dashboard() {
                         }
                       }}
                       style={{
-                        padding: "8px 14px",
-                        borderRadius: "10px",
-                        border: `1px solid ${colors.borderCard}`,
-                        backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9",
+                        padding: "10px 18px",
+                        borderRadius: "14px",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        backgroundColor: isDark ? "rgba(30, 41, 59, 0.7)" : "#F1F5F9",
                         color: colors.textPrimary,
-                        fontWeight: "700",
+                        fontWeight: "800",
                         cursor: "pointer",
-                        fontSize: "13px"
+                        fontSize: "13px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        transition: "all 0.2s ease"
                       }}
                     >
                       Mês Seguinte ▶
@@ -2418,16 +3189,16 @@ export default function Dashboard() {
                   </div>
 
                   {/* GRADE DE DIAS DO MÊS */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px", textAlign: "center" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "10px", textAlign: "center" }}>
                     {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => (
-                      <div key={d} style={{ fontSize: "12px", fontWeight: "800", color: colors.textSecondary, paddingBottom: "6px" }}>
+                      <div key={d} style={{ fontSize: "11px", fontWeight: "900", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "1px", paddingBottom: "8px" }}>
                         {d}
                       </div>
                     ))}
 
                     {getDiasDoMes(mesAtual, anoAtual).map((item, idx) => {
                       if (!item) {
-                        return <div key={`empty-${idx}`} style={{ minHeight: "64px" }} />;
+                        return <div key={`empty-${idx}`} style={{ minHeight: "72px" }} />;
                       }
 
                       const reunioesNoDia = agendaAulas.filter(a => a.data === item.dataStr);
@@ -2440,50 +3211,56 @@ export default function Dashboard() {
                           key={item.dataStr}
                           onClick={() => setDiaSelecionado(item.dataStr)}
                           style={{
-                            minHeight: "64px",
-                            padding: "8px",
-                            borderRadius: "12px",
+                            minHeight: "72px",
+                            padding: "10px",
+                            borderRadius: "16px",
                             border: isSelecionado 
                               ? "2px solid #3B82F6" 
                               : isHoje 
                               ? "2px solid #10B981" 
-                              : `1px solid ${colors.borderCard}`,
+                              : `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"}`,
                             backgroundColor: isSelecionado
                               ? (isDark ? "rgba(59, 130, 246, 0.25)" : "#E0F2FE")
                               : isHoje
-                              ? (isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5")
-                              : (reunioesNoDia.length > 0 ? (isDark ? "rgba(30, 41, 59, 0.7)" : "#F8FAFC") : "transparent"),
+                              ? (isDark ? "rgba(16, 185, 129, 0.2)" : "#ECFDF5")
+                              : (reunioesNoDia.length > 0 ? (isDark ? "rgba(30, 41, 59, 0.8)" : "#F8FAFC") : "rgba(15, 23, 42, 0.4)"),
+                            boxShadow: isSelecionado
+                              ? "0 0 20px rgba(59, 130, 246, 0.4)"
+                              : isHoje
+                              ? "0 0 15px rgba(16, 185, 129, 0.3)"
+                              : "none",
                             cursor: "pointer",
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
                             justifyContent: "space-between",
-                            transition: "all 0.2s ease"
+                            transition: "all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)"
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                            <span style={{ fontSize: "13px", fontWeight: isSelecionado || isHoje ? "900" : "700", color: isSelecionado ? "#3B82F6" : isHoje ? "#10B981" : colors.textPrimary }}>
+                            <span style={{ fontSize: "14px", fontWeight: isSelecionado || isHoje ? "900" : "700", color: isSelecionado ? "#3B82F6" : isHoje ? "#10B981" : colors.textPrimary }}>
                               {item.diaNum}
                             </span>
                             {isHoje && (
-                              <span style={{ fontSize: "9px", fontWeight: "900", color: "#10B981", textTransform: "uppercase" }}>
-                                (Hoje)
+                              <span style={{ fontSize: "9px", fontWeight: "900", color: "#10B981", textTransform: "uppercase", backgroundColor: "rgba(16,185,129,0.2)", padding: "1px 4px", borderRadius: "4px" }}>
+                                Hoje
                               </span>
                             )}
                           </div>
 
                           {reunioesNoDia.length > 0 && (
                             <span style={{
-                              fontSize: "10px",
-                              fontWeight: "800",
-                              padding: "2px 6px",
-                              borderRadius: "8px",
-                              backgroundColor: reunioesNoDia[0].statusCor,
+                              fontSize: "10.5px",
+                              fontWeight: "900",
+                              padding: "3px 10px",
+                              borderRadius: "9999px",
+                              background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
                               color: "#FFFFFF",
                               whiteSpace: "nowrap",
-                              marginTop: "4px"
+                              marginTop: "4px",
+                              boxShadow: "0 2px 8px rgba(59, 130, 246, 0.5)"
                             }}>
-                              {reunioesNoDia.length} reunião
+                              📅 {reunioesNoDia.length} {reunioesNoDia.length === 1 ? "aula" : "aulas"}
                             </span>
                           )}
                         </div>
@@ -2492,166 +3269,403 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* PAINEL DE REUNIÕES NO DIA SELECIONADO */}
+                {/* PAINEL DE REUNIÕES NO DIA SELECIONADO — REDESIGN ULTRA MODERN 2026 */}
                 <div style={{
-                  backgroundColor: colors.bgCard,
-                  border: `1px solid ${colors.borderCard}`,
-                  borderRadius: "20px",
-                  padding: "22px"
+                  backgroundColor: isDark ? "rgba(15, 23, 42, 0.75)" : "#FFFFFF",
+                  backdropFilter: "blur(16px)",
+                  border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"}`,
+                  borderRadius: "24px",
+                  padding: "24px",
+                  boxShadow: "0 12px 40px rgba(0, 0, 0, 0.25)"
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-                    <h3 style={{ fontSize: "17px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px" }}>
-                      📍 Reuniões & Aulas Marcadas em: <span style={{ color: "#3B82F6" }}>{diaSelecionado}</span>
-                    </h3>
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "20px",
+                    flexWrap: "wrap",
+                    gap: "14px",
+                    paddingBottom: "16px",
+                    borderBottom: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0"}`
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                      <div style={{
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "14px",
+                        background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                        boxShadow: "0 0 20px rgba(59, 130, 246, 0.4)"
+                      }}>
+                        📍
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: "1.1rem", fontWeight: "900", margin: 0, color: isDark ? "#FFF" : "#0F172A" }}>
+                          Reuniões & Aulas Marcadas
+                        </h3>
+                        <span style={{ fontSize: "0.82rem", color: isDark ? "#94A3B8" : "#64748B", fontWeight: "600" }}>
+                          Exibindo compromissos em <strong style={{ color: "#3B82F6" }}>{diaSelecionado}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{
+                        fontSize: "12px",
+                        fontWeight: "800",
+                        padding: "6px 14px",
+                        borderRadius: "12px",
+                        backgroundColor: "rgba(59, 130, 246, 0.15)",
+                        color: "#3B82F6",
+                        border: "1px solid rgba(59, 130, 246, 0.3)"
+                      }}>
+                        📅 {agendaAulas.filter(a => a.data === diaSelecionado).length} {agendaAulas.filter(a => a.data === diaSelecionado).length === 1 ? "Evento" : "Eventos"}
+                      </span>
+
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setFormAulaTitulo("");
+                            setFormAulaDescricao("");
+                            setFormAulaHorario("19:00 - 20:30");
+                            setFormAulaData(diaSelecionado || hojeBR);
+                            setModalCriarAulaAberto(true);
+                          }}
+                          style={{
+                            padding: "8px 16px",
+                            borderRadius: "12px",
+                            background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+                            color: "#FFF",
+                            border: "none",
+                            fontSize: "12px",
+                            fontWeight: "800",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            boxShadow: "0 4px 16px rgba(59, 130, 246, 0.4)",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          ➕ Agendar Aula
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {agendaAulas.filter(a => a.data === diaSelecionado).length === 0 ? (
-                    <div style={{ padding: "32px", textAlign: "center", color: colors.textSecondary }}>
-                      <p style={{ fontSize: "15px", marginBottom: "8px" }}>📅 Nenhuma reunião agendada para o dia {diaSelecionado}.</p>
+                    <div style={{
+                      padding: "40px 20px",
+                      textAlign: "center",
+                      backgroundColor: isDark ? "rgba(255, 255, 255, 0.02)" : "#F8FAFC",
+                      borderRadius: "16px",
+                      border: `1px dashed ${isDark ? "rgba(255, 255, 255, 0.1)" : "#CBD5E1"}`
+                    }}>
+                      <div style={{ fontSize: "32px", marginBottom: "8px" }}>📆</div>
+                      <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: "800", color: isDark ? "#FFF" : "#0F172A" }}>
+                        Nenhuma reunião ou aula agendada para {diaSelecionado}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: "13px", color: isDark ? "#94A3B8" : "#64748B" }}>
+                        Selecione outra data no calendário acima ou agende um novo encontro ao vivo.
+                      </p>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                      {agendaAulas.filter(a => a.data === diaSelecionado).map((aula) => (
-                        <div
-                          key={aula.id}
-                          style={{
-                            backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
-                            border: `1px solid ${colors.borderCard}`,
-                            borderRadius: "14px",
-                            padding: "18px",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            flexWrap: "wrap",
-                            gap: "12px"
-                          }}
-                        >
-                          <div>
-                            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
-                              <span style={{
-                                fontSize: "11px",
-                                fontWeight: "700",
-                                padding: "3px 8px",
-                                borderRadius: "8px",
-                                backgroundColor: `${aula.statusCor}20`,
-                                color: aula.statusCor,
-                                whiteSpace: "nowrap"
-                              }}>
-                                {aula.status}
-                              </span>
-                              <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "600" }}>
-                                ⏰ {aula.horario}
-                              </span>
-                            </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      {agendaAulas.filter(a => a.data === diaSelecionado).map((aula) => {
+                        const isAoVivo = aula.status && aula.status.includes("Ao Vivo");
+                        const isConcluida = aula.status && aula.status.includes("Concluída");
+                        const accentColor = isAoVivo ? "#EF4444" : isConcluida ? "#10B981" : "#3B82F6";
 
-                            <h4 style={{ fontSize: "16px", fontWeight: "800", marginBottom: "4px" }}>
-                              {aula.titulo}
-                            </h4>
-
-                            <p style={{ fontSize: "13px", color: colors.textSecondary, marginBottom: "6px" }}>
-                              {aula.descricao}
-                            </p>
-
-                            <span style={{ fontSize: "12px", color: "#3B82F6", fontWeight: "700" }}>
-                              👨‍🏫 Conduzido por: {aula.instrutor ? aula.instrutor.replace(/\s*\(.*?\)/, "").trim() : "A definir"}
-                            </span>
-                          </div>
-
-                          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                            {/* Botão Entrar na Reunião */}
-                            {aula.link && (
-                              <a
-                                href={aula.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  padding: "8px 14px",
-                                  borderRadius: "10px",
-                                  backgroundColor: "#3B82F6",
-                                  color: "#FFFFFF",
-                                  textDecoration: "none",
-                                  fontSize: "12px",
-                                  fontWeight: "800",
+                        return (
+                          <div
+                            key={aula.id}
+                            style={{
+                              backgroundColor: isDark
+                                ? isAoVivo ? "rgba(239, 68, 68, 0.08)" : "rgba(15, 23, 42, 0.9)"
+                                : isAoVivo ? "rgba(239, 68, 68, 0.05)" : "#F8FAFC",
+                              border: `1px solid ${isAoVivo ? "rgba(239, 68, 68, 0.4)" : isDark ? "rgba(255, 255, 255, 0.1)" : "#E2E8F0"}`,
+                              borderLeft: `5px solid ${accentColor}`,
+                              borderRadius: "18px",
+                              padding: "20px 22px",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              gap: "16px",
+                              boxShadow: isAoVivo ? "0 8px 30px rgba(239, 68, 68, 0.2)" : "0 4px 20px rgba(0, 0, 0, 0.15)",
+                              transition: "transform 0.2s, box-shadow 0.2s"
+                            }}
+                          >
+                            {/* LADO ESQUERDO: INFOS DA AULA */}
+                            <div style={{ flex: "1 1 320px", minWidth: "280px" }}>
+                              {/* TAGS HEADER */}
+                              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px", flexWrap: "wrap" }}>
+                                {/* BADGE AO VIVO / STATUS COM PULSO */}
+                                <span style={{
+                                  fontSize: "11px",
+                                  fontWeight: "900",
+                                  padding: "4px 10px",
+                                  borderRadius: "20px",
+                                  backgroundColor: `${accentColor}22`,
+                                  color: accentColor,
+                                  border: `1px solid ${accentColor}55`,
                                   display: "inline-flex",
                                   alignItems: "center",
                                   gap: "6px",
-                                  boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)"
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.5px"
+                                }}>
+                                  {isAoVivo && <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#EF4444", display: "inline-block" }} />}
+                                  {aula.status}
+                                </span>
+
+                                {/* HORÁRIO */}
+                                <span style={{
+                                  fontSize: "12px",
+                                  fontWeight: "700",
+                                  color: isDark ? "#CBD5E1" : "#475569",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0",
+                                  padding: "4px 10px",
+                                  borderRadius: "8px"
+                                }}>
+                                  ⏰ {aula.horario}
+                                </span>
+
+                                {/* BASE */}
+                                <span style={{
+                                  fontSize: "11px",
+                                  fontWeight: "800",
+                                  padding: "3px 8px",
+                                  borderRadius: "8px",
+                                  backgroundColor: isDark ? "rgba(59,130,246,0.15)" : "#EFF6FF",
+                                  color: "#3B82F6",
+                                  border: "1px solid rgba(59,130,246,0.3)"
+                                }}>
+                                  🏢 {aula.base_nome || "ContabHub"}
+                                </span>
+
+                                {/* CARGA HORÁRIA */}
+                                <span style={{
+                                  fontSize: "11px",
+                                  fontWeight: "800",
+                                  padding: "3px 8px",
+                                  borderRadius: "8px",
+                                  backgroundColor: isDark ? "rgba(16,185,129,0.15)" : "#ECFDF5",
+                                  color: "#10B981",
+                                  border: "1px solid rgba(16,185,129,0.3)"
+                                }}>
+                                  🎓 {aula.carga_horaria || "2h"}
+                                </span>
+                              </div>
+
+                              {/* TÍTULO DA AULA */}
+                              <h4 style={{
+                                fontSize: "1.1rem",
+                                fontWeight: "900",
+                                margin: "0 0 6px 0",
+                                color: isDark ? "#FFFFFF" : "#0F172A",
+                                lineHeight: "1.3"
+                              }}>
+                                {aula.titulo}
+                              </h4>
+
+                              {/* DESCRIÇÃO */}
+                              {aula.descricao && (
+                                <p style={{
+                                  fontSize: "13px",
+                                  color: isDark ? "#94A3B8" : "#64748B",
+                                  margin: "0 0 10px 0",
+                                  lineHeight: "1.4"
+                                }}>
+                                  {aula.descricao}
+                                </p>
+                              )}
+
+                              {/* INSTRUTOR BADGE */}
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: isDark ? "#38BDF8" : "#0284C7", fontWeight: "700" }}>
+                                <span>🧑‍🏫 Conduzido por:</span>
+                                <span style={{ backgroundColor: isDark ? "rgba(56, 189, 248, 0.12)" : "#E0F2FE", padding: "2px 8px", borderRadius: "6px", color: isDark ? "#38BDF8" : "#0369A1", fontWeight: "800" }}>
+                                  {aula.instrutor ? aula.instrutor.replace(/\s*\(.*?\)/, "").trim() : "Superadmin"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* LADO DIREITO: BARRA DE AÇÕES LIMPA E ULTRA MODERNA */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "flex-end", flexShrink: 0 }}>
+                              {/* BOTÃO PRINCIPAL HERO DA CHAMADA */}
+                              <button
+                                onClick={() => handleEntrarVideoChamada(aula)}
+                                style={{
+                                  padding: "10px 20px",
+                                  borderRadius: "14px",
+                                  background: isAoVivo
+                                    ? "linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)"
+                                    : (aula.link && aula.link.includes("zoom.us"))
+                                    ? "linear-gradient(135deg, #2D8CFF 0%, #1D4ED8 100%)"
+                                    : (aula.link && aula.link.includes("meet.google"))
+                                    ? "linear-gradient(135deg, #10B981 0%, #047857 100%)"
+                                    : "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+                                  color: "#FFFFFF",
+                                  border: "none",
+                                  fontSize: "13px",
+                                  fontWeight: "900",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  cursor: "pointer",
+                                  boxShadow: isAoVivo
+                                    ? "0 0 24px rgba(239, 68, 68, 0.6)"
+                                    : "0 6px 20px rgba(59, 130, 246, 0.35)",
+                                  transition: "all 0.2s"
                                 }}
                               >
-                                🔗 Entrar na Reunião
-                              </a>
-                            )}
+                                {aula.link && aula.link.includes("zoom.us")
+                                  ? "🔵 Entrar via Zoom"
+                                  : aula.link && aula.link.includes("meet.google")
+                                  ? "🟢 Entrar via Google Meet"
+                                  : isAoVivo
+                                  ? "🔴 Entrar na Aula Ao Vivo (Nativa)"
+                                  : "💻 Entrar na VídeoChamada Nativa"}
+                              </button>
 
-                            {isAdmin && (
-                              <div style={{ display: "flex", gap: "6px" }}>
-                                <button
-                                  onClick={() => {
-                                    const proximoStatus = aula.status.includes("Concluída") 
-                                      ? "Agendada 📅" 
-                                      : "Concluída ✅";
-                                    const statusCor = proximoStatus.includes("Concluída") ? "#10B981" : "#3B82F6";
-                                    const listaAtualizada = agendaAulas.map(item => item.id === aula.id ? { ...item, status: proximoStatus, statusCor, status_cor: statusCor } : item);
-                                    salvarAgendaLS(listaAtualizada, null, null, aula.id, { ...aula, status: proximoStatus, statusCor, status_cor: statusCor });
-                                  }}
-                                  title="Alternar entre Concluída e Agendada"
-                                  style={{
-                                    padding: "8px 12px",
-                                    borderRadius: "8px",
-                                    backgroundColor: aula.status.includes("Concluída") ? "rgba(16, 185, 129, 0.2)" : "rgba(255,255,255,0.08)",
-                                    color: aula.status.includes("Concluída") ? "#10B981" : colors.textPrimary,
-                                    border: `1px solid ${aula.status.includes("Concluída") ? "rgba(16, 185, 129, 0.4)" : colors.borderCard}`,
-                                    cursor: "pointer",
-                                    fontSize: "12px",
-                                    fontWeight: "700"
-                                  }}
-                                >
-                                  {aula.status.includes("Concluída") ? "✅ Concluída" : "Marcar Concluída"}
-                                </button>
+                              {/* BARRA DE AÇÕES SECUNDÁRIAS (REPRISE, PRESENÇAS, EDITAR, DELETAR) */}
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                                {/* BOTÃO REPRISE */}
+                                {(aula.link_gravacao || aula.status.includes("Reprise") || isConcluida) && (
+                                  <button
+                                    onClick={() => handleAbrirReprise(aula)}
+                                    style={{
+                                      padding: "7px 12px",
+                                      borderRadius: "10px",
+                                      backgroundColor: "rgba(168, 85, 247, 0.15)",
+                                      color: "#A855F7",
+                                      border: "1px solid rgba(168, 85, 247, 0.35)",
+                                      fontSize: "11.5px",
+                                      fontWeight: "800",
+                                      cursor: "pointer",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "5px"
+                                    }}
+                                  >
+                                    📹 Reprise
+                                  </button>
+                                )}
 
-                                <button
-                                  onClick={() => handleAbrirEditarAula(aula)}
-                                  style={{
-                                    padding: "8px 12px",
-                                    borderRadius: "8px",
-                                    backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
-                                    color: colors.textPrimary,
-                                    border: `1px solid ${colors.borderCard}`,
-                                    cursor: "pointer",
-                                    fontSize: "12px",
-                                    fontWeight: "600"
-                                  }}
-                                >
-                                  ✏️ Editar
-                                </button>
-                                <button
-                                  onClick={() => handleExcluirAula(aula.id)}
-                                  style={{
-                                    padding: "8px 12px",
-                                    borderRadius: "8px",
-                                    backgroundColor: "rgba(239, 68, 68, 0.15)",
-                                    color: "#EF4444",
-                                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                                    cursor: "pointer",
-                                    fontSize: "12px",
-                                    fontWeight: "600"
-                                  }}
-                                >
-                                  🗑️
-                                </button>
+                                {/* BOTÃO PRESENÇAS (ADMIN) */}
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleVerPresencas(aula)}
+                                    style={{
+                                      padding: "7px 12px",
+                                      borderRadius: "10px",
+                                      backgroundColor: "rgba(59, 130, 246, 0.12)",
+                                      color: "#3B82F6",
+                                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                                      cursor: "pointer",
+                                      fontSize: "11.5px",
+                                      fontWeight: "800",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "5px"
+                                    }}
+                                    title="Ver check-ins e presenças da aula"
+                                  >
+                                    📊 Presenças
+                                  </button>
+                                )}
+
+                                {/* ALTERNAR CONCLUÍDA (ADMIN) */}
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => {
+                                      const proximoStatus = isConcluida ? "Agendada 📅" : "Concluída ✅";
+                                      const statusCor = proximoStatus.includes("Concluída") ? "#10B981" : "#3B82F6";
+                                      const listaAtualizada = agendaAulas.map(item => item.id === aula.id ? { ...item, status: proximoStatus, statusCor, status_cor: statusCor } : item);
+                                      salvarAgendaLS(listaAtualizada, null, null, aula.id, { ...aula, status: proximoStatus, statusCor, status_cor: statusCor });
+                                    }}
+                                    title="Alternar entre Concluída e Agendada"
+                                    style={{
+                                      padding: "7px 12px",
+                                      borderRadius: "10px",
+                                      backgroundColor: isConcluida ? "rgba(16, 185, 129, 0.15)" : (isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0"),
+                                      color: isConcluida ? "#10B981" : (isDark ? "#CBD5E1" : "#475569"),
+                                      border: `1px solid ${isConcluida ? "rgba(16, 185, 129, 0.35)" : (isDark ? "rgba(255,255,255,0.12)" : "#CBD5E1")}`,
+                                      cursor: "pointer",
+                                      fontSize: "11.5px",
+                                      fontWeight: "800"
+                                    }}
+                                  >
+                                    {isConcluida ? "✅ Concluída" : "Marcar Concluída"}
+                                  </button>
+                                )}
+
+                                {/* BOTÃO EDITAR (ADMIN) */}
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleAbrirEditarAula(aula)}
+                                    title="Editar aula"
+                                    style={{
+                                      padding: "7px 10px",
+                                      borderRadius: "10px",
+                                      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0",
+                                      color: isDark ? "#CBD5E1" : "#475569",
+                                      border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#CBD5E1"}`,
+                                      cursor: "pointer",
+                                      fontSize: "11.5px",
+                                      fontWeight: "700"
+                                    }}
+                                  >
+                                    ✏️
+                                  </button>
+                                )}
+
+                                {/* BOTÃO EXCLUIR (ADMIN) */}
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleExcluirAula(aula.id)}
+                                    title="Excluir aula"
+                                    style={{
+                                      padding: "7px 10px",
+                                      borderRadius: "10px",
+                                      backgroundColor: "rgba(239, 68, 68, 0.15)",
+                                      color: "#EF4444",
+                                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                                      cursor: "pointer",
+                                      fontSize: "11.5px",
+                                      fontWeight: "700"
+                                    }}
+                                  >
+                                    🗑️
+                                  </button>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* ABA: CATÁLOGO DE JOGOS (Batalha de Código + Programar em Dupla) */}
-            {abaAtiva === "games" && (
-              <GameCatalogModule user={user} isDark={isDark} colors={colors} relatorioAlunos={relatorioAlunos} />
+            {/* ABA: CATÁLOGO DE JOGOS & LABORATÓRIO (Batalha de Código + Programar em Dupla + Mini-Sistemas) */}
+            {(abaAtiva === "games" || abaAtiva === "mini_sistemas") && (
+              <GameCatalogModule 
+                user={user} 
+                isDark={isDark} 
+                colors={colors} 
+                relatorioAlunos={relatorioAlunos} 
+                initialJogo={abaAtiva === "mini_sistemas" || targetProjetoId ? "mini_sistemas" : null}
+                targetProjetoId={targetProjetoId}
+              />
             )}
 
             {/* ABA: CADERNO DE ESTUDOS */}
@@ -2664,255 +3678,20 @@ export default function Dashboard() {
               <CodePlaygroundModule initialCode={targetSnippetCodigo} />
             )}
 
-            {/* ABA: FLASHCARDS IA */}
-            {abaAtiva === "flashcards" && (
-              <FlashcardsModule />
-            )}
-
-            {/* ABA: TRILHAS DE APRENDIZADO & BADGES */}
-            {abaAtiva === "trilhas" && (
-              <TrilhasModule user={user} onSelectAba={handleNavegarDaTrilha} />
-            )}
-
-            {/* ABA: LABORATÓRIO DE MINI-SISTEMAS PRÁTICOS */}
-            {abaAtiva === "mini_sistemas" && (
-              <MiniSistemasModule user={user} isDark={isDark} colors={colors} initialProjetoId={targetProjetoId} />
-            )}
-
             {/* ABA 3: HALL DA FAMA / RANKING DE DEVS */}
             {abaAtiva === "ranking" && (
-              <HallDaFamaModule isDark={isDark} colors={colors} />
+              <HallDaFamaModule isDark={isDark} colors={colors} user={user} />
             )}
 
-            {/* ABA 5: EVOLUÇÃO / TIMELINE */}
-            {abaAtiva === "evolucao" && (
-              <EvolucaoTimelineModule isDark={isDark} colors={colors} />
-            )}
-
-            {/* ABA 4: NOTAS DAS PROVAS COM LANÇAMENTO ADMIN */}
-            {abaAtiva === "notas" && (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
-                  <div>
-                    <h2 style={{ fontSize: "20px", fontWeight: "800" }}>📝 Relatório de Notas das Provas</h2>
-                    <p style={{ color: colors.textSecondary, fontSize: "13px", marginTop: "2px" }}>
-                      Desempenho individual dos estudantes nas avaliações teóricas e práticas.
-                    </p>
-                  </div>
-
-                  {isAdmin && (
-                    <div style={{ display: "flex", gap: "10px" }}>
-                      <button
-                        onClick={() => {
-                          if (confirm("Tem certeza que deseja limpar todas as notas antigas de teste do relatório?")) {
-                            setNotasProvas([]);
-                            try {
-                              localStorage.setItem("devhub_notas_provas", JSON.stringify([]));
-                            } catch (e) {}
-                          }
-                        }}
-                        style={{
-                          padding: "10px 16px",
-                          borderRadius: "12px",
-                          backgroundColor: isDark ? "rgba(239, 68, 68, 0.15)" : "#FEE2E2",
-                          color: "#EF4444",
-                          border: "1px solid rgba(239, 68, 68, 0.3)",
-                          fontWeight: "700",
-                          fontSize: "13px",
-                          cursor: "pointer"
-                        }}
-                      >
-                        🗑️ Resetar Notas Antigas
-                      </button>
-
-                      <button
-                        onClick={handleAbrirNovaProva}
-                        style={{
-                          padding: "10px 18px",
-                          borderRadius: "12px",
-                          backgroundColor: "#A855F7",
-                          color: "#FFF",
-                          border: "none",
-                          fontWeight: "700",
-                          fontSize: "13px",
-                          cursor: "pointer",
-                          boxShadow: "0 4px 12px rgba(168, 85, 247, 0.3)"
-                        }}
-                      >
-                        ➕ Lançar Nota de Prova
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ marginBottom: "16px" }}>
-                  <input
-                    type="text"
-                    placeholder="🔍 Buscar aluno por nome ou e-mail..."
-                    value={buscaAluno}
-                    onChange={(e) => setBuscaAluno(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      border: `1px solid ${colors.borderCard}`,
-                      backgroundColor: colors.inputBg,
-                      color: colors.textPrimary,
-                      fontSize: "14px"
-                    }}
-                  />
-                </div>
-
-                {(() => {
-                  const listaProvasRealizadas = notasProvasFiltradas;
-
-                  if (listaProvasRealizadas.length === 0) {
-                    return (
-                      <div style={{
-                        backgroundColor: colors.bgCard,
-                        border: `1px solid ${colors.borderCard}`,
-                        borderRadius: "18px",
-                        padding: "45px 20px",
-                        textAlign: "center",
-                        color: colors.textSecondary
-                      }}>
-                        <span style={{ fontSize: "38px", display: "block", marginBottom: "12px" }}>📊</span>
-                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: colors.textPrimary, marginBottom: "4px" }}>
-                          Nenhuma Nota de Prova Registrada
-                        </h3>
-                        <p style={{ fontSize: "13px", maxWidth: "460px", margin: "0 auto" }}>
-                          As notas dos estudantes aparecerão nesta tabela automaticamente assim que as provas forem sendo realizadas no sistema!
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div style={{
-                      backgroundColor: colors.bgCard,
-                      border: `1px solid ${colors.borderCard}`,
-                      borderRadius: "16px",
-                      overflow: "hidden"
-                    }}>
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
-                          <thead>
-                            <tr style={{ backgroundColor: isDark ? "#1E293B" : "#F1F5F9", borderBottom: `1px solid ${colors.borderCard}` }}>
-                              <th style={{ padding: "12px 16px" }}>Aluno</th>
-                              <th style={{ padding: "12px 16px" }}>Prova Realizada</th>
-                              <th style={{ padding: "12px 16px" }}>Nota Obtida</th>
-                              <th style={{ padding: "12px 16px" }}>Status</th>
-                              <th style={{ padding: "12px 16px" }}>Data de Realização</th>
-                              {isAdmin && <th style={{ padding: "12px 16px" }}>Ações (Admin)</th>}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {listaProvasRealizadas.map((nota) => {
-                              const valorNota = nota.nota !== undefined && nota.nota !== null ? parseFloat(nota.nota) : (nota.prova1 !== undefined ? parseFloat(nota.prova1) : 0);
-                              const titulo = nota.provaTitulo || nota.ultimaProvaTitulo || "Prova do Sistema";
-                              const dataStr = nota.dataRealizacao || nota.dataConclusao || "Hoje";
-
-                              return (
-                                <tr key={nota.id} style={{ borderBottom: `1px solid ${colors.borderCard}` }}>
-                                  <td style={{ padding: "14px 16px" }}>
-                                    <strong style={{ display: "block" }}>{nota.alunoNome}</strong>
-                                    <span style={{ fontSize: "11px", color: colors.textSecondary }}>{nota.email}</span>
-                                  </td>
-
-                                  <td style={{ padding: "14px 16px" }}>
-                                    <span style={{
-                                      fontSize: "12px",
-                                      fontWeight: "700",
-                                      padding: "4px 10px",
-                                      borderRadius: "6px",
-                                      backgroundColor: "rgba(168, 85, 247, 0.15)",
-                                      color: "#A855F7",
-                                      border: "1px solid rgba(168, 85, 247, 0.3)"
-                                    }}>
-                                      ✍️ {titulo}
-                                    </span>
-                                  </td>
-
-                                  <td style={{ padding: "14px 16px" }}>
-                                    <strong style={{ fontSize: "16px", color: valorNota >= 7 ? "#10B981" : "#EF4444" }}>
-                                      {valorNota.toFixed(1)} <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "normal" }}>/ 10</span>
-                                    </strong>
-                                  </td>
-
-                                  <td style={{ padding: "14px 16px" }}>
-                                    <span style={{
-                                      fontSize: "11px",
-                                      fontWeight: "800",
-                                      padding: "4px 8px",
-                                      borderRadius: "6px",
-                                      backgroundColor: valorNota >= 9.5 ? "rgba(168, 85, 247, 0.15)" : valorNota >= 7 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                                      color: valorNota >= 9.5 ? "#A855F7" : valorNota >= 7 ? "#10B981" : "#EF4444",
-                                      border: valorNota >= 9.5 ? "1px solid rgba(168, 85, 247, 0.3)" : valorNota >= 7 ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)"
-                                    }}>
-                                      {nota.status || (valorNota >= 9.5 ? "Excelente 🌟" : valorNota >= 7 ? "Bom 👍" : "Ruim ❌")}
-                                    </span>
-                                  </td>
-
-                                  <td style={{ padding: "14px 16px", color: colors.textSecondary, fontSize: "12px" }}>
-                                    📅 {dataStr}
-                                  </td>
-
-                                  {isAdmin && (
-                                    <td style={{ padding: "14px 16px" }}>
-                                      <div style={{ display: "flex", gap: "6px" }}>
-                                        <button
-                                          onClick={() => handleAbrirEditarProva(nota)}
-                                          title="Editar Nota"
-                                          style={{
-                                            padding: "6px 10px",
-                                            borderRadius: "6px",
-                                            backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
-                                            color: colors.textPrimary,
-                                            border: `1px solid ${colors.borderCard}`,
-                                            cursor: "pointer",
-                                            fontSize: "12px"
-                                          }}
-                                        >
-                                          ✏️
-                                        </button>
-                                        <button
-                                          onClick={() => handleExcluirProva(nota.id)}
-                                          title="Excluir Registro"
-                                          style={{
-                                            padding: "6px 10px",
-                                            borderRadius: "6px",
-                                            backgroundColor: "rgba(239, 68, 68, 0.15)",
-                                            color: "#EF4444",
-                                            border: "1px solid rgba(239, 68, 68, 0.3)",
-                                            cursor: "pointer",
-                                            fontSize: "12px"
-                                          }}
-                                        >
-                                          🗑️
-                                        </button>
-                                      </div>
-                                    </td>
-                                  )}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* ABA 5: SISTEMA DE PROVAS ONLINE / AVALIAÇÕES */}
-            {abaAtiva === "provas-online" && (() => {
+            {/* ABA 5: PROVAS & NOTAS DE PROVA (MÓDULO UNIFICADO) */}
+            {(abaAtiva === "provas-online" || abaAtiva === "notas") && (() => {
+              const subAba = abaAtiva === "notas" ? (abaSubProvas === "provas" ? "minhas_notas" : abaSubProvas) : abaSubProvas;
               const hoje = new Date();
               const diaSemanaHoje = hoje.getDay();
               const provaDoDia = PROVAS_DIARIAS.find(p => p.diaSemana === diaSemanaHoje);
               const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-              // Função helper para renderizar card de prova (usada tanto para provas diárias quanto do sistema)
+              // Função helper para renderizar card de prova
               const renderCardProva = (prova, isDiaria = false) => {
                 const ehPdf = prova.tipo === "pdf";
                 const partesData = prova.dataLimite ? prova.dataLimite.split("/") : ["2099","12","31"];
@@ -2932,95 +3711,144 @@ export default function Dashboard() {
                   <div
                     key={prova.id}
                     style={{
-                      backgroundColor: colors.bgCard,
-                      border: `1px solid ${isDiaria && !isDiaria._small ? "rgba(168,85,247,0.35)" : colors.borderCard}`,
-                      borderRadius: "18px",
-                      padding: "22px",
+                      background: isDark
+                        ? (ehPdf
+                          ? "linear-gradient(145deg, rgba(251, 146, 60, 0.12) 0%, rgba(15, 23, 42, 0.75) 100%)"
+                          : "linear-gradient(145deg, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.75) 100%)")
+                        : "linear-gradient(145deg, rgba(251, 146, 60, 0.05) 0%, #FFFFFF 100%)",
+                      border: `1.5px solid ${ehPdf ? (isDark ? "rgba(251,146,60,0.35)" : "rgba(251,146,60,0.25)") : (isDark ? "rgba(245,158,11,0.35)" : "rgba(245,158,11,0.25)")}`,
+                      borderRadius: "20px",
+                      padding: "24px",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
+                      gap: "18px",
                       position: "relative",
                       overflow: "hidden",
+                      boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.3)" : "0 8px 24px rgba(0,0,0,0.06)",
                       opacity: isFutura ? 0.85 : 1
                     }}
                   >
-                    {/* Glow sutil para provas diárias */}
-                    {isDiaria && (
-                      <div style={{
-                        position: "absolute", top: 0, left: 0, right: 0, height: "3px",
-                        background: isFutura
-                          ? "linear-gradient(90deg, #eab308, #a855f7)"
-                          : "linear-gradient(90deg, #a855f7, #ec4899, #a855f7)",
-                        borderRadius: "18px 18px 0 0"
-                      }} />
-                    )}
+                    <div style={{
+                      position: "absolute", top: 0, left: 0, right: 0, height: "4px",
+                      background: ehPdf
+                        ? "linear-gradient(90deg, #FB923C, #F97316, #FBBF24)"
+                        : (expirada
+                          ? "linear-gradient(90deg, #EF4444, #F59E0B)"
+                          : "linear-gradient(90deg, #F59E0B, #10B981, #3B82F6)")
+                    }} />
 
                     <div>
-                      {/* Header do card */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                           {isFutura ? (
-                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(234,179,8,0.15)", color: "#EAB308", border: "1px solid rgba(234,179,8,0.4)" }}>🔒 Agendada ({diasSemana[prova.diaSemana]})</span>
+                            <span style={{ fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "10px", backgroundColor: "rgba(234,179,8,0.15)", color: "#EAB308", border: "1px solid rgba(234,179,8,0.35)" }}>🔒 AGENDADA ({diasSemana[prova.diaSemana]})</span>
                           ) : expirada ? (
-                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)" }}>⌛ Encerrada</span>
+                            <span style={{ fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "10px", backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.35)" }}>⌛ ENCERRADA</span>
                           ) : provaJaRealizada ? (
-                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7", border: "1px solid rgba(168,85,247,0.4)" }}>🔒 Realizada & Trancada</span>
+                            <span style={{ fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "10px", backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7", border: "1px solid rgba(168,85,247,0.35)" }}>🔒 REALIZADA</span>
                           ) : (
-                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(16,185,129,0.15)", color: "#10B981", border: "1px solid rgba(16,185,129,0.4)" }}>🟢 Disponível</span>
+                            <span style={{ fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "10px", backgroundColor: "rgba(16,185,129,0.15)", color: "#10B981", border: "1px solid rgba(16,185,129,0.35)" }}>🟢 DISPONÍVEL</span>
                           )}
                           {ehPdf && (
-                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(251,146,60,0.15)", color: "#FB923C", border: "1px solid rgba(251,146,60,0.4)" }}>📄 PDF</span>
-                          )}
-                          {isDiaria && (
-                            <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7", border: "1px solid rgba(168,85,247,0.4)" }}>🤖 Sistema</span>
+                            <span style={{ fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "10px", backgroundColor: "rgba(251,146,60,0.18)", color: "#FB923C", border: "1px solid rgba(251,146,60,0.4)", boxShadow: "0 2px 8px rgba(251,146,60,0.2)" }}>📄 PROVA EM PDF</span>
                           )}
                         </div>
-                        <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "600" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: colors.textSecondary, backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9", padding: "2px 8px", borderRadius: "8px" }}>
                           ⏱️ {prova.duracaoMinutos} min
                         </span>
                       </div>
 
-                      <h3 style={{ fontSize: "17px", fontWeight: "800", marginBottom: "8px" }}>{prova.titulo}</h3>
-                      <p style={{ fontSize: "13px", color: colors.textSecondary, marginBottom: "14px", lineHeight: "1.5" }}>{prova.descricao}</p>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "12px" }}>
+                        <div style={{
+                          width: "48px", height: "48px", borderRadius: "14px", flexShrink: 0,
+                          background: ehPdf
+                            ? "linear-gradient(135deg, rgba(251,146,60,0.25), rgba(249,115,22,0.15))"
+                            : "linear-gradient(135deg, rgba(245,158,11,0.25), rgba(239,68,68,0.15))",
+                          border: `1.5px solid ${ehPdf ? "rgba(251,146,60,0.4)" : "rgba(245,158,11,0.4)"}`,
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px"
+                        }}>
+                          {ehPdf ? "📄" : "✍️"}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h3 style={{ fontSize: "17.5px", fontWeight: "900", margin: "0 0 4px 0", color: colors.textPrimary, lineHeight: "1.3" }}>
+                            {prova.titulo}
+                          </h3>
+                          <p style={{ fontSize: "12.5px", color: colors.textSecondary, lineHeight: "1.5", margin: 0 }}>
+                            {prova.descricao}
+                          </p>
+                        </div>
+                      </div>
 
-                      <div style={{ fontSize: "12px", color: colors.textSecondary, backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F1F5F9", padding: "10px 12px", borderRadius: "10px", marginBottom: "16px" }}>
-                        {prova.dataLimite && <div>📅 <strong>Validade:</strong> {prova.dataLimite} às {prova.horarioLimite}</div>}
-                        {ehPdf
-                          ? <div>📄 <strong>Arquivo:</strong> {prova.pdfNome || "prova.pdf"}</div>
-                          : <div>❓ <strong>Questões:</strong> {prova.questoes.length} perguntas</div>
-                        }
-                        <div style={{ marginTop: "4px", fontSize: "11px", color: "#A855F7" }}>👑 <strong>Criado por:</strong> {prova.criadoPor}</div>
+                      <div style={{
+                        fontSize: "12px", color: colors.textSecondary,
+                        backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC",
+                        border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : colors.borderCard}`,
+                        padding: "12px 14px", borderRadius: "12px", display: "flex", flexDirection: "column", gap: "4px"
+                      }}>
+                        {prova.dataLimite && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span>📅</span> <strong>Validade:</strong> {prova.dataLimite} às {prova.horarioLimite}
+                          </div>
+                        )}
+                        {ehPdf ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#FB923C", fontWeight: "700" }}>
+                            <span>📄</span> <strong>Arquivo:</strong> {prova.pdfNome || "prova.pdf"}
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span>❓</span> <strong>Questões:</strong> {prova.questoes ? prova.questoes.length : 0} perguntas
+                          </div>
+                        )}
+                        <div style={{ marginTop: "2px", fontSize: "11px", color: "#A855F7", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>👑</span> <strong>Criado por:</strong> {prova.criadoPor}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Botões de ação */}
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "10px" }}>
                       {ehPdf ? (
                         <button
                           onClick={() => {
                             if (prova.pdfData) {
-                              const win = window.open();
-                              win.document.write(`<iframe src="${prova.pdfData}" style="width:100%;height:100vh;border:none;"></iframe>`);
+                              setPdfVisualizarModal({
+                                id: prova.id,
+                                titulo: prova.titulo,
+                                pdfData: prova.pdfData,
+                                pdfNome: prova.pdfNome || "prova.pdf"
+                              });
+                            } else {
+                              alert("⚠️ O arquivo PDF desta prova não foi anexado corretamente.");
                             }
                           }}
                           style={{
-                            flex: 1, padding: "12px", borderRadius: "10px",
-                            background: "linear-gradient(135deg,#FB923C,#F97316)",
-                            color: "#FFFFFF", border: "none", fontWeight: "700", fontSize: "13px", cursor: "pointer"
+                            flex: 1, padding: "12px 18px", borderRadius: "12px",
+                            background: "linear-gradient(135deg, #FB923C 0%, #F97316 100%)",
+                            color: "#FFFFFF", border: "none", fontWeight: "900", fontSize: "13px", cursor: "pointer",
+                            boxShadow: "0 4px 16px rgba(251, 146, 60, 0.4)",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                            transition: "all 0.2s ease"
                           }}
                         >
-                          📄 Abrir Prova em PDF
+                          <span>📄</span> Abrir Prova em PDF
                         </button>
                       ) : (
                         <button
                           disabled={expirada || provaJaRealizada || isFutura}
                           onClick={() => handleIniciarProvaOnline(prova)}
                           style={{
-                            flex: 1, padding: "12px", borderRadius: "10px",
-                            backgroundColor: (expirada || provaJaRealizada || isFutura) ? (isDark ? "rgba(255,255,255,0.06)" : "#CBD5E1") : "#EC4899",
+                            flex: 1, padding: "12px 18px", borderRadius: "12px",
+                            backgroundColor: (expirada || provaJaRealizada || isFutura)
+                              ? (isDark ? "rgba(255,255,255,0.08)" : "#CBD5E1")
+                              : "#F59E0B",
+                            background: (expirada || provaJaRealizada || isFutura)
+                              ? "none"
+                              : "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
                             color: (expirada || provaJaRealizada || isFutura) ? colors.textSecondary : "#FFFFFF",
-                            border: "none", fontWeight: "700", fontSize: "13px",
-                            cursor: (expirada || provaJaRealizada || isFutura) ? "not-allowed" : "pointer"
+                            border: "none", fontWeight: "900", fontSize: "13px",
+                            cursor: (expirada || provaJaRealizada || isFutura) ? "not-allowed" : "pointer",
+                            boxShadow: (expirada || provaJaRealizada || isFutura) ? "none" : "0 4px 16px rgba(245, 158, 11, 0.4)",
+                            transition: "all 0.2s ease"
                           }}
                         >
                           {isFutura
@@ -3037,7 +3865,12 @@ export default function Dashboard() {
                         <button
                           onClick={() => handleExcluirProvaSuperAdmin(prova.id)}
                           title="Excluir Prova"
-                          style={{ padding: "12px", borderRadius: "10px", backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.3)", cursor: "pointer", fontSize: "13px" }}
+                          style={{
+                            padding: "12px 14px", borderRadius: "12px",
+                            backgroundColor: "rgba(239,68,68,0.12)", color: "#EF4444",
+                            border: "1px solid rgba(239,68,68,0.3)", cursor: "pointer", fontSize: "14px",
+                            transition: "all 0.2s ease"
+                          }}
                         >
                           🗑️
                         </button>
@@ -3048,231 +3881,654 @@ export default function Dashboard() {
               };
 
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
 
-                  {/* ===== HEADER DA SEÇÃO ===== */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
-                    <div>
-                      <h2 style={{ fontSize: "22px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                        ✍️ Sistema de Avaliações & Provas
-                      </h2>
-                      <p style={{ color: colors.textSecondary, fontSize: "13px" }}>
-                        Provas automáticas por dia da semana + provas criadas pelos administradores
-                      </p>
-                    </div>
-                    {isAdmin && (
-                      <button
-                        onClick={handleAbrirCriarProvaSuperAdmin}
-                        style={{
-                          padding: "11px 22px", borderRadius: "12px",
-                          background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
-                          color: "#FFF", border: "none", fontWeight: "700", fontSize: "13px",
-                          cursor: "pointer", boxShadow: "0 4px 16px rgba(168,85,247,0.4)",
-                          display: "flex", alignItems: "center", gap: "8px"
-                        }}
-                      >
-                        <span>➕</span> Criar Prova
-                      </button>
-                    )}
-                  </div>
-
-                  {/* ===== SEÇÃO: PROVA DO DIA ===== */}
-                  <div>
-                    {/* Título da seção */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                      <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg,#a855f7,#ec4899)", borderRadius: "4px" }} />
-                      <h3 style={{ fontSize: "17px", fontWeight: "800" }}>🗓️ Prova do Dia</h3>
-                      <span style={{
-                        fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "20px",
-                        background: "linear-gradient(135deg,#a855f7,#ec4899)", color: "#FFF",
-                        letterSpacing: "0.5px", animation: "pulse 2s infinite"
-                      }}>HOJE</span>
-                    </div>
-
-                    {/* Calendário semanal (Disponível a partir de Hoje) */}
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "20px", overflowX: "auto", paddingBottom: "4px" }}>
-                      {PROVAS_DIARIAS.filter(p => p.diaSemana >= diaSemanaHoje).map((p) => {
-                        const isHoje = p.diaSemana === diaSemanaHoje;
-                        return (
-                          <div
-                            key={p.id}
-                            style={{
-                              minWidth: "70px",
-                              padding: "10px 6px",
-                              borderRadius: "12px",
-                              textAlign: "center",
-                              border: isHoje ? "2px solid #a855f7" : `1px solid ${colors.borderCard}`,
-                              backgroundColor: isHoje ? "rgba(168,85,247,0.12)" : colors.bgCard,
-                              cursor: "default",
-                              flexShrink: 0,
-                              transition: "all 0.2s"
-                            }}
-                          >
-                            <div style={{ fontSize: "18px", marginBottom: "4px" }}>{p.emoji}</div>
-                            <div style={{ fontSize: "11px", fontWeight: "800", color: isHoje ? "#A855F7" : colors.textSecondary }}>
-                              {diasSemana[p.diaSemana]} <span style={{ fontSize: "9.5px", opacity: 0.85, fontWeight: "900" }}>{p.id.includes("-v2-") ? "P2" : "P1"}</span>
-                            </div>
-                            <div style={{ fontSize: "10px", color: isHoje ? "#A855F7" : colors.textSecondary, marginTop: "2px", lineHeight: "1.2" }}>{p.tema.split(" ").slice(0, 2).join(" ")}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Provas em Destaque do Dia (2 Provas por dia) */}
-                    {(() => {
-                      const provasHoje = PROVAS_DIARIAS.filter(p => p.diaSemana === diaSemanaHoje);
-                      if (provasHoje.length === 0) return null;
-                      return (
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
-                          {provasHoje.map((pHoje) => (
-                            <div key={pHoje.id} style={{
-                              background: isDark
-                                ? "linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(236,72,153,0.10) 100%)"
-                                : "linear-gradient(135deg, rgba(168,85,247,0.08) 0%, rgba(236,72,153,0.05) 100%)",
-                              border: "1.5px solid rgba(168,85,247,0.35)",
-                              borderRadius: "20px",
-                              padding: "24px",
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "space-between",
-                              gap: "16px",
-                              position: "relative",
-                              overflow: "hidden"
-                            }}>
-                              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #a855f7, #ec4899, #a855f7)" }} />
-                              <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
-                                <div style={{
-                                  width: "56px", height: "56px", flexShrink: 0,
-                                  background: "linear-gradient(135deg, rgba(168,85,247,0.25), rgba(236,72,153,0.15))",
-                                  border: "2px solid rgba(168,85,247,0.4)",
-                                  borderRadius: "16px",
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  fontSize: "28px"
-                                }}>
-                                  {pHoje.emoji}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
-                                    <span style={{
-                                      fontSize: "10px", fontWeight: "900", padding: "2px 8px", borderRadius: "12px",
-                                      background: "linear-gradient(135deg,#a855f7,#ec4899)", color: "#FFF", letterSpacing: "0.5px"
-                                    }}>✨ PROVA DO DIA</span>
-                                    <span style={{ fontSize: "11px", color: colors.textSecondary }}>⏱️ {pHoje.duracaoMinutos} min</span>
-                                    <span style={{ fontSize: "11px", color: colors.textSecondary }}>❓ {pHoje.questoes.length} q.</span>
-                                  </div>
-                                  <h3 style={{ fontSize: "17px", fontWeight: "900", marginBottom: "6px" }}>{pHoje.titulo}</h3>
-                                  <p style={{ fontSize: "12px", color: colors.textSecondary, lineHeight: "1.5" }}>{pHoje.descricao}</p>
-                                </div>
-                              </div>
-
-                              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                {(() => {
-                                  const jaFezHoje = user && provasConcluidas.some(c =>
-                                    c.provaId === pHoje.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
-                                  );
-                                  const regHoje = user ? provasConcluidas.find(c =>
-                                    c.provaId === pHoje.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
-                                  ) : null;
-                                  return (
-                                    <button
-                                      disabled={jaFezHoje}
-                                      onClick={() => handleIniciarProvaOnline(pHoje)}
-                                      style={{
-                                        padding: "11px 20px",
-                                        borderRadius: "12px",
-                                        background: jaFezHoje ? (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0") : "linear-gradient(135deg,#EC4899,#a855f7)",
-                                        color: jaFezHoje ? colors.textSecondary : "#FFF",
-                                        border: "none", fontWeight: "800", fontSize: "13px",
-                                        cursor: jaFezHoje ? "not-allowed" : "pointer",
-                                        boxShadow: jaFezHoje ? "none" : "0 4px 14px rgba(236,72,153,0.35)",
-                                        transition: "all 0.2s"
-                                      }}
-                                    >
-                                      {jaFezHoje ? `🔒 Concluída hoje! (Nota: ${regHoje ? regHoje.nota : "?"})` : "🚀 Realizar Prova do Dia"}
-                                    </button>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* ===== SEÇÃO: PROVAS A PARTIR DE HOJE ===== */}
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                      <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg,#10B981,#3B82F6)", borderRadius: "4px" }} />
-                      <h3 style={{ fontSize: "17px", fontWeight: "800" }}>📅 Próximas Provas da Semana</h3>
-                      <span style={{ fontSize: "12px", color: colors.textSecondary }}>— agendadas para os próximos dias</span>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
-                      {PROVAS_DIARIAS.filter(p => p.diaSemana > diaSemanaHoje).map(prova => renderCardProva(prova, true))}
-                    </div>
-                  </div>
-
-                  {/* ===== SEÇÃO: PROVAS DO SISTEMA (CRIADAS PELOS ADMINS) ===== */}
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                      <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg,#F59E0B,#EF4444)", borderRadius: "4px" }} />
-                      <h3 style={{ fontSize: "17px", fontWeight: "800" }}>👑 Provas do Sistema</h3>
-                      <span style={{ fontSize: "12px", color: colors.textSecondary }}>— criadas pelos administradores</span>
-                    </div>
-
-                    {provasSistema.length === 0 ? (
+                  {/* ===== HEADER INTEGRADO DO MÓDULO COM SELETOR DE SUB-ABAS ===== */}
+                  <div style={{
+                    background: isDark ? "linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(13, 148, 136, 0.05))" : "#FFFFFF",
+                    border: `1px solid ${isDark ? "rgba(20, 184, 166, 0.3)" : colors.borderCard}`,
+                    borderRadius: "20px",
+                    padding: "20px 24px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "16px",
+                    boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.05)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                       <div style={{
-                        backgroundColor: colors.bgCard, border: `1px dashed ${colors.borderCard}`,
-                        borderRadius: "18px", padding: "40px 20px", textAlign: "center", color: colors.textSecondary
+                        width: "48px", height: "48px", borderRadius: "14px",
+                        background: "linear-gradient(135deg, #14b8a6, #0d9488)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "#FFF", boxShadow: "0 4px 16px rgba(20, 184, 166, 0.4)",
+                        flexShrink: 0
                       }}>
-                        <span style={{ fontSize: "36px", display: "block", marginBottom: "12px" }}>📋</span>
-                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
-                          Nenhuma Prova Publicada pelo Admin
-                        </h3>
-                        <p style={{ fontSize: "13px", maxWidth: "450px", margin: "0 auto" }}>
-                          {isAdmin
-                            ? "Use o botão \"Criar Prova\" acima para publicar uma prova com questões ou em PDF."
-                            : "Fique atento! Provas especiais serão publicadas aqui pelos administradores."}
+                        <CheckSquare size={24} />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
+                          <span style={{ backgroundColor: "rgba(20, 184, 166, 0.18)", color: "#14b8a6", fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "8px", border: "1px solid rgba(20, 184, 166, 0.3)" }}>
+                            MÓDULO DE AVALIAÇÕES
+                          </span>
+                        </div>
+                        <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0, color: colors.textPrimary }}>
+                          Provas & Notas de Prova ✍️📊
+                        </h2>
+                        <p style={{ color: colors.textSecondary, fontSize: "13px", margin: "2px 0 0 0" }}>
+                          Realize suas avaliações online e consulte seu boletim completo de notas.
                         </p>
                       </div>
-                    ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
-                        {provasSistema.map(prova => renderCardProva(prova, false))}
-                      </div>
-                    )}
+                    </div>
+
+                    {/* CONTROLES DE SUB-ABA */}
+                    <div style={{
+                      display: "flex",
+                      gap: "6px",
+                      backgroundColor: isDark ? "rgba(0, 0, 0, 0.3)" : "#F1F5F9",
+                      padding: "5px",
+                      borderRadius: "14px",
+                      border: `1px solid ${colors.borderCard}`
+                    }}>
+                      <button
+                        onClick={() => { setAbaSubProvas("provas"); if (abaAtiva === "notas") setAbaAtiva("provas-online"); }}
+                        style={{
+                          padding: "9px 18px",
+                          borderRadius: "10px",
+                          border: "none",
+                          background: subAba === "provas" ? "linear-gradient(135deg, #14b8a6, #0d9488)" : "transparent",
+                          color: subAba === "provas" ? "#FFFFFF" : colors.textPrimary,
+                          fontWeight: subAba === "provas" ? "800" : "600",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                          boxShadow: subAba === "provas" ? "0 4px 14px rgba(20,184,166,0.35)" : "none",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        ✍️ Realizar Provas
+                      </button>
+
+                      <button
+                        onClick={() => { setAbaSubProvas("minhas_notas"); if (abaAtiva === "notas") setAbaAtiva("provas-online"); }}
+                        style={{
+                          padding: "9px 18px",
+                          borderRadius: "10px",
+                          border: "none",
+                          background: subAba === "minhas_notas" ? "linear-gradient(135deg, #a855f7, #7c3aed)" : "transparent",
+                          color: subAba === "minhas_notas" ? "#FFFFFF" : colors.textPrimary,
+                          fontWeight: subAba === "minhas_notas" ? "800" : "600",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                          boxShadow: subAba === "minhas_notas" ? "0 4px 14px rgba(168,85,247,0.35)" : "none",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        📊 Minhas Notas
+                      </button>
+
+                      {isAdmin && (
+                        <button
+                          onClick={() => { setAbaSubProvas("relatorio_admin"); if (abaAtiva === "notas") setAbaAtiva("provas-online"); }}
+                          style={{
+                            padding: "9px 18px",
+                            borderRadius: "10px",
+                            border: "none",
+                            background: subAba === "relatorio_admin" ? "linear-gradient(135deg, #3b82f6, #1d4ed8)" : "transparent",
+                            color: subAba === "relatorio_admin" ? "#FFFFFF" : colors.textPrimary,
+                            fontWeight: subAba === "relatorio_admin" ? "800" : "600",
+                            fontSize: "13px",
+                            cursor: "pointer",
+                            boxShadow: subAba === "relatorio_admin" ? "0 4px 14px rgba(59,130,246,0.35)" : "none",
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          👑 Boletim Geral (Admin)
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* ===== SUB-ABA 1: REALIZAR PROVAS ===== */}
+                  {subAba === "provas" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+                      {/* Botão Criar Prova para Admin */}
+                      {isAdmin && (
+                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                          <button
+                            onClick={handleAbrirCriarProvaSuperAdmin}
+                            style={{
+                              padding: "11px 22px", borderRadius: "12px",
+                              background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
+                              color: "#FFF", border: "none", fontWeight: "700", fontSize: "13px",
+                              cursor: "pointer", boxShadow: "0 4px 16px rgba(168,85,247,0.4)",
+                              display: "flex", alignItems: "center", gap: "8px"
+                            }}
+                          >
+                            <span>➕</span> Criar Prova
+                          </button>
+                        </div>
+                      )}
+
+                      {/* SEÇÃO: PROVA DO DIA */}
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg,#14b8a6,#0d9488)", borderRadius: "4px" }} />
+                            <h3 style={{ fontSize: "18px", fontWeight: "900", color: colors.textPrimary, margin: 0 }}>🗓️ Cronograma Semanal de Provas</h3>
+                            <span style={{
+                              fontSize: "11px", fontWeight: "800", padding: "3px 10px", borderRadius: "20px",
+                              background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "#FFF",
+                              boxShadow: "0 2px 10px rgba(20,184,166,0.3)", letterSpacing: "0.5px"
+                            }}>HOJE</span>
+                          </div>
+                        </div>
+
+                        {/* CRONOGRAMA SEMANAL TRACK FULL-WIDTH */}
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                          gap: "12px",
+                          marginBottom: "24px"
+                        }}>
+                          {PROVAS_DIARIAS.map((p) => {
+                            const isHoje = p.diaSemana === diaSemanaHoje;
+                            const jaPassou = p.diaSemana < diaSemanaHoje;
+                            return (
+                              <div
+                                key={p.id}
+                                style={{
+                                  padding: "14px 16px",
+                                  borderRadius: "16px",
+                                  border: isHoje ? "2px solid #14b8a6" : `1px solid ${isDark ? "rgba(255,255,255,0.08)" : colors.borderCard}`,
+                                  backgroundColor: isHoje
+                                    ? (isDark ? "rgba(20, 184, 166, 0.15)" : "#F0FDFA")
+                                    : (isDark ? "rgba(15, 23, 42, 0.4)" : colors.bgCard),
+                                  boxShadow: isHoje ? "0 4px 20px rgba(20, 184, 166, 0.25)" : "none",
+                                  transition: "all 0.2s ease",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "8px",
+                                  opacity: jaPassou ? 0.6 : 1
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <span style={{ fontSize: "22px" }}>{p.emoji}</span>
+                                  <span style={{
+                                    fontSize: "10px",
+                                    fontWeight: "800",
+                                    padding: "2px 8px",
+                                    borderRadius: "8px",
+                                    background: isHoje
+                                      ? "linear-gradient(135deg, #14b8a6, #0d9488)"
+                                      : (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"),
+                                    color: isHoje ? "#FFF" : colors.textSecondary
+                                  }}>
+                                    {p.id.includes("-v2-") ? "P2" : "P1"}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: "13px", fontWeight: "900", color: isHoje ? "#14b8a6" : colors.textPrimary }}>
+                                    {diasSemana[p.diaSemana]}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: colors.textSecondary, fontWeight: "500", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {p.tema}
+                                  </div>
+                                </div>
+
+                                <div style={{ marginTop: "4px", fontSize: "10px", fontWeight: "800", color: isHoje ? "#14b8a6" : colors.textSecondary, display: "flex", alignItems: "center", gap: "4px" }}>
+                                  {isHoje ? "🔥 Liberada Hoje" : jaPassou ? "✔ Concluída" : "🔒 Em Breve"}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* PROVAS DISPONÍVEIS HOJE */}
+                        {(() => {
+                          const provasHoje = PROVAS_DIARIAS.filter(p => p.diaSemana === diaSemanaHoje);
+                          if (provasHoje.length === 0) {
+                            return (
+                              <div style={{
+                                backgroundColor: isDark ? "rgba(15, 23, 42, 0.4)" : colors.bgCard,
+                                border: `1px dashed ${colors.borderCard}`,
+                                borderRadius: "18px", padding: "28px 20px", textAlign: "center", color: colors.textSecondary,
+                                marginBottom: "24px"
+                              }}>
+                                <span style={{ fontSize: "32px", display: "block", marginBottom: "8px" }}>☕</span>
+                                <h4 style={{ fontSize: "15px", fontWeight: "800", color: colors.textPrimary, margin: "0 0 4px 0" }}>Nenhuma Prova Diária para Hoje</h4>
+                                <p style={{ fontSize: "12px", margin: 0 }}>Consulte o cronograma semanal acima para se preparar para as próximas avaliações.</p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+                              {provasHoje.map((pHoje) => (
+                                <div key={pHoje.id} style={{
+                                  background: isDark
+                                    ? "linear-gradient(145deg, rgba(20, 184, 166, 0.12) 0%, rgba(15, 23, 42, 0.7) 100%)"
+                                    : "linear-gradient(145deg, rgba(20, 184, 166, 0.05) 0%, #FFFFFF 100%)",
+                                  border: `1.5px solid ${isDark ? "rgba(20, 184, 166, 0.35)" : "rgba(20, 184, 166, 0.25)"}`,
+                                  borderRadius: "20px", padding: "24px",
+                                  display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "20px",
+                                  position: "relative", overflow: "hidden",
+                                  boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.3)" : "0 8px 24px rgba(20, 184, 166, 0.08)"
+                                }}>
+                                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: "linear-gradient(90deg, #14b8a6, #0d9488, #2dd4bf)" }} />
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+                                    <div style={{
+                                      width: "56px", height: "56px", flexShrink: 0,
+                                      background: "linear-gradient(135deg, rgba(20, 184, 166, 0.25), rgba(13, 148, 136, 0.15))",
+                                      border: "2px solid rgba(20, 184, 166, 0.4)", borderRadius: "16px",
+                                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px",
+                                      boxShadow: "0 4px 12px rgba(20, 184, 166, 0.2)"
+                                    }}>
+                                      {pHoje.emoji}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px", flexWrap: "wrap" }}>
+                                        <span style={{ fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "10px", background: "linear-gradient(135deg,#14b8a6,#0d9488)", color: "#FFF", boxShadow: "0 2px 8px rgba(20,184,166,0.3)" }}>🔥 PROVA DO DIA</span>
+                                        <span style={{ fontSize: "11px", fontWeight: "700", color: colors.textSecondary, backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9", padding: "2px 8px", borderRadius: "8px" }}>⏱️ {pHoje.duracaoMinutos} min</span>
+                                        <span style={{ fontSize: "11px", fontWeight: "700", color: colors.textSecondary, backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9", padding: "2px 8px", borderRadius: "8px" }}>❓ {pHoje.questoes.length} q.</span>
+                                      </div>
+                                      <h3 style={{ fontSize: "18px", fontWeight: "900", margin: "0 0 6px 0", color: colors.textPrimary, lineHeight: "1.3" }}>{pHoje.titulo}</h3>
+                                      <p style={{ fontSize: "12.5px", color: colors.textSecondary, lineHeight: "1.5", margin: 0 }}>{pHoje.descricao}</p>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                    {(() => {
+                                      const jaFezHoje = user && provasConcluidas.some(c =>
+                                        c.provaId === pHoje.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
+                                      );
+                                      const regHoje = user ? provasConcluidas.find(c =>
+                                        c.provaId === pHoje.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
+                                      ) : null;
+                                      return (
+                                        <button
+                                          disabled={jaFezHoje}
+                                          onClick={() => handleIniciarProvaOnline(pHoje)}
+                                          style={{
+                                            padding: "12px 20px", borderRadius: "12px",
+                                            background: jaFezHoje
+                                              ? (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0")
+                                              : "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
+                                            color: jaFezHoje ? colors.textSecondary : "#FFF",
+                                            border: "none", fontWeight: "800", fontSize: "13px",
+                                            cursor: jaFezHoje ? "not-allowed" : "pointer",
+                                            boxShadow: jaFezHoje ? "none" : "0 4px 16px rgba(20, 184, 166, 0.4)",
+                                            transition: "all 0.2s ease"
+                                          }}
+                                        >
+                                          {jaFezHoje ? `✅ Concluída hoje! (Nota: ${regHoje ? regHoje.nota : "?"})` : "🚀 Realizar Prova do Dia"}
+                                        </button>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* SEÇÃO: PROVAS DO SISTEMA */}
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+                          <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg,#F59E0B,#EF4444)", borderRadius: "4px" }} />
+                          <h3 style={{ fontSize: "18px", fontWeight: "900", color: colors.textPrimary, margin: 0 }}>👑 Provas Especiais do Sistema</h3>
+                        </div>
+
+                        {provasSistema.length === 0 ? (
+                          <div style={{
+                            backgroundColor: isDark ? "rgba(15, 23, 42, 0.4)" : colors.bgCard,
+                            border: `1.5px dashed ${isDark ? "rgba(255,255,255,0.12)" : colors.borderCard}`,
+                            borderRadius: "20px", padding: "40px 24px", textAlign: "center", color: colors.textSecondary,
+                            boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.2)" : "0 2px 10px rgba(0,0,0,0.03)"
+                          }}>
+                            <div style={{
+                              width: "54px", height: "54px", borderRadius: "16px",
+                              background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.25)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              margin: "0 auto 16px auto", fontSize: "24px", color: "#F59E0B"
+                            }}>
+                              📋
+                            </div>
+                            <h3 style={{ fontSize: "16px", fontWeight: "900", color: colors.textPrimary, marginBottom: "6px" }}>
+                              Nenhuma Prova Publicada pelo Admin
+                            </h3>
+                            <p style={{ fontSize: "13px", maxWidth: "460px", margin: "0 auto", lineHeight: "1.5" }}>
+                              {isAdmin
+                                ? "Use o botão \"Criar Prova\" no topo da página para publicar avaliações customizadas em formulário ou PDF."
+                                : "Fique atento! Provas oficiais e desafios especiais serão disponibilizados aqui pela coordenação."}
+                            </p>
+                          </div>
+                        ) : (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
+                            {provasSistema.map(prova => renderCardProva(prova, false))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== SUB-ABA 2: MINHAS NOTAS (BOLETIM INDIVIDUAL DO ESTUDANTE) ===== */}
+                  {subAba === "minhas_notas" && (() => {
+                    const minhasProvas = user ? notasProvas.filter(n =>
+                      (n.userId && n.userId.toString() === user.id.toString()) ||
+                      (n.email && user.email && n.email.toLowerCase() === user.email.toLowerCase())
+                    ) : [];
+
+                    const totalFeitas = minhasProvas.length;
+                    const somaNotas = minhasProvas.reduce((acc, curr) => {
+                      const val = curr.nota !== undefined ? parseFloat(curr.nota) : (curr.mediaFinal !== undefined ? parseFloat(curr.mediaFinal) : 0);
+                      return acc + val;
+                    }, 0);
+                    const mediaAluno = totalFeitas > 0 ? (somaNotas / totalFeitas).toFixed(1) : "0.0";
+                    const aprovadasCount = minhasProvas.filter(n => {
+                      const val = n.nota !== undefined ? parseFloat(n.nota) : (n.mediaFinal !== undefined ? parseFloat(n.mediaFinal) : 0);
+                      return val >= 7.0;
+                    }).length;
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                        {/* STATS DE NOTAS */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+                          <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderCard}`, borderRadius: "16px", padding: "18px 20px" }}>
+                            <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "700" }}>🎓 SUA MÉDIA GERAL</span>
+                            <div style={{ fontSize: "26px", fontWeight: "900", color: parseFloat(mediaAluno) >= 7 ? "#10B981" : "#A855F7", marginTop: "4px" }}>
+                              {mediaAluno} <span style={{ fontSize: "14px", color: colors.textSecondary }}>/ 10.0</span>
+                            </div>
+                          </div>
+                          <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderCard}`, borderRadius: "16px", padding: "18px 20px" }}>
+                            <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "700" }}>✍️ PROVAS REALIZADAS</span>
+                            <div style={{ fontSize: "26px", fontWeight: "900", color: "#3B82F6", marginTop: "4px" }}>
+                              {totalFeitas} {totalFeitas === 1 ? "prova" : "provas"}
+                            </div>
+                          </div>
+                          <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderCard}`, borderRadius: "16px", padding: "18px 20px" }}>
+                            <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "700" }}>🏆 PROVAS APROVADAS</span>
+                            <div style={{ fontSize: "26px", fontWeight: "900", color: "#10B981", marginTop: "4px" }}>
+                              {aprovadasCount} / {totalFeitas}
+                            </div>
+                          </div>
+                        </div>
+
+                        {minhasProvas.length === 0 ? (
+                          <div style={{
+                            backgroundColor: colors.bgCard, border: `1px dashed ${colors.borderCard}`,
+                            borderRadius: "18px", padding: "40px 20px", textAlign: "center", color: colors.textSecondary
+                          }}>
+                            <span style={{ fontSize: "36px", display: "block", marginBottom: "10px" }}>📊</span>
+                            <h3 style={{ fontSize: "16px", fontWeight: "800", color: colors.textPrimary, marginBottom: "4px" }}>
+                              Você ainda não realizou nenhuma prova
+                            </h3>
+                            <p style={{ fontSize: "13px", maxWidth: "440px", margin: "0 auto 16px auto" }}>
+                              Acesse a aba <strong>"✍️ Realizar Provas"</strong> para responder à Prova do Dia ou avaliações disponíveis no sistema!
+                            </p>
+                            <button
+                              onClick={() => setAbaSubProvas("provas")}
+                              style={{ padding: "10px 20px", borderRadius: "12px", backgroundColor: "#14b8a6", color: "#FFF", border: "none", fontWeight: "800", cursor: "pointer" }}
+                            >
+                              🚀 Ver Provas Disponíveis
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderCard}`, borderRadius: "16px", overflow: "hidden" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
+                              <thead>
+                                <tr style={{ backgroundColor: isDark ? "#1E293B" : "#F1F5F9", borderBottom: `1px solid ${colors.borderCard}` }}>
+                                  <th style={{ padding: "12px 16px" }}>Avaliação / Prova</th>
+                                  <th style={{ padding: "12px 16px" }}>Nota Obtida</th>
+                                  <th style={{ padding: "12px 16px" }}>Status</th>
+                                  <th style={{ padding: "12px 16px" }}>Data de Conclusão</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {minhasProvas.map((nota) => {
+                                  const valorNota = nota.nota !== undefined ? parseFloat(nota.nota) : (nota.mediaFinal !== undefined ? parseFloat(nota.mediaFinal) : 0);
+                                  const titulo = nota.provaTitulo || nota.titulo || "Prova DevHub";
+                                  return (
+                                    <tr key={nota.id} style={{ borderBottom: `1px solid ${colors.borderCard}` }}>
+                                      <td style={{ padding: "14px 16px" }}>
+                                        <strong style={{ display: "block" }}>✍️ {titulo}</strong>
+                                      </td>
+                                      <td style={{ padding: "14px 16px" }}>
+                                        <strong style={{ fontSize: "16px", color: valorNota >= 7 ? "#10B981" : "#EF4444" }}>
+                                          {valorNota.toFixed(1)} <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "normal" }}>/ 10</span>
+                                        </strong>
+                                      </td>
+                                      <td style={{ padding: "14px 16px" }}>
+                                        <span style={{
+                                          fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "6px",
+                                          backgroundColor: valorNota >= 9.5 ? "rgba(168,85,247,0.15)" : valorNota >= 7 ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                                          color: valorNota >= 9.5 ? "#A855F7" : valorNota >= 7 ? "#10B981" : "#EF4444",
+                                          border: valorNota >= 9.5 ? "1px solid rgba(168,85,247,0.3)" : valorNota >= 7 ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(239,68,68,0.3)"
+                                        }}>
+                                          {nota.status || (valorNota >= 9.5 ? "Excelente 🌟" : valorNota >= 7 ? "Aprovado 👍" : "Abaixo da Média ❌")}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: "14px 16px", color: colors.textSecondary, fontSize: "12px" }}>
+                                        📅 {nota.dataRealizacao || nota.dataConclusao || "Hoje"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ===== SUB-ABA 3: BOLETIM GERAL DE NOTAS (ADMIN / GERAL) ===== */}
+                  {subAba === "relatorio_admin" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                        <div>
+                          <h3 style={{ fontSize: "18px", fontWeight: "800", margin: 0 }}>📊 Relatório Geral de Notas dos Alunos</h3>
+                          <p style={{ color: colors.textSecondary, fontSize: "13px", margin: "2px 0 0 0" }}>
+                            Acompanhe e lance notas individuais para todos os estudantes.
+                          </p>
+                        </div>
+
+                        {isAdmin && (
+                          <div style={{ display: "flex", gap: "10px" }}>
+                            <button
+                              onClick={() => {
+                                if (confirm("Tem certeza que deseja limpar todas as notas antigas de teste do relatório?")) {
+                                  setNotasProvas([]);
+                                  try {
+                                    localStorage.setItem("devhub_notas_provas", JSON.stringify([]));
+                                  } catch (e) {}
+                                }
+                              }}
+                              style={{
+                                padding: "10px 16px", borderRadius: "12px",
+                                backgroundColor: isDark ? "rgba(239, 68, 68, 0.15)" : "#FEE2E2",
+                                color: "#EF4444", border: "1px solid rgba(239, 68, 68, 0.3)",
+                                fontWeight: "700", fontSize: "13px", cursor: "pointer"
+                              }}
+                            >
+                              🗑️ Resetar Notas Antigas
+                            </button>
+
+                            <button
+                              onClick={handleAbrirNovaProva}
+                              style={{
+                                padding: "10px 18px", borderRadius: "12px",
+                                backgroundColor: "#A855F7", color: "#FFF",
+                                border: "none", fontWeight: "700", fontSize: "13px",
+                                cursor: "pointer", boxShadow: "0 4px 12px rgba(168, 85, 247, 0.3)"
+                              }}
+                            >
+                              ➕ Lançar Nota de Prova
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ marginBottom: "16px" }}>
+                        <input
+                          type="text"
+                          placeholder="🔍 Buscar aluno por nome ou e-mail..."
+                          value={buscaAluno}
+                          onChange={(e) => setBuscaAluno(e.target.value)}
+                          style={{
+                            width: "100%", padding: "10px 14px", borderRadius: "10px",
+                            border: `1px solid ${colors.borderCard}`,
+                            backgroundColor: colors.inputBg,
+                            color: colors.textPrimary, fontSize: "14px"
+                          }}
+                        />
+                      </div>
+
+                      {(() => {
+                        const listaProvasRealizadas = notasProvasFiltradas;
+                        if (listaProvasRealizadas.length === 0) {
+                          return (
+                            <div style={{
+                              backgroundColor: colors.bgCard, border: `1px solid ${colors.borderCard}`,
+                              borderRadius: "18px", padding: "45px 20px", textAlign: "center", color: colors.textSecondary
+                            }}>
+                              <span style={{ fontSize: "38px", display: "block", marginBottom: "12px" }}>📊</span>
+                              <h3 style={{ fontSize: "16px", fontWeight: "800", color: colors.textPrimary, marginBottom: "4px" }}>
+                                Nenhuma Nota Registrada
+                              </h3>
+                              <p style={{ fontSize: "13px", maxWidth: "460px", margin: "0 auto" }}>
+                                As notas dos estudantes aparecerão nesta tabela assim que realizarem provas no sistema!
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderCard}`, borderRadius: "16px", overflow: "hidden" }}>
+                            <div style={{ overflowX: "auto" }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: isDark ? "#1E293B" : "#F1F5F9", borderBottom: `1px solid ${colors.borderCard}` }}>
+                                    <th style={{ padding: "12px 16px" }}>Aluno</th>
+                                    <th style={{ padding: "12px 16px" }}>Prova Realizada</th>
+                                    <th style={{ padding: "12px 16px" }}>Nota Obtida</th>
+                                    <th style={{ padding: "12px 16px" }}>Status</th>
+                                    <th style={{ padding: "12px 16px" }}>Data de Realização</th>
+                                    {isAdmin && <th style={{ padding: "12px 16px" }}>Ações (Admin)</th>}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {listaProvasRealizadas.map((nota) => {
+                                    const valorNota = nota.nota !== undefined && nota.nota !== null ? parseFloat(nota.nota) : (nota.prova1 !== undefined ? parseFloat(nota.prova1) : 0);
+                                    const titulo = nota.provaTitulo || nota.ultimaProvaTitulo || "Prova do Sistema";
+                                    const dataStr = nota.dataRealizacao || nota.dataConclusao || "Hoje";
+
+                                    return (
+                                      <tr key={nota.id} style={{ borderBottom: `1px solid ${colors.borderCard}` }}>
+                                        <td style={{ padding: "14px 16px" }}>
+                                          <strong style={{ display: "block" }}>{nota.alunoNome}</strong>
+                                          <span style={{ fontSize: "11px", color: colors.textSecondary }}>{nota.email}</span>
+                                        </td>
+
+                                        <td style={{ padding: "14px 16px" }}>
+                                          <span style={{
+                                            fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "6px",
+                                            backgroundColor: "rgba(168, 85, 247, 0.15)", color: "#A855F7",
+                                            border: "1px solid rgba(168, 85, 247, 0.3)"
+                                          }}>
+                                            ✍️ {titulo}
+                                          </span>
+                                        </td>
+
+                                        <td style={{ padding: "14px 16px" }}>
+                                          <strong style={{ fontSize: "16px", color: valorNota >= 7 ? "#10B981" : "#EF4444" }}>
+                                            {valorNota.toFixed(1)} <span style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "normal" }}>/ 10</span>
+                                          </strong>
+                                        </td>
+
+                                        <td style={{ padding: "14px 16px" }}>
+                                          <span style={{
+                                            fontSize: "11px", fontWeight: "800", padding: "4px 8px", borderRadius: "6px",
+                                            backgroundColor: valorNota >= 9.5 ? "rgba(168, 85, 247, 0.15)" : valorNota >= 7 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                                            color: valorNota >= 9.5 ? "#A855F7" : valorNota >= 7 ? "#10B981" : "#EF4444",
+                                            border: valorNota >= 9.5 ? "1px solid rgba(168, 85, 247, 0.3)" : valorNota >= 7 ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)"
+                                          }}>
+                                            {nota.status || (valorNota >= 9.5 ? "Excelente 🌟" : valorNota >= 7 ? "Bom 👍" : "Ruim ❌")}
+                                          </span>
+                                        </td>
+
+                                        <td style={{ padding: "14px 16px", color: colors.textSecondary, fontSize: "12px" }}>
+                                          📅 {dataStr}
+                                        </td>
+
+                                        {isAdmin && (
+                                          <td style={{ padding: "14px 16px" }}>
+                                            <div style={{ display: "flex", gap: "6px" }}>
+                                              <button
+                                                onClick={() => handleAbrirEditarProva(nota)}
+                                                title="Editar Nota"
+                                                style={{
+                                                  padding: "6px 10px", borderRadius: "6px",
+                                                  backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
+                                                  color: colors.textPrimary, border: `1px solid ${colors.borderCard}`,
+                                                  cursor: "pointer", fontSize: "12px"
+                                                }}
+                                              >
+                                                ✏️
+                                              </button>
+                                              <button
+                                                onClick={() => handleExcluirProva(nota.id)}
+                                                title="Excluir Registro"
+                                                style={{
+                                                  padding: "6px 10px", borderRadius: "6px",
+                                                  backgroundColor: "rgba(239, 68, 68, 0.15)",
+                                                  color: "#EF4444", border: "1px solid rgba(239, 68, 68, 0.3)",
+                                                  cursor: "pointer", fontSize: "12px"
+                                                }}
+                                              >
+                                                🗑️
+                                              </button>
+                                            </div>
+                                          </td>
+                                        )}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                 </div>
               );
             })()}
-
-            {/* ABA: PAINEL SUPER ADMIN VIP */}
-            {/* ABA TICKETS & SUPORTE */}
-            {abaAtiva === "tickets" && (
-              <TicketsModule user={user} />
-            )}
-
-            {abaAtiva === "super_admin" && (
-              <SuperAdminModule isDark={isDark} colors={colors} currentUser={user} />
-            )}
-
-
 
             {/* ABA: SUA EVOLUÇÃO — TIMELINE & XP */}
             {abaAtiva === "evolucao" && (
               <EvolucaoTimelineModule isDark={isDark} colors={colors} user={user} />
             )}
 
-            {/* ABA: DEV IA — ASSISTENTE DE ESTUDOS DE PROGRAMAÇÃO */}
-            {abaAtiva === "dev_ia" && (
-              <DevIaModule user={user} />
+            {/* ABA SUPER ADMIN / PAINEL DE CONTROLE (SEM MODULOS ALUNO NA SIDEBAR) */}
+            {abaAtiva === "super_admin" && (
+              <div style={{ padding: "28px 24px", maxWidth: "1400px", margin: "0 auto" }}>
+                <SuperAdminModule 
+                  isDark={isDark} 
+                  colors={colors} 
+                  currentUser={user}
+                  onVoltarEntrada={() => setAbaAtiva("visao_geral")}
+                />
+              </div>
             )}
               </>
             )}
           </main>
         </div>
 
-        {/* MODAL INTERATIVO DE PERFIL DO USUÁRIO & FOTO */}
+        {modalPerfilOpen && (
         <PerfilModal
           isOpen={modalPerfilOpen}
           onClose={() => setModalPerfilOpen(false)}
@@ -3280,6 +4536,15 @@ export default function Dashboard() {
           onUpdateUser={(updatedUser) => setUser(updatedUser)}
           onLogout={handleLogout}
           onTemaEquipado={(temaId) => setTemaEquipado(temaId)}
+        />
+        )}
+
+        {/* MODAL REDUZIDO DE TICKETS & SUPORTE */}
+        <TicketsModule
+          user={user}
+          isOpen={modalTicketsOpen}
+          onClose={() => setModalTicketsOpen(false)}
+          modoAdmin={user?.cargo === "admin" || user?.cargo === "superadmin" || user?.cargo === "super_admin" || user?.role === "admin" || user?.role === "superadmin"}
         />
 
         {/* MODAL DE AGENDAMENTO (ADMIN ONLY) */}
@@ -3296,105 +4561,141 @@ export default function Dashboard() {
             padding: "20px"
           }}>
             <div style={{
-              backgroundColor: isDark ? "rgba(17, 24, 39, 0.95)" : "#FFFFFF",
+              backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
               color: colors.textPrimary,
-              maxWidth: "520px",
+              maxWidth: "720px",
               width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
               borderRadius: "24px",
-              padding: "30px",
-              border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0"}`,
-              boxShadow: isDark ? "0 25px 50px rgba(0, 0, 0, 0.6)" : "0 20px 40px rgba(0, 0, 0, 0.1)",
-              backdropFilter: "blur(16px)",
+              padding: "32px",
+              border: `1.5px solid ${isDark ? "rgba(59, 130, 246, 0.35)" : "rgba(59, 130, 246, 0.2)"}`,
+              boxShadow: "0 25px 60px -12px rgba(0, 0, 0, 0.65)",
               position: "relative"
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px" }}>
+              {/* Barra de gradiente no topo */}
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: "linear-gradient(90deg, #3B82F6, #A855F7, #EC4899)", borderRadius: "24px 24px 0 0" }} />
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "22px" }}>
                 <div>
-                  <h3 style={{ fontSize: "19px", fontWeight: "800", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                    {aulaEmEdicaoId ? "✏️ Editar Reunião" : `📅 Agendar Nova Reunião`}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "900", padding: "2px 8px", borderRadius: "6px", backgroundColor: "rgba(59, 130, 246, 0.15)", color: "#3B82F6", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+                      📅 GESTÃO DE AULAS & REUNIÕES
+                    </span>
+                    <span style={{ fontSize: "11.5px", color: colors.textSecondary, fontWeight: "600" }}>
+                      Data: <strong style={{ color: "#3B82F6" }}>{formData}</strong>
+                    </span>
+                  </div>
+                  <h3 style={{ fontSize: "21px", fontWeight: "900", background: "linear-gradient(135deg, #3B82F6, #A855F7)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", margin: 0 }}>
+                    {aulaEmEdicaoId ? "✏️ Editar Reunião" : `✨ Agendar Nova Reunião`}
                   </h3>
-                  <span style={{ fontSize: "12px", color: colors.textSecondary, marginTop: "2px", display: "block" }}>
-                    Data selecionada: <strong style={{ color: "#3B82F6" }}>{formData}</strong>
-                  </span>
                 </div>
+
                 <button
+                  type="button"
                   onClick={() => setModalAgendaOpen(false)}
                   style={{
                     border: "none",
-                    backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F1F5F9",
+                    backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9",
                     color: colors.textPrimary,
-                    width: "32px", height: "32px",
-                    borderRadius: "50%",
+                    width: "36px", height: "36px", borderRadius: "12px",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "14px", cursor: "pointer"
+                    fontSize: "16px", cursor: "pointer", transition: "all 0.2s ease"
                   }}
                 >
                   ✕
                 </button>
               </div>
 
-              <form onSubmit={handleSalvarAgendamento} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <form onSubmit={handleSalvarAgendamento} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                {/* TÍTULO DA REUNIÃO */}
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: colors.textSecondary, marginBottom: "6px" }}>
-                    Título da Reunião / Aula
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                    📝 Título da Reunião / Aula *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Ex: DEVHUB - AULA 6 - DEPLOY EM PRODUÇÃO"
+                    placeholder="Ex: Treinamento Fiscal & Contábil — Módulo Prático"
                     value={formTitulo}
                     onChange={(e) => setFormTitulo(e.target.value)}
                     style={{
-                      width: "100%", padding: "12px 14px", borderRadius: "12px",
-                      border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                      color: colors.textPrimary, fontSize: "13.5px", outline: "none"
+                      width: "100%", padding: "12px 16px", borderRadius: "12px",
+                      border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                      backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13.5px", outline: "none"
                     }}
                   />
                 </div>
 
+                {/* DESCRIÇÃO RESUMIDA */}
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: colors.textSecondary, marginBottom: "6px" }}>
-                    Descrição Resumida
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                    📋 Descrição & Pauta da Reunião
                   </label>
                   <input
                     type="text"
-                    placeholder="Resumo da pauta ou assunto da reunião..."
+                    placeholder="Resumo dos temas que serão abordados durante a transmissão..."
                     value={formDescricao}
                     onChange={(e) => setFormDescricao(e.target.value)}
                     style={{
-                      width: "100%", padding: "12px 14px", borderRadius: "12px",
-                      border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                      color: colors.textPrimary, fontSize: "13.5px", outline: "none"
+                      width: "100%", padding: "12px 16px", borderRadius: "12px",
+                      border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                      backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13.5px", outline: "none"
                     }}
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: colors.textSecondary, marginBottom: "6px" }}>
-                    👨‍🏫 Instrutor / Condutor
-                  </label>
-                  <select
-                    value={formInstrutor}
-                    onChange={(e) => setFormInstrutor(e.target.value)}
-                    style={{
-                      width: "100%", padding: "12px 14px", borderRadius: "12px",
-                      border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                      color: colors.textPrimary, fontSize: "13.5px", fontWeight: "600",
-                      cursor: "pointer", outline: "none"
-                    }}
-                  >
-                    {listaAdmins.map((adminNome, idx) => (
-                      <option key={idx} value={adminNome}>
-                        {adminNome}
-                      </option>
-                    ))}
-                  </select>
+                {/* GRID 2 COLUNAS: INSTRUTOR E STATUS */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                      👨‍🏫 Instrutor / Condutor *
+                    </label>
+                    <select
+                      value={formInstrutor}
+                      onChange={(e) => setFormInstrutor(e.target.value)}
+                      style={{
+                        width: "100%", padding: "12px 14px", borderRadius: "12px",
+                        border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                        backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", fontWeight: "700",
+                        cursor: "pointer", outline: "none"
+                      }}
+                    >
+                      {listaAdmins.map((adminNome, idx) => (
+                        <option key={idx} value={adminNome}>
+                          {adminNome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                      📡 Status da Reunião *
+                    </label>
+                    <select
+                      value={formStatus}
+                      onChange={(e) => setFormStatus(e.target.value)}
+                      style={{
+                        width: "100%", padding: "12px 14px", borderRadius: "12px",
+                        border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                        backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", fontWeight: "700",
+                        cursor: "pointer", outline: "none"
+                      }}
+                    >
+                      <option value="Agendada 📅">Agendada 📅</option>
+                      <option value="Ao Vivo 🔴">Ao Vivo 🔴 (Acontecendo Agora)</option>
+                      <option value="📹 Reprise Disponível">📹 Reprise Disponível</option>
+                      <option value="Concluída ✅">Concluída ✅</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  {/* SELETOR VISUAL DE DATA */}
+                {/* GRID 2 COLUNAS: DATA E HORÁRIO */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                   <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: colors.textSecondary, marginBottom: "6px" }}>
-                      📅 Data da Reunião
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                      📅 Data da Reunião *
                     </label>
                     <input
                       type="date"
@@ -3405,20 +4706,19 @@ export default function Dashboard() {
                         if (br) setFormData(br);
                       }}
                       style={{
-                        width: "100%", padding: "11px 12px", borderRadius: "12px",
-                        border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                        color: colors.textPrimary, fontSize: "13px", fontWeight: "600",
+                        width: "100%", padding: "11px 14px", borderRadius: "12px",
+                        border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                        backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", fontWeight: "700",
                         cursor: "pointer", outline: "none"
                       }}
                     />
                   </div>
 
-                  {/* SELETOR DE HORÁRIOS AUTOMÁTICOS */}
                   <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: colors.textSecondary, marginBottom: "6px" }}>
-                      ⏰ Horário (Início / Fim)
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                      ⏰ Horário (Início / Fim) *
                     </label>
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                       <input
                         type="time"
                         value={formHoraInicio}
@@ -3427,12 +4727,12 @@ export default function Dashboard() {
                           setFormHorario(`${e.target.value} - ${formHoraFim}`);
                         }}
                         style={{
-                          flex: 1, padding: "11px 8px", borderRadius: "12px",
-                          border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                          color: colors.textPrimary, fontSize: "12.5px", fontWeight: "700", outline: "none"
+                          flex: 1, padding: "11px 10px", borderRadius: "12px",
+                          border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                          backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12.5px", fontWeight: "800", outline: "none"
                         }}
                       />
-                      <span style={{ fontSize: "11px", color: colors.textSecondary, fontWeight: "700" }}>até</span>
+                      <span style={{ fontSize: "11px", color: colors.textSecondary, fontWeight: "800" }}>até</span>
                       <input
                         type="time"
                         value={formHoraFim}
@@ -3441,60 +4741,194 @@ export default function Dashboard() {
                           setFormHorario(`${formHoraInicio} - ${e.target.value}`);
                         }}
                         style={{
-                          flex: 1, padding: "11px 8px", borderRadius: "12px",
-                          border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                          color: colors.textPrimary, fontSize: "12.5px", fontWeight: "700", outline: "none"
+                          flex: 1, padding: "11px 10px", borderRadius: "12px",
+                          border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                          backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12.5px", fontWeight: "800", outline: "none"
                         }}
                       />
                     </div>
                   </div>
                 </div>
 
+                {/* GRID 2 COLUNAS: BASE E CARGA HORÁRIA */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                      🏢 Base de Origem / Empresa
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: ContabHub, CF Smart ou Todas as Bases"
+                      value={formBaseNome}
+                      onChange={(e) => setFormBaseNome(e.target.value)}
+                      style={{
+                        width: "100%", padding: "12px 14px", borderRadius: "12px",
+                        border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                        backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", outline: "none"
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                      ⏱️ Carga Horária de Treinamento
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 2h, 1.5h, 4h"
+                      value={formCargaHoraria}
+                      onChange={(e) => setFormCargaHoraria(e.target.value)}
+                      style={{
+                        width: "100%", padding: "12px 14px", borderRadius: "12px",
+                        border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                        backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", outline: "none"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* SELETOR INTERATIVO DE PLATAFORMA DE VÍDEO (ZOOM / MEET / NATIVA) */}
+                <div style={{
+                  padding: "18px", borderRadius: "18px",
+                  backgroundColor: isDark ? "rgba(30, 41, 59, 0.5)" : "#F8FAFC",
+                  border: `1.5px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : colors.borderCard}`
+                }}>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "900", color: colors.textPrimary, marginBottom: "10px" }}>
+                    🎥 Escolha a Plataforma de Transmissão da Chamada:
+                  </label>
+
+                  {/* ABAS SELETORAS */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px", marginBottom: "14px" }}>
+                    {[
+                      { id: "zoom", label: "🔵 Zoom Meeting", color: "#2D8CFF", desc: "Link do Zoom" },
+                      { id: "meet", label: "🟢 Google Meet", color: "#10B981", desc: "Link do Meet" },
+                      { id: "nativa", label: "🎥 Nativa DevHub", color: "#A855F7", desc: "Sem link externo" },
+                      { id: "youtube", label: "📺 YouTube Live", color: "#EF4444", desc: "Transmissão" }
+                    ].map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setFormPlataforma(item.id);
+                          if (item.id === "nativa") setFormLink("");
+                        }}
+                        style={{
+                          padding: "10px 8px", borderRadius: "12px",
+                          border: formPlataforma === item.id ? `2px solid ${item.color}` : `1px solid ${colors.borderCard}`,
+                          backgroundColor: formPlataforma === item.id ? `${item.color}15` : "transparent",
+                          color: formPlataforma === item.id ? item.color : colors.textPrimary,
+                          fontWeight: "800", fontSize: "12px", cursor: "pointer",
+                          transition: "all 0.2s ease", textAlign: "center"
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* CAMPO DE LINK CONFORME A PLATAFORMA SELECIONADA */}
+                  {formPlataforma === "zoom" && (
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", color: "#2D8CFF", marginBottom: "4px" }}>
+                        🔵 Cole aqui o Link da Reunião no Zoom (zoom.us):
+                      </label>
+                      <input
+                        type="url"
+                        required
+                        placeholder="https://zoom.us/j/1234567890?pwd=..."
+                        value={formLink}
+                        onChange={(e) => setFormLink(e.target.value)}
+                        style={{
+                          width: "100%", padding: "12px 14px", borderRadius: "12px",
+                          border: "1.5px solid #2D8CFF", backgroundColor: colors.inputBg,
+                          color: colors.textPrimary, fontSize: "13px", fontWeight: "600", outline: "none"
+                        }}
+                      />
+                      <span style={{ fontSize: "11px", color: colors.textSecondary, marginTop: "4px", display: "block" }}>
+                        💡 Os alunos poderão entrar diretamente na chamada Zoom clicando no botão no DevHub!
+                      </span>
+                    </div>
+                  )}
+
+                  {formPlataforma === "meet" && (
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", color: "#10B981", marginBottom: "4px" }}>
+                        🟢 Cole aqui o Link da Reunião no Google Meet:
+                      </label>
+                      <input
+                        type="url"
+                        required
+                        placeholder="https://meet.google.com/abc-defg-hij"
+                        value={formLink}
+                        onChange={(e) => setFormLink(e.target.value)}
+                        style={{
+                          width: "100%", padding: "12px 14px", borderRadius: "12px",
+                          border: "1.5px solid #10B981", backgroundColor: colors.inputBg,
+                          color: colors.textPrimary, fontSize: "13px", fontWeight: "600", outline: "none"
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {formPlataforma === "youtube" && (
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", color: "#EF4444", marginBottom: "4px" }}>
+                        📺 Cole aqui o Link da Live ou Vídeo do YouTube:
+                      </label>
+                      <input
+                        type="url"
+                        required
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        value={formLink}
+                        onChange={(e) => setFormLink(e.target.value)}
+                        style={{
+                          width: "100%", padding: "12px 14px", borderRadius: "12px",
+                          border: "1.5px solid #EF4444", backgroundColor: colors.inputBg,
+                          color: colors.textPrimary, fontSize: "13px", fontWeight: "600", outline: "none"
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {formPlataforma === "nativa" && (
+                    <div style={{ padding: "12px 14px", borderRadius: "12px", backgroundColor: "rgba(168, 85, 247, 0.12)", border: "1px solid rgba(168, 85, 247, 0.3)" }}>
+                      <span style={{ fontSize: "12px", color: "#A855F7", fontWeight: "800" }}>
+                        ✨ Chamada Nativa DevHub Ativada!
+                      </span>
+                      <p style={{ fontSize: "11.5px", color: colors.textSecondary, margin: "2px 0 0 0" }}>
+                        Não é necessário cole nenhum link externo. O DevHub criará a sala WebRTC integrada automaticamente para alunos e instrutores com áudio, vídeo e compartilhamento de tela!
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* LINK DA GRAVAÇÃO / REPRISE */}
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: colors.textSecondary, marginBottom: "6px" }}>
-                    🔗 Link da Reunião (Google Meet / Zoom / YouTube)
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "800", color: colors.textPrimary, marginBottom: "6px" }}>
+                    📹 Link da Gravação / Reprise (Opcional para Aulas Concluídas)
                   </label>
                   <input
                     type="url"
-                    placeholder="Cole o link aqui (ex: https://meet.google.com/...)"
-                    value={formLink}
-                    onChange={(e) => setFormLink(e.target.value)}
+                    placeholder="Link do YouTube ou arquivo MP4 para gravação posterior..."
+                    value={formLinkGravacao}
+                    onChange={(e) => setFormLinkGravacao(e.target.value)}
                     style={{
                       width: "100%", padding: "12px 14px", borderRadius: "12px",
-                      border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                      color: colors.textPrimary, fontSize: "13.5px", outline: "none"
+                      border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`,
+                      backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", outline: "none"
                     }}
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em", color: colors.textSecondary, marginBottom: "6px" }}>
-                    Status da Reunião
-                  </label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value)}
-                    style={{
-                      width: "100%", padding: "12px 14px", borderRadius: "12px",
-                      border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg,
-                      color: colors.textPrimary, fontSize: "13.5px", fontWeight: "600",
-                      cursor: "pointer", outline: "none"
-                    }}
-                  >
-                    <option value="Agendada 📅">Agendada 📅</option>
-                    <option value="Ao Vivo 🔴">Ao Vivo 🔴 (Acontecendo Agora)</option>
-                    <option value="Concluída ✅">Concluída ✅</option>
-                  </select>
-                </div>
-
-                <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+                {/* BOTÕES DE AÇÃO */}
+                <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
                   <button
                     type="button"
                     onClick={() => setModalAgendaOpen(false)}
                     style={{
-                      flex: 1, padding: "12px", borderRadius: "12px",
+                      flex: 1, padding: "13px", borderRadius: "12px",
                       border: `1px solid ${colors.borderCard}`, backgroundColor: "transparent",
-                      color: colors.textPrimary, fontWeight: "700", cursor: "pointer"
+                      color: colors.textPrimary, fontWeight: "700", cursor: "pointer", fontSize: "13px"
                     }}
                   >
                     Cancelar
@@ -3503,14 +4937,17 @@ export default function Dashboard() {
                   <button
                     type="submit"
                     style={{
-                      flex: 1, padding: "12px", borderRadius: "12px",
+                      flex: 2, padding: "13px", borderRadius: "12px",
                       border: "none",
-                      background: "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
-                      color: "#FFFFFF", fontWeight: "800", cursor: "pointer",
-                      boxShadow: "0 4px 14px rgba(59, 130, 246, 0.35)"
+                      background: formPlataforma === "zoom"
+                        ? "linear-gradient(135deg, #2D8CFF 0%, #1A73E8 100%)"
+                        : "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
+                      color: "#FFFFFF", fontWeight: "900", fontSize: "13.5px", cursor: "pointer",
+                      boxShadow: "0 4px 16px rgba(59, 130, 246, 0.4)",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
                     }}
                   >
-                    Salvar Reunião
+                    🚀 Salvar Reunião
                   </button>
                 </div>
               </form>
@@ -3938,113 +5375,195 @@ export default function Dashboard() {
 
 
         {/* MODAL REALIZAR PROVA (ESTUDANTES) */}
-        {provaEmAndamento && (
-          <div style={{
-            position: "fixed",
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
-            backdropFilter: "blur(8px)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px"
-          }}>
+        {provaEmAndamento && (() => {
+          const totalQuestoes = provaEmAndamento.questoes ? provaEmAndamento.questoes.length : 0;
+          const respondidasCount = provaEmAndamento.questoes
+            ? provaEmAndamento.questoes.filter(q => respostasUsuario[q.id] !== undefined && respostasUsuario[q.id] !== null).length
+            : 0;
+          const pctProgresso = totalQuestoes > 0 ? Math.round((respondidasCount / totalQuestoes) * 100) : 0;
+
+          return (
             <div style={{
-              backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
-              color: colors.textPrimary,
-              maxWidth: "650px",
-              width: "100%",
-              maxHeight: "85vh",
-              overflowY: "auto",
-              borderRadius: "20px",
-              padding: "28px",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
-              position: "relative"
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(10, 15, 30, 0.82)",
+              backdropFilter: "blur(12px)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px"
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <div>
-                  <span style={{ fontSize: "12px", color: "#EC4899", fontWeight: "700" }}>✍️ Prova em Andamento</span>
-                  <h3 style={{ fontSize: "19px", fontWeight: "800" }}>{provaEmAndamento.titulo}</h3>
-                </div>
-                <button
-                  onClick={() => setProvaEmAndamento(null)}
-                  style={{ border: "none", backgroundColor: "transparent", color: colors.textPrimary, fontSize: "18px", cursor: "pointer" }}
-                >
-                  ✕
-                </button>
-              </div>
+              <div style={{
+                backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                color: colors.textPrimary,
+                maxWidth: "720px",
+                width: "100%",
+                maxHeight: "90vh",
+                overflowY: "auto",
+                borderRadius: "24px",
+                padding: "32px",
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.6)",
+                position: "relative",
+                border: `1.5px solid ${isDark ? "rgba(20, 184, 166, 0.3)" : "rgba(20, 184, 166, 0.2)"}`
+              }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "5px", background: "linear-gradient(90deg, #14b8a6, #0d9488, #38bdf8)" }} />
 
-              <form onSubmit={handleEnviarProvaOnline} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                {provaEmAndamento.questoes.map((q, idx) => (
-                  <div key={q.id} style={{
-                    backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
-                    border: `1px solid ${colors.borderCard}`,
-                    borderRadius: "14px",
-                    padding: "16px"
-                  }}>
-                    <h4 style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px" }}>
-                      {idx + 1}. {q.pergunta}
-                    </h4>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {q.opcoes.map((opcao, oIdx) => (
-                        <label
-                          key={oIdx}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                            padding: "10px 14px",
-                            borderRadius: "10px",
-                            border: `1px solid ${respostasUsuario[q.id] === oIdx ? "#EC4899" : colors.borderCard}`,
-                            backgroundColor: respostasUsuario[q.id] === oIdx ? "rgba(236, 72, 153, 0.1)" : "transparent",
-                            cursor: "pointer",
-                            fontSize: "13px"
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name={`questao-${q.id}`}
-                            checked={respostasUsuario[q.id] === oIdx}
-                            onChange={() => handleSelecionarResposta(q.id, oIdx)}
-                            required
-                          />
-                          <span>{opcao}</span>
-                        </label>
-                      ))}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "11px", color: "#14b8a6", fontWeight: "900", padding: "2px 8px", borderRadius: "8px", background: "rgba(20, 184, 166, 0.15)", border: "1px solid rgba(20, 184, 166, 0.3)" }}>
+                        ✍️ PROVA EM ANDAMENTO
+                      </span>
+                      <span style={{ fontSize: "11px", color: colors.textSecondary, fontWeight: "700" }}>⏱️ Prova Individual</span>
                     </div>
+                    <h3 style={{ fontSize: "21px", fontWeight: "900", color: colors.textPrimary, margin: 0, lineHeight: "1.3" }}>
+                      {provaEmAndamento.titulo}
+                    </h3>
                   </div>
-                ))}
 
-                <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                   <button
                     type="button"
                     onClick={() => setProvaEmAndamento(null)}
                     style={{
-                      flex: 1, padding: "12px", borderRadius: "10px",
-                      border: `1px solid ${colors.borderCard}`, backgroundColor: "transparent",
-                      color: colors.textPrimary, fontWeight: "600", cursor: "pointer"
+                      border: "none",
+                      backgroundColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#F1F5F9",
+                      color: colors.textPrimary,
+                      width: "36px", height: "36px", borderRadius: "12px",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "16px", cursor: "pointer", transition: "all 0.2s ease"
                     }}
                   >
-                    Cancelar
-                  </button>
-
-                  <button
-                    type="submit"
-                    style={{
-                      flex: 1, padding: "12px", borderRadius: "10px",
-                      border: "none", backgroundColor: "#EC4899",
-                      color: "#FFFFFF", fontWeight: "700", cursor: "pointer"
-                    }}
-                  >
-                    📤 Finalizar e Enviar Prova
+                    ✕
                   </button>
                 </div>
-              </form>
+
+                {/* BARRA DE PROGRESSO EM TEMPO REAL */}
+                <div style={{
+                  marginBottom: "24px", padding: "16px", borderRadius: "16px",
+                  background: isDark ? "rgba(30, 41, 59, 0.7)" : "#F8FAFC",
+                  border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : colors.borderCard}`
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", fontSize: "12px", fontWeight: "700" }}>
+                    <span style={{ color: colors.textSecondary }}>Progresso da Avaliação</span>
+                    <span style={{ color: "#14b8a6", fontWeight: "900" }}>{respondidasCount} de {totalQuestoes} respondidas ({pctProgresso}%)</span>
+                  </div>
+                  <div style={{ width: "100%", height: "8px", backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0", borderRadius: "4px", overflow: "hidden" }}>
+                    <div style={{ width: `${pctProgresso}%`, height: "100%", background: "linear-gradient(90deg, #14b8a6, #2dd4bf)", borderRadius: "4px", transition: "width 0.3s ease" }} />
+                  </div>
+                </div>
+
+                <form onSubmit={handleEnviarProvaOnline} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                  {provaEmAndamento.questoes.map((q, idx) => {
+                    const respondida = respostasUsuario[q.id] !== undefined && respostasUsuario[q.id] !== null;
+                    return (
+                      <div key={q.id} style={{
+                        backgroundColor: isDark ? "rgba(30, 41, 59, 0.4)" : "#FFFFFF",
+                        border: `1.5px solid ${respondida ? "rgba(20, 184, 166, 0.4)" : (isDark ? "rgba(255,255,255,0.08)" : colors.borderCard)}`,
+                        borderRadius: "18px",
+                        padding: "20px",
+                        boxShadow: respondida ? "0 4px 20px rgba(20, 184, 166, 0.08)" : "none",
+                        transition: "all 0.2s ease"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                          <span style={{
+                            fontSize: "10px", fontWeight: "900", padding: "3px 10px", borderRadius: "8px",
+                            background: respondida ? "linear-gradient(135deg, #14b8a6, #0d9488)" : (isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"),
+                            color: respondida ? "#FFF" : colors.textSecondary
+                          }}>
+                            QUESTÃO {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                          </span>
+                          {respondida && <span style={{ fontSize: "11px", color: "#14b8a6", fontWeight: "800" }}>✓ Respondida</span>}
+                        </div>
+
+                        <h4 style={{ fontSize: "15px", fontWeight: "800", marginBottom: "16px", color: colors.textPrimary, lineHeight: "1.4" }}>
+                          {q.pergunta}
+                        </h4>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                          {q.opcoes.map((opcao, oIdx) => {
+                            const letras = ["A", "B", "C", "D", "E"];
+                            const isSelected = respostasUsuario[q.id] === oIdx;
+                            return (
+                              <label
+                                key={oIdx}
+                                onClick={() => handleSelecionarResposta(q.id, oIdx)}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "12px",
+                                  padding: "12px 16px",
+                                  borderRadius: "14px",
+                                  border: isSelected ? "2px solid #14b8a6" : `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
+                                  backgroundColor: isSelected
+                                    ? (isDark ? "rgba(20, 184, 166, 0.15)" : "#F0FDFA")
+                                    : (isDark ? "rgba(15, 23, 42, 0.5)" : "#FFFFFF"),
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                                  boxShadow: isSelected ? "0 4px 16px rgba(20, 184, 166, 0.2)" : "none"
+                                }}
+                              >
+                                <div style={{
+                                  width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
+                                  background: isSelected ? "linear-gradient(135deg, #14b8a6, #0d9488)" : (isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0"),
+                                  color: isSelected ? "#FFF" : colors.textSecondary,
+                                  fontWeight: "900", fontSize: "13px",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  boxShadow: isSelected ? "0 2px 8px rgba(20, 184, 166, 0.35)" : "none"
+                                }}>
+                                  {isSelected ? "✓" : letras[oIdx] || (oIdx + 1)}
+                                </div>
+
+                                <span style={{ fontSize: "13.5px", fontWeight: isSelected ? "700" : "500", color: colors.textPrimary, flex: 1, lineHeight: "1.4" }}>
+                                  {opcao}
+                                </span>
+                                <input
+                                  type="radio"
+                                  name={`questao-${q.id}`}
+                                  checked={isSelected}
+                                  onChange={() => handleSelecionarResposta(q.id, oIdx)}
+                                  style={{ display: "none" }}
+                                  required
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setProvaEmAndamento(null)}
+                      style={{
+                        padding: "13px 20px", borderRadius: "14px",
+                        border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : colors.borderCard}`, backgroundColor: "transparent",
+                        color: colors.textPrimary, fontWeight: "700", fontSize: "13px", cursor: "pointer"
+                      }}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="submit"
+                      style={{
+                        flex: 1, padding: "13px 24px", borderRadius: "14px",
+                        border: "none", background: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
+                        color: "#FFFFFF", fontWeight: "900", fontSize: "14px", cursor: "pointer",
+                        boxShadow: "0 4px 20px rgba(20, 184, 166, 0.4)",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
+                      }}
+                    >
+                      <span>📤</span> Finalizar e Enviar Prova
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* MODAL PROVA CONCLUÍDA COM CORREÇÃO EM TEMPO REAL */}
         {modalProvaConcluida && (
@@ -4176,171 +5695,222 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* MODAL CRIAR PROVA — REDESENHADO COM ABAS */}
+        {/* MODAL CRIAR PROVA (ADMIN / SUPER ADMIN) */}
         {modalCriarProvaOpen && (
           <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)",
-            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px"
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(10, 15, 30, 0.82)",
+            backdropFilter: "blur(12px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
           }}>
             <div style={{
               backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
               color: colors.textPrimary,
-              maxWidth: "640px", width: "100%",
+              maxWidth: "720px", width: "100%",
               maxHeight: "90vh", overflowY: "auto",
               borderRadius: "24px",
-              border: isDark ? "1px solid rgba(168,85,247,0.25)" : "1px solid rgba(168,85,247,0.15)",
-              boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+              border: `1.5px solid ${isDark ? "rgba(168, 85, 247, 0.35)" : "rgba(168, 85, 247, 0.2)"}`,
+              boxShadow: "0 25px 60px -12px rgba(0, 0, 0, 0.65)",
               position: "relative"
             }}>
               {/* Barra de gradiente no topo */}
-              <div style={{ height: "3px", background: "linear-gradient(90deg,#a855f7,#ec4899,#a855f7)", borderRadius: "24px 24px 0 0" }} />
+              <div style={{ height: "4px", background: "linear-gradient(90deg, #14b8a6, #a855f7, #ec4899)", borderRadius: "24px 24px 0 0" }} />
 
-              <div style={{ padding: "26px" }}>
+              <div style={{ padding: "30px" }}>
                 {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "22px" }}>
                   <div>
-                    <h3 style={{ fontSize: "19px", fontWeight: "900", background: "linear-gradient(135deg,#a855f7,#ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                      ➕ Criar Nova Prova
+                    <h3 style={{ fontSize: "21px", fontWeight: "900", background: "linear-gradient(135deg, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", margin: 0 }}>
+                      ✨ Criar Nova Avaliação
                     </h3>
-                    <p style={{ fontSize: "12px", color: colors.textSecondary, marginTop: "2px" }}>Escolha o formato da prova abaixo</p>
+                    <p style={{ fontSize: "12.5px", color: colors.textSecondary, marginTop: "4px", margin: 0 }}>
+                      Defina as instruções e escolha entre questões interativas de múltipla escolha ou arquivo PDF.
+                    </p>
                   </div>
                   <button
                     onClick={() => setModalCriarProvaOpen(false)}
-                    style={{ border: "none", backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#F1F5F9", color: colors.textPrimary, fontSize: "16px", cursor: "pointer", borderRadius: "10px", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    style={{
+                      border: "none",
+                      backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9",
+                      color: colors.textPrimary,
+                      width: "36px", height: "36px", borderRadius: "12px",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "16px", cursor: "pointer", transition: "all 0.2s ease"
+                    }}
                   >✕</button>
                 </div>
 
                 {/* ABAS: Questões / PDF */}
-                <div style={{ display: "flex", gap: "8px", marginBottom: "22px", backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#F8FAFC", borderRadius: "14px", padding: "4px" }}>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "24px", backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F8FAFC", borderRadius: "16px", padding: "5px", border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : colors.borderCard}` }}>
                   {[
-                    { key: "questoes", label: "✍️ Criar com Questões", desc: "Adicione perguntas de múltipla escolha" },
-                    { key: "pdf",      label: "📄 Upload de PDF",      desc: "Anexe uma prova já pronta em PDF" }
+                    { key: "questoes", label: "✍️ Criar com Questões", desc: "Perguntas de múltipla escolha interativas" },
+                    { key: "pdf",      label: "📄 Upload de PDF",      desc: "Anexar arquivo em PDF já formatado" }
                   ].map(tab => (
                     <button
                       key={tab.key}
                       type="button"
                       onClick={() => setModalModoProva(tab.key)}
                       style={{
-                        flex: 1, padding: "10px 12px", borderRadius: "10px",
+                        flex: 1, padding: "12px 14px", borderRadius: "12px",
                         border: "none",
                         backgroundColor: modalModoProva === tab.key ? (isDark ? "#1E293B" : "#FFFFFF") : "transparent",
                         color: modalModoProva === tab.key ? "#A855F7" : colors.textSecondary,
-                        fontWeight: modalModoProva === tab.key ? "800" : "600",
+                        fontWeight: modalModoProva === tab.key ? "900" : "600",
                         fontSize: "13px", cursor: "pointer",
-                        boxShadow: modalModoProva === tab.key ? "0 2px 8px rgba(0,0,0,0.15)" : "none",
-                        transition: "all 0.2s",
+                        boxShadow: modalModoProva === tab.key ? "0 4px 14px rgba(168,85,247,0.2)" : "none",
+                        transition: "all 0.2s ease",
                         textAlign: "center"
                       }}
                     >
                       {tab.label}
-                      <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "2px", fontWeight: "400" }}>{tab.desc}</div>
+                      <div style={{ fontSize: "10.5px", opacity: 0.75, marginTop: "2px", fontWeight: "500" }}>{tab.desc}</div>
                     </button>
                   ))}
                 </div>
 
-                <form onSubmit={handleSalvarNovaProvaSuperAdmin} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <form onSubmit={handleSalvarNovaProvaSuperAdmin} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                   {/* Campos comuns */}
                   <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: "700", marginBottom: "5px" }}>📝 Título da Prova *</label>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", marginBottom: "6px", color: colors.textPrimary }}>📝 Título da Prova *</label>
                     <input
                       type="text" required
-                      placeholder="Ex: Avaliação Final — Módulo Backend"
+                      placeholder="Ex: Avaliação Final — Módulo Backend & APIs REST"
                       value={formCriarTitulo}
                       onChange={(e) => setFormCriarTitulo(e.target.value)}
-                      style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px" }}
+                      style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13.5px", transition: "all 0.2s ease" }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: "700", marginBottom: "5px" }}>📋 Descrição & Instruções *</label>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "800", marginBottom: "6px", color: colors.textPrimary }}>📋 Descrição & Instruções *</label>
                     <textarea
-                      rows={2} required
-                      placeholder="Descreva o que será cobrado e as instruções para os alunos..."
+                      rows={3} required
+                      placeholder="Descreva o conteúdo cobrado, critérios de aprovação e orientações aos alunos..."
                       value={formCriarDescricao}
                       onChange={(e) => setFormCriarDescricao(e.target.value)}
-                      style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", resize: "vertical" }}
+                      style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13.5px", resize: "vertical", transition: "all 0.2s ease" }}
                     />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: "700", marginBottom: "4px" }}>📅 Data Limite</label>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", marginBottom: "5px", color: colors.textSecondary }}>📅 Data Limite</label>
                       <input type="date" value={formCriarDataLimite} onChange={(e) => setFormCriarDataLimite(e.target.value)}
-                        style={{ width: "100%", padding: "9px", borderRadius: "8px", border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12px" }}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12.5px" }}
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: "700", marginBottom: "4px" }}>⏰ Hora Limite</label>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", marginBottom: "5px", color: colors.textSecondary }}>⏰ Hora Limite</label>
                       <input type="time" value={formCriarHoraLimite} onChange={(e) => setFormCriarHoraLimite(e.target.value)}
-                        style={{ width: "100%", padding: "9px", borderRadius: "8px", border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12px" }}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12.5px" }}
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "11px", fontWeight: "700", marginBottom: "4px" }}>⏱️ Duração (min)</label>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", marginBottom: "5px", color: colors.textSecondary }}>⏱️ Duração (min)</label>
                       <input type="number" min="5" max="360" value={formCriarDuracao} onChange={(e) => setFormCriarDuracao(e.target.value)}
-                        style={{ width: "100%", padding: "9px", borderRadius: "8px", border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12px" }}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1.5px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12.5px" }}
                       />
                     </div>
                   </div>
 
                   {/* ===== MODO QUESTÕES ===== */}
                   {modalModoProva === "questoes" && (
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                        <label style={{ fontSize: "13px", fontWeight: "800", color: "#A855F7" }}>❓ Questões da Prova</label>
+                    <div style={{ marginTop: "6px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                        <label style={{ fontSize: "14px", fontWeight: "900", color: "#A855F7", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>❓</span> Questões da Prova ({formCriarPerguntas.length})
+                        </label>
                         <button
                           type="button"
                           onClick={handleAdicionarPerguntaForm}
-                          style={{ padding: "5px 12px", borderRadius: "8px", backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7", border: "1px solid rgba(168,85,247,0.3)", fontSize: "12px", cursor: "pointer", fontWeight: "700" }}
-                        >+ Nova Questão</button>
+                          style={{
+                            padding: "7px 14px", borderRadius: "10px",
+                            backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7",
+                            border: "1px solid rgba(168,85,247,0.35)", fontSize: "12px",
+                            cursor: "pointer", fontWeight: "800", transition: "all 0.2s ease"
+                          }}
+                        >
+                          ➕ Nova Questão
+                        </button>
                       </div>
 
                       {formCriarPerguntas.map((q, qIdx) => (
-                        <div key={qIdx} style={{ padding: "16px", borderRadius: "14px", backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC", border: `1px solid ${colors.borderCard}`, marginBottom: "12px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                            <span style={{ fontSize: "12px", fontWeight: "900", color: "#A855F7", background: "rgba(168,85,247,0.12)", padding: "3px 10px", borderRadius: "8px" }}>
-                              Pergunta #{qIdx + 1}
+                        <div key={qIdx} style={{
+                          padding: "20px", borderRadius: "18px",
+                          backgroundColor: isDark ? "rgba(30, 41, 59, 0.4)" : "#F8FAFC",
+                          border: `1.5px solid ${isDark ? "rgba(255,255,255,0.08)" : colors.borderCard}`,
+                          marginBottom: "16px",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.1)"
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: "900", color: "#A855F7", background: "rgba(168,85,247,0.15)", padding: "4px 12px", borderRadius: "10px", border: "1px solid rgba(168,85,247,0.3)" }}>
+                              QUESTÃO {qIdx + 1 < 10 ? `0${qIdx + 1}` : qIdx + 1}
                             </span>
                             {formCriarPerguntas.length > 1 && (
                               <button type="button" onClick={() => setFormCriarPerguntas(prev => prev.filter((_, i) => i !== qIdx))}
-                                style={{ border: "none", backgroundColor: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: "11px", cursor: "pointer", fontWeight: "700", padding: "4px 10px", borderRadius: "6px" }}>
+                                style={{ border: "none", backgroundColor: "rgba(239,68,68,0.12)", color: "#EF4444", fontSize: "11px", cursor: "pointer", fontWeight: "800", padding: "5px 12px", borderRadius: "8px" }}>
                                 🗑️ Remover
                               </button>
                             )}
                           </div>
 
-                          <input
-                            type="text" required
-                            placeholder={`Enunciado da Pergunta ${qIdx + 1}...`}
-                            value={q.pergunta}
-                            onChange={(e) => { const val = e.target.value; setFormCriarPerguntas(prev => prev.map((item, i) => i === qIdx ? { ...item, pergunta: val } : item)); }}
-                            style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", marginBottom: "10px" }}
-                          />
-
-                          <label style={{ display: "block", fontSize: "11px", fontWeight: "700", marginBottom: "6px", color: colors.textSecondary }}>Opções de Resposta:</label>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-                            {q.opcoes.map((op, oIdx) => (
-                              <input
-                                key={oIdx} type="text" required
-                                placeholder={`Opção ${oIdx + 1}`}
-                                value={op}
-                                onChange={(e) => { const val = e.target.value; setFormCriarPerguntas(prev => prev.map((item, i) => i === qIdx ? { ...item, opcoes: item.opcoes.map((o, idx2) => idx2 === oIdx ? val : o) } : item)); }}
-                                style={{ padding: "9px 10px", borderRadius: "8px", border: `1px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12px" }}
-                              />
-                            ))}
+                          <div style={{ marginBottom: "12px" }}>
+                            <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", color: colors.textSecondary, marginBottom: "4px" }}>Enunciado da Pergunta:</label>
+                            <input
+                              type="text" required
+                              placeholder={`Ex: O que é um middleware no contexto do ExpressJS?`}
+                              value={q.pergunta}
+                              onChange={(e) => { const val = e.target.value; setFormCriarPerguntas(prev => prev.map((item, i) => i === qIdx ? { ...item, pergunta: val } : item)); }}
+                              style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px" }}
+                            />
                           </div>
 
-                          <div style={{ backgroundColor: isDark ? "rgba(16,185,129,0.08)" : "#E6F4EA", padding: "10px 12px", borderRadius: "10px", border: "1px solid rgba(16,185,129,0.25)" }}>
-                            <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#10B981", marginBottom: "5px" }}>✅ Qual é a Resposta CORRETA?</label>
+                          <label style={{ display: "block", fontSize: "11.5px", fontWeight: "800", marginBottom: "8px", color: colors.textSecondary }}>Opções de Resposta (A, B, C, D):</label>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
+                            {q.opcoes.map((op, oIdx) => {
+                              const letras = ["A", "B", "C", "D"];
+                              return (
+                                <div key={oIdx} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <div style={{
+                                    width: "28px", height: "28px", borderRadius: "8px", flexShrink: 0,
+                                    backgroundColor: "rgba(168, 85, 247, 0.15)", color: "#A855F7",
+                                    fontWeight: "900", fontSize: "12px",
+                                    display: "flex", alignItems: "center", justifyContent: "center"
+                                  }}>
+                                    {letras[oIdx]}
+                                  </div>
+                                  <input
+                                    type="text" required
+                                    placeholder={`Texto da Opção ${letras[oIdx]}`}
+                                    value={op}
+                                    onChange={(e) => { const val = e.target.value; setFormCriarPerguntas(prev => prev.map((item, i) => i === qIdx ? { ...item, opcoes: item.opcoes.map((o, idx2) => idx2 === oIdx ? val : o) } : item)); }}
+                                    style={{ flex: 1, padding: "10px 12px", borderRadius: "10px", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12.5px" }}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div style={{ backgroundColor: isDark ? "rgba(16,185,129,0.12)" : "#E6F4EA", padding: "12px 16px", borderRadius: "12px", border: "1px solid rgba(16,185,129,0.3)" }}>
+                            <label style={{ display: "block", fontSize: "12px", fontWeight: "900", color: "#10B981", marginBottom: "6px" }}>✅ Qual é a Resposta CORRETA?</label>
                             <select
                               value={q.respostaCorreta}
                               onChange={(e) => { const val = parseInt(e.target.value); setFormCriarPerguntas(prev => prev.map((item, i) => i === qIdx ? { ...item, respostaCorreta: val } : item)); }}
-                              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #10B981", backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
+                              style={{ width: "100%", padding: "10px 12px", borderRadius: "10px", border: "1.5px solid #10B981", backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "13px", fontWeight: "800", cursor: "pointer" }}
                             >
-                              {q.opcoes.map((opText, oIdx) => (
-                                <option key={oIdx} value={oIdx}>Opção {oIdx + 1}: {opText || `(Opção ${oIdx + 1})`}</option>
-                              ))}
+                              {q.opcoes.map((opText, oIdx) => {
+                                const letras = ["A", "B", "C", "D"];
+                                return (
+                                  <option key={oIdx} value={oIdx}>
+                                    Opção {letras[oIdx]}: {opText ? `"${opText}"` : `(Preencha a opção ${letras[oIdx]})`}
+                                  </option>
+                                );
+                              })}
                             </select>
                           </div>
                         </div>
@@ -4350,29 +5920,29 @@ export default function Dashboard() {
 
                   {/* ===== MODO PDF ===== */}
                   {modalModoProva === "pdf" && (
-                    <div>
-                      <label style={{ display: "block", fontSize: "13px", fontWeight: "800", color: "#FB923C", marginBottom: "10px" }}>📄 Arquivo PDF da Prova</label>
+                    <div style={{ marginTop: "6px" }}>
+                      <label style={{ display: "block", fontSize: "13.5px", fontWeight: "900", color: "#FB923C", marginBottom: "10px" }}>📄 Arquivo PDF da Prova</label>
 
                       <label
                         htmlFor="pdf-upload-input"
                         style={{
                           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                          padding: "32px 20px", borderRadius: "16px",
-                          border: pdfUploadNome ? "2px solid #FB923C" : `2px dashed ${colors.borderCard}`,
-                          backgroundColor: pdfUploadNome ? "rgba(251,146,60,0.08)" : (isDark ? "rgba(255,255,255,0.02)" : "#FAFBFC"),
-                          cursor: "pointer", textAlign: "center", transition: "all 0.2s"
+                          padding: "36px 20px", borderRadius: "20px",
+                          border: pdfUploadNome ? "2px solid #FB923C" : `2px dashed ${isDark ? "rgba(251,146,60,0.4)" : colors.borderCard}`,
+                          backgroundColor: pdfUploadNome ? "rgba(251,146,60,0.1)" : (isDark ? "rgba(255,255,255,0.02)" : "#FAFBFC"),
+                          cursor: "pointer", textAlign: "center", transition: "all 0.2s ease"
                         }}
                       >
-                        <span style={{ fontSize: "40px", marginBottom: "12px" }}>{pdfUploadNome ? "📄" : "⬆️"}</span>
+                        <span style={{ fontSize: "44px", marginBottom: "12px" }}>{pdfUploadNome ? "📄" : "⬆️"}</span>
                         {pdfUploadNome ? (
                           <>
-                            <span style={{ fontSize: "14px", fontWeight: "800", color: "#FB923C", marginBottom: "4px" }}>{pdfUploadNome}</span>
-                            <span style={{ fontSize: "12px", color: colors.textSecondary }}>✅ PDF carregado com sucesso! Clique para trocar.</span>
+                            <span style={{ fontSize: "15px", fontWeight: "900", color: "#FB923C", marginBottom: "4px" }}>{pdfUploadNome}</span>
+                            <span style={{ fontSize: "12px", color: colors.textSecondary }}>✅ PDF pronto para publicação! Clique para trocar o arquivo.</span>
                           </>
                         ) : (
                           <>
-                            <span style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px" }}>Arraste ou clique para enviar o PDF</span>
-                            <span style={{ fontSize: "12px", color: colors.textSecondary }}>Formatos aceitos: .pdf · Máximo recomendado: 10MB</span>
+                            <span style={{ fontSize: "14.5px", fontWeight: "800", marginBottom: "4px", color: colors.textPrimary }}>Clique ou arraste o arquivo PDF aqui</span>
+                            <span style={{ fontSize: "12px", color: colors.textSecondary }}>Formatos aceitos: .pdf (Máx. 15MB)</span>
                           </>
                         )}
                         <input
@@ -4398,20 +5968,20 @@ export default function Dashboard() {
                       </label>
 
                       {pdfUploadNome && (
-                        <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderRadius: "10px", backgroundColor: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.3)" }}>
-                          <span style={{ fontSize: "18px" }}>📄</span>
+                        <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", borderRadius: "12px", backgroundColor: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.35)" }}>
+                          <span style={{ fontSize: "20px" }}>📄</span>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#FB923C" }}>{pdfUploadNome}</div>
-                            <div style={{ fontSize: "11px", color: colors.textSecondary }}>Arquivo pronto para publicação</div>
+                            <div style={{ fontSize: "13.5px", fontWeight: "800", color: "#FB923C" }}>{pdfUploadNome}</div>
+                            <div style={{ fontSize: "11.5px", color: colors.textSecondary }}>Arquivo anexado e pronto para publicação</div>
                           </div>
                           <button type="button" onClick={() => { setPdfUploadData(null); setPdfUploadNome(""); }}
-                            style={{ border: "none", backgroundColor: "transparent", color: "#EF4444", cursor: "pointer", fontSize: "14px" }}>✕</button>
+                            style={{ border: "none", backgroundColor: "transparent", color: "#EF4444", cursor: "pointer", fontSize: "16px", fontWeight: "900" }}>✕</button>
                         </div>
                       )}
 
-                      <div style={{ marginTop: "14px", padding: "12px 14px", borderRadius: "10px", backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F0F4FF", border: `1px solid ${colors.borderCard}` }}>
-                        <p style={{ fontSize: "12px", color: colors.textSecondary, lineHeight: "1.6" }}>
-                          💡 <strong>Como funciona:</strong> O PDF será armazenado e os alunos poderão abrir o arquivo diretamente no navegador para realizar a prova. Ideal para provas já formatadas em Word, Google Docs, etc.
+                      <div style={{ marginTop: "14px", padding: "14px 16px", borderRadius: "14px", backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#F0F4FF", border: `1px solid ${colors.borderCard}` }}>
+                        <p style={{ fontSize: "12px", color: colors.textSecondary, lineHeight: "1.6", margin: 0 }}>
+                          💡 <strong>Como funciona:</strong> O PDF é disponibilizado aos alunos diretamente para download/leitura online durante o período de avaliação.
                         </p>
                       </div>
                     </div>
@@ -4445,6 +6015,253 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* MODAL VISUALIZADOR DE PROVA EM PDF */}
+        {pdfVisualizarModal && (() => {
+          const jaConcluidaPdf = user && provasConcluidas.some(c =>
+            c.provaId === pdfVisualizarModal.id && (c.userId === user.id || (c.userEmail && c.userEmail.toLowerCase() === user.email.toLowerCase()))
+          );
+
+          const handleFinalizarProvaPdf = (e) => {
+            e.preventDefault();
+            if (!pdfVisualizarModal) return;
+
+            const novaNota = {
+              id: Date.now().toString(),
+              provaId: pdfVisualizarModal.id,
+              titulo: pdfVisualizarModal.titulo,
+              userId: user ? user.id : "anon",
+              userName: user ? (user.nome || user.email) : "Estudante",
+              userEmail: user ? user.email : "",
+              nota: 0.0,
+              status: "Pendente ⏳",
+              statusTexto: "Aguardando Correção do Professor",
+              isPendenteCorrecao: true,
+              acertos: 0,
+              total: 1,
+              data: new Date().toLocaleDateString("pt-BR"),
+              horario: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+              respostaTexto: pdfTextoResposta || "Resposta enviada via PDF."
+            };
+
+            const novasNotas = [novaNota, ...notasProvas];
+            setNotasProvas(novasNotas);
+            try { localStorage.setItem("devhub_notas_provas", JSON.stringify(novasNotas)); } catch (err) {}
+
+            const novasConcluidas = [novaNota, ...provasConcluidas];
+            setProvasConcluidas(novasConcluidas);
+            try { localStorage.setItem("devhub_provas_concluidas", JSON.stringify(novasConcluidas)); } catch (err) {}
+
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+            fetch(`${apiUrl}/notas`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(novaNota)
+            }).catch(() => {});
+
+            setPdfVisualizarModal(null);
+            setPdfModoResposta(false);
+            setPdfTextoResposta("");
+            alert("📩 Resposta enviada com sucesso!\n\nSua prova em PDF foi enviada para o professor e está com o status 'Aguardando Correção'. A nota final será atualizada no seu Boletim assim que for corrigida.");
+          };
+
+          return (
+            <div style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(10, 15, 30, 0.85)",
+              backdropFilter: "blur(14px)",
+              zIndex: 1100,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px"
+            }}>
+              <div style={{
+                backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                color: colors.textPrimary,
+                maxWidth: "1200px",
+                width: "100%",
+                height: "92vh",
+                borderRadius: "24px",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 25px 60px -12px rgba(0, 0, 0, 0.75)",
+                overflow: "hidden",
+                border: `1.5px solid ${isDark ? "rgba(251, 146, 60, 0.35)" : "rgba(251, 146, 60, 0.2)"}`
+              }}>
+                {/* Top Header */}
+                <div style={{
+                  padding: "16px 24px",
+                  background: isDark ? "rgba(30, 41, 59, 0.8)" : "#F8FAFC",
+                  borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : colors.borderCard}`,
+                  display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div style={{
+                      width: "42px", height: "42px", borderRadius: "12px",
+                      background: "linear-gradient(135deg, #FB923C, #F97316)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#FFF", fontSize: "20px", boxShadow: "0 4px 14px rgba(251, 146, 60, 0.4)"
+                    }}>
+                      📄
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "10.5px", fontWeight: "900", padding: "2px 8px", borderRadius: "6px", background: "rgba(251, 146, 60, 0.15)", color: "#FB923C", border: "1px solid rgba(251, 146, 60, 0.3)" }}>
+                          AVALIAÇÃO EM PDF
+                        </span>
+                        <span style={{ fontSize: "11px", color: colors.textSecondary }}>{pdfVisualizarModal.pdfNome}</span>
+                      </div>
+                      <h3 style={{ fontSize: "17px", fontWeight: "900", color: colors.textPrimary, margin: "2px 0 0 0" }}>
+                        {pdfVisualizarModal.titulo}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    {jaConcluidaPdf ? (
+                      <span style={{
+                        padding: "8px 14px", borderRadius: "10px",
+                        background: "rgba(16, 185, 129, 0.15)", color: "#10B981",
+                        border: "1px solid rgba(16, 185, 129, 0.3)", fontWeight: "800", fontSize: "12.5px"
+                      }}>
+                        ✅ PROVA JÁ CONCLUÍDA
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setPdfModoResposta(!pdfModoResposta)}
+                        style={{
+                          padding: "9px 18px", borderRadius: "10px", border: "none",
+                          background: pdfModoResposta ? "linear-gradient(135deg, #14b8a6, #0d9488)" : "linear-gradient(135deg, #FB923C, #F97316)",
+                          color: "#FFF", fontWeight: "900", fontSize: "12.5px", cursor: "pointer",
+                          boxShadow: "0 4px 14px rgba(251, 146, 60, 0.35)", transition: "all 0.2s ease"
+                        }}
+                      >
+                        {pdfModoResposta ? "📖 Ver Apenas o PDF" : "✍️ Responder / Finalizar Prova"}
+                      </button>
+                    )}
+
+                    <a
+                      href={pdfVisualizarModal.pdfData}
+                      download={pdfVisualizarModal.pdfNome || "prova.pdf"}
+                      style={{
+                        padding: "9px 16px", borderRadius: "10px",
+                        background: isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0",
+                        color: colors.textPrimary, fontWeight: "700", fontSize: "12.5px",
+                        textDecoration: "none", display: "flex", alignItems: "center", gap: "6px",
+                        transition: "all 0.2s ease"
+                      }}
+                    >
+                      <span>📥</span> Baixar PDF
+                    </a>
+
+                    <button
+                      onClick={() => { setPdfVisualizarModal(null); setPdfModoResposta(false); }}
+                      style={{
+                        border: "none",
+                        backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444",
+                        padding: "9px 16px", borderRadius: "10px",
+                        fontWeight: "800", fontSize: "12.5px", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: "6px",
+                        border: "1px solid rgba(239,68,68,0.3)"
+                      }}
+                    >
+                      ✕ Fechar
+                    </button>
+                  </div>
+                </div>
+
+                {/* PDF & Submission Body */}
+                <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+                  {/* PDF Viewer */}
+                  <div style={{ flex: pdfModoResposta ? 0.6 : 1, backgroundColor: "#1e293b", position: "relative", transition: "flex 0.3s ease" }}>
+                    <iframe
+                      src={pdfVisualizarModal.pdfData}
+                      title={pdfVisualizarModal.titulo}
+                      style={{ width: "100%", height: "100%", border: "none" }}
+                    />
+                  </div>
+
+                  {/* Sidebar de Resposta */}
+                  {pdfModoResposta && (
+                    <div style={{
+                      flex: 0.4,
+                      backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                      borderLeft: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : colors.borderCard}`,
+                      padding: "24px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      overflowY: "auto"
+                    }}>
+                      <form onSubmit={handleFinalizarProvaPdf} style={{ display: "flex", flexDirection: "column", gap: "16px", height: "100%", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: "900", color: "#FB923C", background: "rgba(251, 146, 60, 0.15)", padding: "3px 10px", borderRadius: "8px" }}>
+                              ✍️ FOLHA DE RESPOSTA
+                            </span>
+                          </div>
+                          <h4 style={{ fontSize: "16px", fontWeight: "900", margin: "0 0 6px 0", color: colors.textPrimary }}>
+                            Envio de Avaliação em PDF
+                          </h4>
+                          <p style={{ fontSize: "12px", color: colors.textSecondary, lineHeight: "1.5", margin: 0 }}>
+                            Leia as perguntas no documento ao lado e digite abaixo suas respostas ou resumo final. Ao enviar, a nota será registrada em seu boletim.
+                          </p>
+
+                          <div style={{ marginTop: "18px" }}>
+                            <label style={{ display: "block", fontSize: "12px", fontWeight: "800", marginBottom: "6px", color: colors.textPrimary }}>
+                              📝 Suas Respostas / Comentários:
+                            </label>
+                            <textarea
+                              rows={10}
+                              required
+                              placeholder="Digite aqui suas respostas (ex: Questão 1: A, Questão 2: C...) ou o resumo solicitado no documento..."
+                              value={pdfTextoResposta}
+                              onChange={(e) => setPdfTextoResposta(e.target.value)}
+                              style={{
+                                width: "100%", padding: "14px", borderRadius: "14px",
+                                border: `1.5px solid ${isDark ? "rgba(255,255,255,0.12)" : colors.borderCard}`,
+                                backgroundColor: colors.inputBg, color: colors.textPrimary,
+                                fontSize: "13px", resize: "vertical", lineHeight: "1.5"
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setPdfModoResposta(false)}
+                            style={{
+                              padding: "12px 16px", borderRadius: "12px",
+                              border: `1px solid ${colors.borderCard}`, backgroundColor: "transparent",
+                              color: colors.textPrimary, fontWeight: "700", fontSize: "12.5px", cursor: "pointer"
+                            }}
+                          >
+                            Voltar ao PDF
+                          </button>
+
+                          <button
+                            type="submit"
+                            style={{
+                              flex: 1, padding: "12px 18px", borderRadius: "12px", border: "none",
+                              background: "linear-gradient(135deg, #FB923C 0%, #F97316 100%)",
+                              color: "#FFF", fontWeight: "900", fontSize: "13px", cursor: "pointer",
+                              boxShadow: "0 4px 16px rgba(251, 146, 60, 0.4)"
+                            }}
+                          >
+                            🚀 Enviar e Registrar Nota
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* MODAL DA CENTRAL DE NOTIFICAÇÕES */}
         <NotificationCenterModal 
@@ -4453,9 +6270,597 @@ export default function Dashboard() {
           onUpdateUnreadCount={(count) => setUnreadNotificacoesCount(count)}
         />
 
+        {/* ===================================================================
+            BALÃO FLUTUANTE & MODAL GRANDE DA DEV IA TUTOR
+           =================================================================== */}
+        {/* Modal / Tela Grande da Dev IA */}
+        {modalDevIaOpen && (
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setModalDevIaOpen(false);
+            }}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(10, 15, 30, 0.8)",
+              backdropFilter: "blur(10px)",
+              zIndex: 99990,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px"
+            }}
+          >
+            <div style={{
+              width: "100%",
+              maxWidth: "1350px",
+              height: "calc(100vh - 40px)",
+              maxHeight: "920px",
+              backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+              borderRadius: "24px",
+              border: `1.5px solid ${isDark ? "rgba(168, 85, 247, 0.4)" : "#E2E8F0"}`,
+              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.7), 0 0 45px rgba(99, 102, 241, 0.35)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              position: "relative"
+            }}>
+              <DevIaModule user={user} isFloating={false} onClose={() => setModalDevIaOpen(false)} />
+            </div>
+          </div>
+        )}
 
+        {/* Botão de Balão Flutuante (FAB) - Sempre Visível no Canto Inferior */}
+        <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 99999 }}>
+          <button
+            onClick={() => setModalDevIaOpen(prev => !prev)}
+            style={{
+              width: "60px",
+              height: "60px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
+              color: "#ffffff",
+              border: "2px solid rgba(255, 255, 255, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              boxShadow: "0 8px 25px rgba(99, 102, 241, 0.6), 0 0 25px rgba(168, 85, 247, 0.5)",
+              transition: "all 0.25s ease",
+              transform: modalDevIaOpen ? "scale(1.05)" : "scale(1)"
+            }}
+            title={modalDevIaOpen ? "Fechar Dev IA (X)" : "Abrir Dev IA — Guia do DevHub 🤖"}
+          >
+            {modalDevIaOpen ? <X size={28} /> : <Sparkles size={28} />}
+            {!modalDevIaOpen && (
+              <span style={{
+                position: "absolute",
+                top: "2px",
+                right: "2px",
+                width: "14px",
+                height: "14px",
+                backgroundColor: "#10b981",
+                borderRadius: "50%",
+                border: "2px solid #0f121d",
+                boxShadow: "0 0 8px #10b981"
+              }} />
+            )}
+          </button>
+        </div>
+
+        {/* MODAL PARA CRIAR CHAMADA INSTANTÂNEA AO VIVO */}
+        {modalChamadaInstantaneaOpen && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0, left: 0, width: "100vw", height: "100vh",
+              backgroundColor: "rgba(10, 15, 30, 0.85)",
+              backdropFilter: "blur(12px)",
+              zIndex: 99999,
+              display: "flex", alignItems: "center", justifyContent: "center", padding: "20px"
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                color: colors.textPrimary,
+                maxWidth: "480px", width: "100%",
+                borderRadius: "24px", padding: "30px",
+                border: "1.5px solid rgba(239, 68, 68, 0.4)",
+                boxShadow: "0 25px 60px rgba(239, 68, 68, 0.3)",
+                position: "relative"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+                <span style={{ fontSize: "11px", fontWeight: "900", padding: "4px 12px", borderRadius: "8px", backgroundColor: "rgba(239,68,68,0.2)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.4)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  🔴 CHAMADA AO VIVO
+                </span>
+                <button
+                  onClick={() => setModalChamadaInstantaneaOpen(false)}
+                  style={{ border: "none", backgroundColor: "transparent", color: colors.textSecondary, fontSize: "20px", cursor: "pointer", fontWeight: "900" }}
+                >✕</button>
+              </div>
+
+              <h3 style={{ fontSize: "20px", fontWeight: "900", margin: "0 0 6px 0", color: colors.textPrimary }}>
+                ⚡ Nome da Chamada
+              </h3>
+              <p style={{ fontSize: "12.5px", color: colors.textSecondary, margin: "0 0 20px 0" }}>
+                Digite o título ou nome da reunião. Ela será salva no sistema e aparecerá instantaneamente em <strong>Agendas</strong> com status <strong>Ao Vivo 🔴</strong>.
+              </p>
+
+              <form onSubmit={handleConfirmarChamadaInstantanea} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "800", marginBottom: "8px" }}>📝 Título / Nome da Chamada *</label>
+                  <input
+                    type="text" required autoFocus
+                    placeholder="Ex: Reunião com a Turma, Tira-Dúvidas Módulo 2..."
+                    value={formInstantaneaTitulo}
+                    onChange={(e) => setFormInstantaneaTitulo(e.target.value)}
+                    style={{ width: "100%", padding: "14px 16px", borderRadius: "14px", border: `1.5px solid ${colors.borderCard}`, backgroundColor: colors.inputBg, color: colors.textPrimary, fontSize: "14px", fontWeight: "600" }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: "12px", marginTop: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setModalChamadaInstantaneaOpen(false)}
+                    style={{ flex: 1, padding: "13px", borderRadius: "12px", border: `1px solid ${colors.borderCard}`, backgroundColor: "transparent", color: colors.textPrimary, fontWeight: "700", fontSize: "13px", cursor: "pointer" }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    style={{ flex: 2, padding: "13px", borderRadius: "12px", border: "none", background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)", color: "#FFF", fontWeight: "900", fontSize: "14px", cursor: "pointer", boxShadow: "0 4px 18px rgba(239, 68, 68, 0.5)" }}
+                  >
+                    🔴 Iniciar e Salvar Chamada
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ===================================================================
+            MODAIS DE VÍDEOCHAMADA NATIVA, PRESENÇAS & REPRISE DA AGENDA
+           =================================================================== */}
+
+        {/* 1. Modal da Sala de VídeoChamada Nativa com Design Ultra Premium (2026 Layout) */}
+        {reuniaoAtivaVideo && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "#080B11",
+              zIndex: 999999,
+              display: "flex",
+              flexDirection: "column",
+              fontFamily: "'Inter', sans-serif"
+            }}
+          >
+            <div
+              style={{
+                padding: "14px 28px",
+                backgroundColor: "rgba(11, 17, 32, 0.85)",
+                backdropFilter: "blur(24px)",
+                borderBottom: "1px solid rgba(59, 130, 246, 0.25)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "16px",
+                flexWrap: "wrap",
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6)",
+                zIndex: 1000000
+              }}
+            >
+              {/* Título & Info da Aula */}
+              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                <span
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "9999px",
+                    background: "linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.3) 100%)",
+                    color: "#EF4444",
+                    fontWeight: "900",
+                    fontSize: "11px",
+                    border: "1px solid rgba(239, 68, 68, 0.5)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    letterSpacing: "0.08em",
+                    boxShadow: "0 0 16px rgba(239, 68, 68, 0.3)"
+                  }}
+                >
+                  <span style={{ width: "9px", height: "9px", borderRadius: "50%", backgroundColor: "#EF4444", boxShadow: "0 0 12px #EF4444" }} />
+                  🔴 AO VIVO (Transmissão HD)
+                </span>
+
+                <div>
+                  <h3 style={{ fontSize: "1.05rem", fontWeight: "900", color: "#FFFFFF", margin: 0, letterSpacing: "-0.02em" }}>
+                    {reuniaoAtivaVideo.titulo}
+                  </h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "3px" }}>
+                    <span style={{ fontSize: "12px", color: "#94A3B8", fontWeight: "600" }}>
+                      👨‍🏫 {reuniaoAtivaVideo.instrutor || "Instrutor DevHub"}
+                    </span>
+                    <span style={{ fontSize: "11.5px", color: "#10B981", fontWeight: "800", backgroundColor: "rgba(16,185,129,0.15)", padding: "2px 8px", borderRadius: "6px" }}>
+                      ✅ Presença Confirmada
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cluster de Ações Rápida */}
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                {/* Botão Chat */}
+                <button
+                  onClick={() => setChatPainelAberto(!chatPainelAberto)}
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: "12px",
+                    background: chatPainelAberto 
+                      ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" 
+                      : "rgba(255, 255, 255, 0.08)",
+                    color: "#FFFFFF",
+                    border: chatPainelAberto ? "1px solid #3B82F6" : "1px solid rgba(255, 255, 255, 0.15)",
+                    fontWeight: "800",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    boxShadow: chatPainelAberto ? "0 4px 20px rgba(37, 99, 235, 0.4)" : "none",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  💬 Chat ao Vivo ({chatMensagens.length})
+                </button>
+
+                {/* Copiar Link Direct */}
+                <button
+                  onClick={() => {
+                    const url = obterUrlVideoChamada(reuniaoAtivaVideo, servidorVideo);
+                    navigator.clipboard.writeText(url);
+                    alert("📋 Link direto da chamada copiado para a área de transferência!");
+                  }}
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: "12px",
+                    backgroundColor: "rgba(255, 255, 255, 0.08)",
+                    color: "#F1F5F9",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    fontWeight: "800",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  🔗 Compartilhar Link
+                </button>
+
+                {/* Botão Sair */}
+                <button
+                  onClick={() => setReuniaoAtivaVideo(null)}
+                  style={{
+                    padding: "9px 20px",
+                    borderRadius: "12px",
+                    background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
+                    color: "#FFFFFF",
+                    border: "none",
+                    fontWeight: "900",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 18px rgba(239, 68, 68, 0.5)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  🚪 Sair da Chamada
+                </button>
+              </div>
+            </div>
+
+            {/* Container Principal de Transmissão */}
+            <div style={{ flex: 1, display: "flex", position: "relative", backgroundColor: "#030712", overflow: "hidden" }}>
+              {/* Moldura de Vídeo WebRTC */}
+              <div style={{ flex: 1, position: "relative" }}>
+                <iframe
+                  src={obterUrlVideoChamada(reuniaoAtivaVideo, servidorVideo)}
+                  allow="camera *; microphone *; display-capture *; autoplay *; clipboard-write *; fullscreen *; media-record *"
+                  style={{ width: "100%", height: "100%", border: "none" }}
+                />
+              </div>
+
+              {/* Chat Lateral DevHub Live */}
+              {chatPainelAberto && (
+                <div
+                  style={{
+                    width: "360px",
+                    backgroundColor: "rgba(11, 17, 32, 0.95)",
+                    backdropFilter: "blur(20px)",
+                    borderLeft: "1px solid rgba(59, 130, 246, 0.2)",
+                    display: "flex",
+                    flexDirection: "column",
+                    zIndex: 10
+                  }}
+                >
+                  {/* Chat Header */}
+                  <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "18px" }}>💬</span>
+                      <strong style={{ color: "#F8FAFC", fontSize: "15px", fontWeight: "900" }}>Chat da Chamada</strong>
+                    </div>
+                    <button
+                      onClick={() => setChatPainelAberto(false)}
+                      style={{ border: "none", backgroundColor: "transparent", color: "#64748B", fontSize: "18px", cursor: "pointer" }}
+                    >✕</button>
+                  </div>
+
+                  {/* Feed de Mensagens */}
+                  <div style={{ flex: 1, padding: "16px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {chatMensagens.map((msg) => (
+                      <div
+                        key={msg.id}
+                        style={{
+                          backgroundColor: msg.autor === user?.nome ? "rgba(37, 99, 235, 0.2)" : "rgba(255, 255, 255, 0.04)",
+                          padding: "12px 16px",
+                          borderRadius: "16px",
+                          border: msg.autor === user?.nome ? "1px solid rgba(59, 130, 246, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)"
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "12.5px", fontWeight: "900", color: msg.autor === user?.nome ? "#60A5FA" : "#38BDF8" }}>
+                            {msg.autor}
+                          </span>
+                          <span style={{ fontSize: "10px", color: "#64748B", fontWeight: "700" }}>{msg.hora}</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: "13.5px", color: "#E2E8F0", lineHeight: "1.45", wordBreak: "break-word" }}>
+                          {msg.texto}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Reações Rápidas por Emojis */}
+                  <div style={{ padding: "10px 16px", display: "flex", gap: "8px", justifyContent: "space-around", borderTop: "1px solid rgba(255, 255, 255, 0.06)", backgroundColor: "rgba(15, 23, 42, 0.6)" }}>
+                    {["👍", "👏", "❤️", "🔥", "🎉", "🙋‍♂️"].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setNovoTextoChat(prev => prev + " " + emoji)}
+                        style={{ backgroundColor: "rgba(255, 255, 255, 0.08)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", padding: "6px 10px", cursor: "pointer", fontSize: "15px" }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Input do Chat */}
+                  <form onSubmit={handleEnviarMensagemChat} style={{ padding: "16px", borderTop: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", gap: "10px" }}>
+                    <input
+                      type="text"
+                      placeholder="Digite no chat ao vivo..."
+                      value={novoTextoChat}
+                      onChange={(e) => setNovoTextoChat(e.target.value)}
+                      style={{ flex: 1, padding: "12px 16px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.15)", backgroundColor: "rgba(30, 41, 59, 0.8)", color: "#FFF", fontSize: "13px", outline: "none" }}
+                    />
+                    <button
+                      type="submit"
+                      style={{ padding: "12px 18px", borderRadius: "12px", background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)", color: "#FFF", border: "none", fontWeight: "900", fontSize: "13px", cursor: "pointer", boxShadow: "0 4px 14px rgba(37, 99, 235, 0.4)" }}
+                    >
+                      Enviar
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 2. Modal de Relatório de Presenças */}
+        {modalPresencasAula && (
+          <div
+            onClick={(e) => { if (e.target === e.currentTarget) setModalPresencasAula(null); }}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(8px)",
+              zIndex: 999998,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px"
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                color: colors.textPrimary,
+                maxWidth: "680px",
+                width: "100%",
+                maxHeight: "85vh",
+                borderRadius: "24px",
+                border: `1.5px solid ${colors.borderCard}`,
+                boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden"
+              }}
+            >
+              <div style={{ padding: "24px", borderBottom: `1px solid ${colors.borderCard}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <h3 style={{ fontSize: "18px", fontWeight: "900", margin: 0, color: colors.textPrimary }}>
+                    📊 Relatório de Presenças & Check-in
+                  </h3>
+                  <p style={{ fontSize: "12.5px", color: colors.textSecondary, margin: "4px 0 0 0" }}>
+                    Aula: <strong>{modalPresencasAula.titulo}</strong> ({modalPresencasAula.data})
+                  </p>
+                </div>
+                <button
+                  onClick={() => setModalPresencasAula(null)}
+                  style={{ border: "none", backgroundColor: "transparent", color: colors.textSecondary, fontSize: "20px", cursor: "pointer", fontWeight: "900" }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
+                {carregandoPresencas ? (
+                  <div style={{ textAlign: "center", padding: "40px", color: colors.textSecondary }}>
+                    ⏳ Carregando registro de presenças...
+                  </div>
+                ) : listaPresencasAula.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px", color: colors.textSecondary }}>
+                    📅 Nenhum check-in registrado para esta aula ainda.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <div style={{ fontSize: "12px", color: colors.textSecondary, fontWeight: "700", marginBottom: "4px" }}>
+                      Total de Participantes Confirmados: {listaPresencasAula.length}
+                    </div>
+                    {listaPresencasAula.map((p, idx) => (
+                      <div
+                        key={p.id || idx}
+                        style={{
+                          padding: "14px 18px",
+                          borderRadius: "12px",
+                          backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC",
+                          border: `1px solid ${colors.borderCard}`,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: "14px", fontWeight: "800", color: colors.textPrimary }}>
+                            👤 {p.user_nome}
+                          </div>
+                          <div style={{ fontSize: "12px", color: colors.textSecondary }}>
+                            📧 {p.user_email} • 🏢 Base: {p.base_nome || "ContabHub"}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <span style={{ fontSize: "11px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px", backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#10B981" }}>
+                            {p.tipo_presenca || "🟢 Presente"}
+                          </span>
+                          <div style={{ fontSize: "11px", color: colors.textSecondary, marginTop: "4px" }}>
+                            ⏰ {p.horario_entrada}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Modal de Reprise de Aula Gravação */}
+        {repriseAulaModal && (
+          <div
+            onClick={(e) => { if (e.target === e.currentTarget) setRepriseAulaModal(null); }}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(0, 0, 0, 0.85)",
+              backdropFilter: "blur(10px)",
+              zIndex: 999998,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px"
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                color: colors.textPrimary,
+                maxWidth: "900px",
+                width: "100%",
+                borderRadius: "24px",
+                border: `1.5px solid ${colors.borderCard}`,
+                boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
+                overflow: "hidden"
+              }}
+            >
+              <div style={{ padding: "20px 24px", borderBottom: `1px solid ${colors.borderCard}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: "900", color: "#A855F7", backgroundColor: "rgba(168, 85, 247, 0.15)", padding: "3px 10px", borderRadius: "6px" }}>
+                    📹 REPRISE DE AULA
+                  </span>
+                  <h3 style={{ fontSize: "17px", fontWeight: "900", margin: "4px 0 0 0", color: colors.textPrimary }}>
+                    {repriseAulaModal.titulo}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setRepriseAulaModal(null)}
+                  style={{ border: "none", backgroundColor: "transparent", color: colors.textSecondary, fontSize: "20px", cursor: "pointer", fontWeight: "900" }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ padding: "24px" }}>
+                {repriseAulaModal.link_gravacao && (repriseAulaModal.link_gravacao.includes("youtube") || repriseAulaModal.link_gravacao.includes("youtu.be")) ? (
+                  <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: "16px", overflow: "hidden", backgroundColor: "#000" }}>
+                    <iframe
+                      src={repriseAulaModal.link_gravacao.includes("embed") ? repriseAulaModal.link_gravacao : `https://www.youtube-nocookie.com/embed/${repriseAulaModal.link_gravacao.split("v=")[1]?.split("&")[0] || repriseAulaModal.link_gravacao.split("/").pop()}?autoplay=1&rel=0`}
+                      title={repriseAulaModal.titulo}
+                      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <div style={{ padding: "30px", textAlign: "center", backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC", borderRadius: "16px" }}>
+                    <p style={{ fontSize: "15px", color: colors.textPrimary, fontWeight: "700", marginBottom: "12px" }}>
+                      📹 A gravação está disponível no link do instrutor:
+                    </p>
+                    <a
+                      href={repriseAulaModal.link_gravacao || repriseAulaModal.link || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: "12px 24px",
+                        borderRadius: "12px",
+                        backgroundColor: "#A855F7",
+                        color: "#FFFFFF",
+                        fontWeight: "900",
+                        textDecoration: "none",
+                        display: "inline-block"
+                      }}
+                    >
+                      ▶️ Assistir Gravação Externa
+                    </a>
+                  </div>
+                )}
+                <div style={{ marginTop: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: colors.textSecondary }}>
+                  <span>👨‍🏫 Instrutor: {repriseAulaModal.instrutor}</span>
+                  <span>✅ Presença de Reprise Registrada</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         </div>
     </>
   );
 }
+

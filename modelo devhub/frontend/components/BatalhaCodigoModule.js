@@ -528,7 +528,19 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
       }
     }
 
-    const oponentesValidos = filtrada.filter(n => n !== user?.nome);
+    // Deduplicar por nome em minúsculo
+    const unicos = [];
+    const mapaNomes = new Set();
+    filtrada.forEach(n => {
+      const key = n.trim().toLowerCase();
+      if (!mapaNomes.has(key)) {
+        mapaNomes.add(key);
+        unicos.push(n.trim());
+      }
+    });
+
+    const userNomeLower = user?.nome ? user.nome.trim().toLowerCase() : "";
+    const oponentesValidos = unicos.filter(n => n.trim().toLowerCase() !== userNomeLower);
     setAlunosCadastrados(oponentesValidos.length > 0 ? oponentesValidos : ["Gabriel Costa", "Nicholas Araujo", "Mariana Souza"]);
 
     if (oponentesValidos.length > 0) {
@@ -888,18 +900,18 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
 
   return (
     <div className={styles.container}>
-      {/* BANNER DE NOTIFICAÇÃO FLUTUANTE TEMPORÁRIA DE X1 */}
+      {/* BANNER DE NOTIFICAÇÃO FLUTUANTE TEMPORÁRIA DE X1 (Canto Inferior Direito) */}
       {toastNotificacao && (
         <div style={{
-          position: "fixed", top: "24px", right: "24px", zIndex: 9999,
-          backgroundColor: "rgba(23, 28, 44, 0.96)",
+          position: "fixed", bottom: "28px", right: "28px", zIndex: 99999,
+          backgroundColor: "rgba(15, 20, 32, 0.98)",
           backdropFilter: "blur(14px)",
           border: "2px solid #818cf8",
           borderRadius: "20px",
-          padding: "18px 20px",
-          width: "380px", maxWidth: "90vw",
-          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(99, 102, 241, 0.4)",
-          display: "flex", flexDirection: "column", gap: "12px",
+          padding: "20px 22px",
+          width: "390px", maxWidth: "90vw",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 30px rgba(99, 102, 241, 0.4)",
+          display: "flex", flexDirection: "column", gap: "14px",
           color: "#FFF"
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -968,8 +980,9 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
         </div>
       )}
 
-      {/* HEADER PRINCIPAL DE DESAFIOS X1 */}
-      <div className={styles.headerBox}>
+      {/* HEADER PRINCIPAL DE DESAFIOS X1 (Exibido apenas fora de batalhas) */}
+      {!emBatalha && (
+        <div className={styles.headerBox}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Swords size={28} color="#ef4444" />
@@ -1033,6 +1046,7 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
           </button>
         </div>
       </div>
+      )}
 
       {/* FEEDBACK DE CONVITE ENVIADO */}
       {conviteEnviadoSucesso && (
@@ -1547,56 +1561,74 @@ export default function BatalhaCodigoModule({ user, relatorioAlunos = [] }) {
         </div>
       )}
 
-      {/* Grade Inferior: Ranking Semanal + Histórico de Batalhas */}
-      <div className={styles.gridTwoCols}>
-        {/* Tabela de Ranking Semanal */}
-        <div className={styles.boxCard}>
-          <div className={styles.boxHeader}>
-            <Trophy size={20} color="#f59e0b" />
-            <span>🏆 Ranking Semanal de Gladiadores</span>
+      {/* Grade Inferior: Ranking Semanal + Histórico de Batalhas (Exibido apenas quando NÃO estiver em batalha) */}
+      {!emBatalha && (
+        <div className={styles.gridTwoCols}>
+          {/* Tabela de Ranking Semanal */}
+          <div className={styles.boxCard}>
+            <div className={styles.boxHeader}>
+              <Trophy size={20} color="#f59e0b" />
+              <span>🏆 Ranking Semanal de Gladiadores</span>
+            </div>
+
+            <div className={styles.tableList}>
+              {ranking.map((item, index) => {
+                const isGold = item.posicao === 1;
+                const isSilver = item.posicao === 2;
+                const isBronze = item.posicao === 3;
+                const rowClass = `${styles.rankingRow} ${isGold ? styles.rankingRowGold : isSilver ? styles.rankingRowSilver : isBronze ? styles.rankingRowBronze : ""}`;
+                const posBadge = isGold ? "👑 #1" : isSilver ? "🔥 #2" : isBronze ? "⚡ #3" : `#${item.posicao}`;
+                const xpColor = isGold ? "#fbbf24" : isSilver ? "#f87171" : isBronze ? "#c084fc" : "#818cf8";
+                const initial = item.nome ? item.nome.charAt(0).toUpperCase() : "U";
+
+                return (
+                  <div key={index} className={rowClass}>
+                    <div className={styles.rankPos} style={{ color: xpColor, minWidth: "56px", flexShrink: 0 }}>
+                      {posBadge}
+                    </div>
+                    <div className={styles.rankInfo}>
+                      <div className={styles.rankAvatar}>
+                        {initial}
+                      </div>
+                      <div>
+                        <div className={styles.rankName}>{item.nome}</div>
+                        <div className={styles.rankStats}>{item.vitorias} Vitórias em {item.batalhas} Duelos</div>
+                      </div>
+                    </div>
+                    <div className={styles.rankXpPill} style={{ color: xpColor, backgroundColor: isGold ? "rgba(245, 158, 11, 0.15)" : isSilver ? "rgba(239, 68, 68, 0.15)" : isBronze ? "rgba(168, 85, 247, 0.15)" : "rgba(99, 102, 241, 0.15)" }}>
+                      {item.xp} XP
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className={styles.tableList}>
-            {ranking.map((item, index) => (
-              <div key={index} className={styles.rankingRow}>
-                <div className={styles.rankPos}>#{item.posicao}</div>
-                <div className={styles.rankInfo}>
-                  <span style={{ fontSize: "1.1rem" }}>{item.avatar || "👤"}</span>
-                  <div>
-                    <div className={styles.rankName}>{item.nome}</div>
-                    <div className={styles.rankStats}>{item.vitorias} Vitórias em {item.batalhas} Duelos</div>
+          {/* Tabela de Histórico de Batalhas Recentes */}
+          <div className={styles.boxCard}>
+            <div className={styles.boxHeader}>
+              <Clock size={20} color="#6366f1" />
+              <span>📜 Histórico das Batalhas Recentes</span>
+            </div>
+
+            <div className={styles.tableList}>
+              {historico.map((h, index) => (
+                <div key={index} className={styles.historyRow}>
+                  <div className={styles.historyTitle}>{h.desafio}</div>
+                  <div className={styles.historyMeta}>
+                    <span>🥊 {h.aluno1} vs {h.aluno2}</span>
+                    <span style={{ color: "#10b981", fontWeight: "700" }}>🏆 Vencedor: {h.vencedor}</span>
+                  </div>
+                  <div className={styles.historyMeta}>
+                    <span>Tempo: {h.tempo} (Erros: {h.erros})</span>
+                    <span>{h.data}</span>
                   </div>
                 </div>
-                <span style={{ fontSize: "0.85rem", fontWeight: "800", color: "#818cf8" }}>{item.xp} XP</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Tabela de Histórico de Batalhas Recentes */}
-        <div className={styles.boxCard}>
-          <div className={styles.boxHeader}>
-            <Clock size={20} color="#6366f1" />
-            <span>📜 Histórico das Batalhas Recentes</span>
-          </div>
-
-          <div className={styles.tableList}>
-            {historico.map((h, index) => (
-              <div key={index} className={styles.historyRow}>
-                <div className={styles.historyTitle}>{h.desafio}</div>
-                <div className={styles.historyMeta}>
-                  <span>🥊 {h.aluno1} vs {h.aluno2}</span>
-                  <span style={{ color: "#10b981", fontWeight: "700" }}>🏆 Vencedor: {h.vencedor}</span>
-                </div>
-                <div className={styles.historyMeta}>
-                  <span>Tempo: {h.tempo} (Erros: {h.erros})</span>
-                  <span>{h.data}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

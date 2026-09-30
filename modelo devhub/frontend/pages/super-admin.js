@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
+import { LayoutDashboard, Sun, Moon, LogOut } from "lucide-react";
 import DevHubLogo from "../components/Logo";
 import SuperAdminModule from "../components/SuperAdminModule";
 
@@ -45,7 +46,9 @@ export default function SuperAdminDashboard() {
 
       try {
         const parsedUser = JSON.parse(userDataStr);
-        if (parsedUser.cargo !== "superadmin" && parsedUser.cargo !== "super_admin") {
+        const cargoLower = (parsedUser.cargo || "").toLowerCase();
+        const isAllowed = cargoLower === "superadmin" || cargoLower === "super_admin" || cargoLower === "admin" || parsedUser.is_super_admin || parsedUser.is_admin || (parsedUser.email && parsedUser.email.toLowerCase().includes("superadmin"));
+        if (!isAllowed) {
           setAuthorized(false);
           setCheckingAuth(false);
           return;
@@ -106,13 +109,13 @@ export default function SuperAdminDashboard() {
 
       <div style={{
         minHeight: "100vh",
-        backgroundColor: colors.bgPage,
+        backgroundColor: isDark ? "#030712" : colors.bgPage,
         color: colors.textPrimary,
         fontFamily: "system-ui, -apple-system, sans-serif",
-        padding: "32px 24px",
+        padding: "24px 36px",
         transition: "all 0.3s ease"
       }}>
-        <div style={{ maxWidth: "1280px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "28px" }}>
+        <div style={{ maxWidth: "100%", width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
           
           {/* Top Bar Navigation */}
           <header style={{
@@ -120,15 +123,15 @@ export default function SuperAdminDashboard() {
             justifyContent: "space-between",
             alignItems: "center",
             paddingBottom: "20px",
-            borderBottom: `1px solid ${colors.borderCard}`
+            borderBottom: `1px solid ${isDark ? "rgba(139, 92, 246, 0.25)" : colors.borderCard}`
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
               <DevHubLogo size="normal" />
-              <div style={{ borderLeft: `2px solid ${colors.borderCard}`, paddingLeft: "16px" }}>
-                <h1 style={{ fontSize: "20px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-                  👑 DevHub VIP Control Panel
+              <div style={{ borderLeft: `2px solid ${isDark ? "rgba(139, 92, 246, 0.25)" : colors.borderCard}`, paddingLeft: "16px" }}>
+                <h1 style={{ fontSize: "20px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px", margin: 0, color: isDark ? "#F8FAFC" : "#0F172A" }}>
+                  🛡️ Painel Executivo Super Admin
                 </h1>
-                <p style={{ color: colors.textSecondary, fontSize: "13px", margin: "2px 0 0 0" }}>
+                <p style={{ color: isDark ? "#94A3B8" : colors.textSecondary, fontSize: "13px", margin: "2px 0 0 0" }}>
                   {userLogado && `Conectado como: ${userLogado.nome} (${userLogado.email})`}
                 </p>
               </div>
@@ -138,43 +141,109 @@ export default function SuperAdminDashboard() {
               <button
                 onClick={() => router.push("/dashboard")}
                 style={{
-                  padding: "10px 18px", borderRadius: "12px",
-                  backgroundColor: "rgba(59, 130, 246, 0.15)",
-                  color: "#3B82F6", border: "1px solid rgba(59, 130, 246, 0.4)",
-                  cursor: "pointer", fontSize: "14px", fontWeight: "700"
+                  padding: "10px 20px", borderRadius: "9999px",
+                  background: isDark
+                    ? "linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.35) 100%)"
+                    : "linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)",
+                  color: isDark ? "#60A5FA" : "#1D4ED8",
+                  border: `1px solid ${isDark ? "rgba(96, 165, 250, 0.35)" : "rgba(37, 99, 235, 0.3)"}`,
+                  backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                  cursor: "pointer", fontSize: "14.5px", fontWeight: "800",
+                  display: "flex", alignItems: "center", gap: "8px",
+                  boxShadow: isDark
+                    ? "0 4px 15px -3px rgba(37, 99, 235, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2)"
+                    : "0 4px 15px -3px rgba(37, 99, 235, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
+                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                  fontFamily: "inherit", letterSpacing: "-0.01em"
                 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                  e.currentTarget.style.boxShadow = isDark
+                    ? "0 8px 25px -4px rgba(37, 99, 235, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3)"
+                    : "0 8px 25px -4px rgba(37, 99, 235, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.9)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0) scale(1)";
+                  e.currentTarget.style.boxShadow = isDark
+                    ? "0 4px 15px -3px rgba(37, 99, 235, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2)"
+                    : "0 4px 15px -3px rgba(37, 99, 235, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)";
+                }}
+                onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.96)"}
+                onMouseUp={(e) => e.currentTarget.style.transform = "translateY(-2px) scale(1.02)"}
               >
-                📊 Voltar ao Dashboard
+                <LayoutDashboard size={18} />
+                <span>Voltar ao Dashboard</span>
               </button>
 
               <button
                 onClick={toggleTheme}
                 style={{
-                  padding: "10px 16px", borderRadius: "12px",
-                  backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#E2E8F0",
-                  color: colors.textPrimary, border: `1px solid ${colors.borderCard}`,
-                  cursor: "pointer", fontSize: "14px", fontWeight: "700"
+                  padding: "10px 18px", borderRadius: "9999px",
+                  background: isDark ? "rgba(255, 255, 255, 0.07)" : "rgba(15, 23, 42, 0.06)",
+                  color: colors.textPrimary,
+                  border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.14)" : "rgba(15, 23, 42, 0.12)"}`,
+                  backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                  cursor: "pointer", fontSize: "14.5px", fontWeight: "800",
+                  display: "flex", alignItems: "center", gap: "8px",
+                  boxShadow: "0 2px 10px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.15)",
+                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                  fontFamily: "inherit", letterSpacing: "-0.01em"
                 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                  e.currentTarget.style.background = isDark ? "rgba(255, 255, 255, 0.13)" : "rgba(15, 23, 42, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0) scale(1)";
+                  e.currentTarget.style.background = isDark ? "rgba(255, 255, 255, 0.07)" : "rgba(15, 23, 42, 0.06)";
+                }}
+                onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.96)"}
+                onMouseUp={(e) => e.currentTarget.style.transform = "translateY(-2px) scale(1.02)"}
               >
-                {isDark ? "☀️ Modo Claro" : "🌙 Modo Escuro"}
+                {isDark ? <Sun size={18} color="#FBBF24" /> : <Moon size={18} color="#6366F1" />}
+                <span>{isDark ? "Modo Claro" : "Modo Escuro"}</span>
               </button>
 
               <button
                 onClick={handleLogout}
                 style={{
-                  padding: "10px 18px", borderRadius: "12px",
-                  backgroundColor: "rgba(239, 68, 68, 0.15)",
-                  color: "#EF4444", border: "1px solid rgba(239, 68, 68, 0.4)",
-                  cursor: "pointer", fontSize: "14px", fontWeight: "700"
+                  padding: "10px 18px", borderRadius: "9999px",
+                  background: isDark
+                    ? "linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.3) 100%)"
+                    : "linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)",
+                  color: isDark ? "#FCA5A5" : "#DC2626",
+                  border: `1px solid ${isDark ? "rgba(239, 68, 68, 0.35)" : "rgba(239, 68, 68, 0.3)"}`,
+                  backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                  cursor: "pointer", fontSize: "14.5px", fontWeight: "800",
+                  display: "flex", alignItems: "center", gap: "8px",
+                  boxShadow: "0 4px 15px -3px rgba(239, 68, 68, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.2)",
+                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                  fontFamily: "inherit", letterSpacing: "-0.01em"
                 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                  e.currentTarget.style.boxShadow = "0 8px 25px -4px rgba(239, 68, 68, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0) scale(1)";
+                  e.currentTarget.style.boxShadow = "0 4px 15px -3px rgba(239, 68, 68, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.2)";
+                }}
+                onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.96)"}
+                onMouseUp={(e) => e.currentTarget.style.transform = "translateY(-2px) scale(1.02)"}
               >
-                Sair 🚪
+                <LogOut size={18} />
+                <span>Sair</span>
               </button>
             </div>
           </header>
 
           {/* MÓDULO EXECUTIVO COMPLETO */}
-          <SuperAdminModule isDark={isDark} colors={colors} currentUser={userLogado} />
+          <SuperAdminModule 
+            isDark={isDark} 
+            colors={colors} 
+            currentUser={userLogado} 
+            onVoltarEntrada={() => router.push("/")}
+          />
 
         </div>
       </div>

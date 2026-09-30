@@ -1,4 +1,5 @@
 const express = require("express");
+const nodemailer = require("nodemailer");
 const pool = require("../config/database");
 const { verifyToken, requireRole } = require("../middlewares/auth");
 
@@ -34,11 +35,11 @@ const router = express.Router();
 })();
 
 // =============================================================
-// SUPER ADMIN — Rotas Exclusivas
+// SUPER ADMIN — Rotas Exclusivas (Protegidas)
 // =============================================================
 
 // --- Anúncio Global ---
-router.post("/anuncio", async (req, res) => {
+router.post("/anuncio", verifyToken, requireRole("super_admin"), async (req, res) => {
   const { mensagem, autor } = req.body;
   if (!mensagem || mensagem.trim() === "") {
     return res.status(400).json({ error: "A mensagem do anúncio não pode estar vazia." });
@@ -73,7 +74,7 @@ router.post("/anuncio", async (req, res) => {
   }
 });
 
-router.delete("/anuncio", async (req, res) => {
+router.delete("/anuncio", verifyToken, requireRole("super_admin"), async (req, res) => {
   try {
     await pool.query("UPDATE superadmin_anuncios SET ativo = 0");
     if (req.io) {
@@ -98,8 +99,8 @@ router.get("/anuncio", async (req, res) => {
   }
 });
 
-// --- Log de Atividades ---
-router.get("/logs", async (req, res) => {
+// --- Log de Atividades (Protegido: Super Admin / Admin) ---
+router.get("/logs", verifyToken, requireRole("super_admin", "admin"), async (req, res) => {
   try {
     const [rows] = await pool.query(
       "SELECT id, tipo, usuario, descricao, created_at AS hora FROM superadmin_logs ORDER BY id DESC LIMIT 50"
@@ -122,18 +123,18 @@ router.get("/logs", async (req, res) => {
   }
 });
 
-router.post("/logs", async (req, res) => {
+router.post("/logs", verifyToken, async (req, res) => {
   const { tipo, usuario, descricao } = req.body;
   try {
     const [result] = await pool.query(
       "INSERT INTO superadmin_logs (tipo, usuario, descricao) VALUES (?, ?, ?)",
-      [tipo || "geral", usuario || "Anônimo", descricao || ""]
+      [tipo || "geral", usuario || req.user.email || "Anônimo", descricao || ""]
     );
 
     const novoLog = {
       id: result.insertId,
       tipo: tipo || "geral",
-      usuario: usuario || "Anônimo",
+      usuario: usuario || req.user.email || "Anônimo",
       descricao: descricao || "",
       hora: new Date().toISOString()
     };
@@ -145,8 +146,8 @@ router.post("/logs", async (req, res) => {
   }
 });
 
-// --- Analytics ---
-router.get("/analytics", async (req, res) => {
+// --- Analytics (Protegido: Super Admin / Admin) ---
+router.get("/analytics", verifyToken, requireRole("super_admin", "admin"), async (req, res) => {
   try {
     const [userRows] = await pool.query("SELECT COUNT(*) as total FROM users");
     const totalUsuarios = userRows[0]?.total || 142;
@@ -177,8 +178,8 @@ router.get("/analytics", async (req, res) => {
   }
 });
 
-// --- Ranking Reset ---
-router.post("/ranking/resetar", (req, res) => {
+// --- Ranking Reset (Protegido: Super Admin) ---
+router.post("/ranking/resetar", verifyToken, requireRole("super_admin"), (req, res) => {
   return res.json({
     success: true,
     message: "Ranking semanal resetado com sucesso!",
@@ -186,8 +187,8 @@ router.post("/ranking/resetar", (req, res) => {
   });
 });
 
-// --- Exportar Dados ---
-router.get("/exportar", async (req, res) => {
+// --- Exportar Dados (Protegido: Super Admin) ---
+router.get("/exportar", verifyToken, requireRole("super_admin"), async (req, res) => {
   try {
     const [logs] = await pool.query("SELECT * FROM superadmin_logs ORDER BY id DESC LIMIT 50");
     const [anuncios] = await pool.query("SELECT * FROM superadmin_anuncios ORDER BY id DESC LIMIT 10");
@@ -214,6 +215,106 @@ router.get("/exportar", async (req, res) => {
   } catch (error) {
     console.error("Erro ao exportar dados:", error);
     return res.status(500).json({ error: "Erro ao exportar dados do sistema." });
+  }
+});
+
+// Helper para instanciar transportador do Nodemailer se SMTP estiver configurado no .env
+const criarTransporterSMTP = () => {
+  const host = process.env.SMTP_HOST;
+  const port = parseInt(process.env.SMTP_PORT || "587");
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!user || !pass || !host) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass }
+  });
+};
+
+// --- Disparo de E-mail para Alunos (Protegido: Super Admin) ---
+router.post("/disparar-email", verifyToken, requireRole("super_admin"), async (req, res) => {
+  const { assunto, corpo, destinatarioId } = req.body;
+
+  if (!assunto || !assunto.trim()) {
+    return res.status(400).json({ error: "O assunto do e-mail é obrigatório." });
+  }
+  if (!corpo || !corpo.trim()) {
+    return res.status(400).json({ error: "O corpo do e-mail é obrigatório." });
+  }
+
+  try {
+    let alunos = [];
+    if (destinatarioId && destinatarioId !== "todos") {
+      const [rows] = await pool.query("SELECT id, email, nome FROM users WHERE id = ? OR email = ?", [destinatarioId, destinatarioId]);
+      alunos = rows;
+    } else {
+      const [rows] = await pool.query("SELECT id, email, nome FROM users WHERE email IS NOT NULL AND email != ''");
+      alunos = rows;
+    }
+
+    const listaEmails = alunos.map(a => a.email).filter(Boolean);
+
+    const transporter = criarTransporterSMTP();
+
+    if (!transporter) {
+      // Caso SMTP não esteja configurado no .env: Registra no log do banco e devolve resposta amigável
+      await pool.query(
+        "INSERT INTO superadmin_logs (tipo, usuario, descricao) VALUES (?, ?, ?)",
+        ["email", "Super Admin", `[Modo Registro] E-mail "${assunto.trim()}" registrado para ${listaEmails.length} alunos.`]
+      );
+
+      return res.json({
+        success: true,
+        simulado: true,
+        total: listaEmails.length,
+        message: `Disparo registrado no sistema para ${listaEmails.length} alunos! (Insira as credenciais SMTP no .env para envio externo real).`
+      });
+    }
+
+    // Com SMTP configurado no .env: envia e-mails reais via Nodemailer
+    const mailOptions = {
+      from: process.env.SMTP_FROM || `"DevHub Plataforma" <${process.env.SMTP_USER}>`,
+      to: process.env.SMTP_USER,
+      bcc: listaEmails,
+      subject: assunto.trim(),
+      html: `
+        <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; padding: 24px; background-color: #0f172a; color: #f8fafc;">
+          <div style="max-width: 600px; margin: 0 auto; background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+              <h2 style="color: #3b82f6; margin: 0; font-size: 22px;">🚀 DevHub</h2>
+            </div>
+            <h3 style="color: #ffffff; margin-top: 0; font-size: 18px; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">${assunto.trim()}</h3>
+            <div style="font-size: 15px; line-height: 1.6; color: #cbd5e1; white-space: pre-wrap; margin: 20px 0;">${corpo.trim()}</div>
+            <hr style="border: none; border-top: 1px solid #334155; margin: 25px 0;" />
+            <p style="font-size: 12px; color: #64748b; text-align: center; margin: 0;">Esta é uma mensagem oficial enviada pela equipe DevHub.</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    await pool.query(
+      "INSERT INTO superadmin_logs (tipo, usuario, descricao) VALUES (?, ?, ?)",
+      ["email", "Super Admin", `E-mail "${assunto.trim()}" enviado com sucesso via SMTP para ${listaEmails.length} alunos.`]
+    );
+
+    return res.json({
+      success: true,
+      simulado: false,
+      total: listaEmails.length,
+      message: `E-mail real disparado com sucesso via SMTP para ${listaEmails.length} alunos!`
+    });
+
+  } catch (error) {
+    console.error("Erro ao disparar e-mail:", error);
+    return res.status(500).json({ error: error.message || "Erro ao processar disparo de e-mail." });
   }
 });
 

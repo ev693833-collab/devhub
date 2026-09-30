@@ -4,133 +4,256 @@ import StudentGamificationHeader from "../StudentGamificationHeader";
 import { 
   Sparkles, Flame, Trophy, Calendar, 
   BookOpen, Compass, Code, Swords, BrainCircuit, 
-  ArrowRight, Bell, Shield, CheckCircle2, Star, Clock
+  ArrowRight, Bell, Shield, CheckCircle2, Star, Clock, Home, ArrowLeft
 } from "lucide-react";
 
-export default function VisaoGeralSection({ user, setAbaAtiva, isDark }) {
+export default function VisaoGeralSection({ user, setAbaAtiva, isDark, agendaAulas = [] }) {
   const [anuncio, setAnuncio] = useState(null);
-  const [dadosEconomia, setDadosEconomia] = useState({ devcoins: 2500, xp: 8420, nivel: 14, streak: 12 });
+  const [proximaReuniao, setProximaReuniao] = useState(null);
+
+  // Helper para converter string de data PT-BR ("DD/MM/YYYY") em Date
+  const parseDataBR = (str) => {
+    if (!str) return null;
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+    return new Date(str);
+  };
 
   useEffect(() => {
-    // Buscar Anúncio do Super Admin se houver
+    let lista = Array.isArray(agendaAulas) && agendaAulas.length > 0 ? agendaAulas : [];
+    if (lista.length === 0 && typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("devhub_agenda_aulas");
+        if (saved) lista = JSON.parse(saved);
+      } catch (e) {}
+    }
+
+    if (lista && lista.length > 0) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const hojeStr = new Date().toLocaleDateString('pt-BR');
+      
+      let proxima = lista.find(a => a.data === hojeStr && !a.status?.includes("Concluída"));
+      
+      if (!proxima) {
+        const futuras = lista
+          .filter(a => {
+            if (a.status?.includes("Concluída")) return false;
+            const dt = parseDataBR(a.data);
+            if (!dt || isNaN(dt.getTime())) return false;
+            dt.setHours(23, 59, 59, 999);
+            return dt >= hoje;
+          })
+          .sort((a, b) => (parseDataBR(a.data) || 0) - (parseDataBR(b.data) || 0));
+
+        proxima = futuras.length > 0 ? futuras[0] : null;
+      }
+      setProximaReuniao(proxima);
+    } else {
+      setProximaReuniao(null);
+    }
+  }, [agendaAulas]);
+
+  const carregarAnuncio = () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
     fetch(`${apiUrl}/superadmin/anuncio`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data && data.anuncio) setAnuncio(data.anuncio);
+        if (data && data.anuncio && data.anuncio.mensagem) {
+          setAnuncio(data.anuncio);
+        } else {
+          checkLocalAnuncio();
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        checkLocalAnuncio();
+      });
+  };
 
-    // Ouvir evento de atualização da carteira
+  const checkLocalAnuncio = () => {
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("devhub_token") || localStorage.getItem("token");
-      if (token) {
-        fetch(`${apiUrl}/gamificacao/carteira`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data) {
-              setDadosEconomia({
-                devcoins: data.devcoins || 2500,
-                xp: data.xp || 8420,
-                nivel: Math.floor((data.xp || 8420) / 600) + 1,
-                streak: data.streakDias || 12
+      try {
+        const raw = localStorage.getItem("devhub_anuncios_globais");
+        if (raw) {
+          const lista = JSON.parse(raw);
+          if (Array.isArray(lista) && lista.length > 0) {
+            const top = lista[0];
+            const agora = Date.now();
+            const limite48h = 48 * 60 * 60 * 1000;
+            if (!top.id || (agora - top.id) < limite48h) {
+              setAnuncio({
+                mensagem: top.titulo ? `${top.titulo}${top.mensagem ? ` — ${top.mensagem}` : ''}` : top.mensagem,
+                autor: top.autor || "Super Admin"
               });
+              return;
             }
-          })
-          .catch(() => {});
-      }
+          }
+        }
+      } catch (e) {}
     }
+    setAnuncio(null);
+  };
+
+  useEffect(() => {
+    carregarAnuncio();
+
+    const handleUpdate = () => carregarAnuncio();
+    if (typeof window !== "undefined") {
+      window.addEventListener("devhub_anuncio_publicado", handleUpdate);
+      window.addEventListener("storage", handleUpdate);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("devhub_anuncio_publicado", handleUpdate);
+        window.removeEventListener("storage", handleUpdate);
+      }
+    };
   }, []);
 
   const atalhosRapidos = [
     {
       id: "aulas",
       titulo: "Assistir Aulas",
-      descricao: "Acesse módulos de HTML, CSS, JS, React e Node.",
+      subtitulo: "Trilhas em vídeo e teoria",
       icon: BookOpen,
       color: "#3B82F6",
-      bgIcon: "rgba(59, 130, 246, 0.18)"
+      bgIcon: "rgba(59, 130, 246, 0.16)"
     },
     {
       id: "trilhas",
       titulo: "Trilhas de Carreira",
-      descricao: "Roadmaps completos do iniciante ao sênior.",
+      subtitulo: "Roadmaps do iniciante ao sênior",
       icon: Compass,
       color: "#10B981",
-      bgIcon: "rgba(16, 185, 129, 0.18)"
+      bgIcon: "rgba(16, 185, 129, 0.16)"
     },
     {
       id: "caderno",
-      titulo: "Caderno de Estudos",
-      descricao: "Editor de notas rich-text com blocos de código.",
+      titulo: "Caderno de Notas",
+      subtitulo: "Anotações e blocos de código",
       icon: Code,
       color: "#8B5CF6",
-      bgIcon: "rgba(139, 92, 246, 0.18)"
-    },
-    {
-      id: "batalhas",
-      titulo: "Batalhas de Código",
-      descricao: "Desafie outros alunos em duelos 1v1 PvP.",
-      icon: Swords,
-      color: "#EF4444",
-      bgIcon: "rgba(239, 68, 68, 0.18)"
+      bgIcon: "rgba(139, 92, 246, 0.16)"
     },
     {
       id: "dev_ia",
-      titulo: "DevIA — Tutor IA",
-      descricao: "Assistente virtual para tirar dúvidas e criar resumos.",
+      titulo: "DevIA Tutor 24/7",
+      subtitulo: "Assistente inteligente de código",
       icon: BrainCircuit,
       color: "#F59E0B",
-      bgIcon: "rgba(245, 158, 11, 0.18)"
+      bgIcon: "rgba(245, 158, 11, 0.16)"
     }
   ];
 
   return (
     <div className={styles.container}>
-      {/* Gamificação & Progresso do Aluno (Fogo de Sequência & Habilidades) */}
-      <StudentGamificationHeader user={user} />
-
-      {/* 2. Grade de KPIs e Metas do Dia */}
-      <div className={styles.kpiGrid}>
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} style={{ background: "rgba(249, 115, 22, 0.18)", color: "#F97316" }}>
-            <Flame size={24} />
+      
+      {/* BARRA SUPERIOR DO DASHBOARD COM BOTÃO VOLTAR AO INÍCIO */}
+      <div className={`${styles.topNavHeader} ${!isDark ? styles.topNavHeaderLight : ""}`}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div className={styles.headerIconBadge}>
+            <Home size={22} />
           </div>
           <div>
-            <div className={styles.kpiLabel}>Ofensiva Diária (Streak)</div>
-            <div className={styles.kpiValue} style={{ color: "#F97316" }}>{dadosEconomia.streak} Dias ⚡</div>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} style={{ background: "rgba(168, 85, 247, 0.18)", color: "#A855F7" }}>
-            <Trophy size={24} />
-          </div>
-          <div>
-            <div className={styles.kpiLabel}>Pontuação Total (XP)</div>
-            <div className={styles.kpiValue} style={{ color: "#A855F7" }}>{dadosEconomia.xp} XP</div>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} style={{ background: "rgba(16, 185, 129, 0.18)", color: "#10B981" }}>
-            <CheckCircle2 size={24} />
-          </div>
-          <div>
-            <div className={styles.kpiLabel}>Frequência de Aulas</div>
-            <div className={styles.kpiValue} style={{ color: "#10B981" }}>100% Presença</div>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "900", margin: 0, color: isDark ? "#F8FAFC" : "#0F172A", letterSpacing: "-0.01em" }}>
+              Visão Geral — Dashboard do Estudante
+            </h2>
+            <p style={{ fontSize: "0.84rem", color: isDark ? "#94A3B8" : "#64748B", margin: "3px 0 0 0" }}>
+              Resumo limpo do seu progresso, próximas aulas e anúncios da plataforma.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* 4. Atalhos Rápidos */}
+      {/* 1. Header Gamificado do Aluno (XP, Nível, Streak & Avatar) */}
+      <StudentGamificationHeader user={user} />
+
+      {/* 2. Central de Destaques & Próxima Aula (Layout Clean & Enxuto) */}
+      <div className={styles.infoBox}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "18px" }}>
+          
+          {/* Card: Comunicado Recente */}
+          <div 
+            className={styles.infoBoxCard}
+            style={{
+              background: anuncio ? (isDark ? "rgba(245, 158, 11, 0.08)" : "rgba(245, 158, 11, 0.05)") : (isDark ? "rgba(255, 255, 255, 0.02)" : "#F8FAFC"),
+              border: `1px solid ${anuncio ? "rgba(245, 158, 11, 0.3)" : (isDark ? "rgba(255, 255, 255, 0.07)" : "#E2E8F0")}`
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: anuncio ? "#F59E0B" : (isDark ? "#94A3B8" : "#64748B"), fontSize: "0.82rem", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <Bell size={16} />
+              <span>Comunicado Recente</span>
+            </div>
+
+            {anuncio ? (
+              <div>
+                <div style={{ fontWeight: "800", fontSize: "0.95rem", color: isDark ? "#F8FAFC" : "#0F172A", marginBottom: "4px" }}>
+                  {anuncio.mensagem}
+                </div>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#94A3B8" : "#64748B" }}>
+                  Publicado por: {anuncio.autor || "Super Admin"}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: "0.88rem", color: isDark ? "#94A3B8" : "#64748B", fontWeight: "500" }}>
+                📢 Nenhum aviso novo no momento. Bons estudos!
+              </div>
+            )}
+          </div>
+
+          {/* Card: Próxima Aula na Agenda */}
+          <div 
+            className={styles.infoBoxCard}
+            onClick={() => setAbaAtiva && setAbaAtiva("agenda")}
+            style={{
+              background: proximaReuniao ? (isDark ? "rgba(16, 185, 129, 0.08)" : "rgba(16, 185, 129, 0.05)") : (isDark ? "rgba(255, 255, 255, 0.02)" : "#F8FAFC"),
+              border: `1px solid ${proximaReuniao ? "rgba(16, 185, 129, 0.3)" : (isDark ? "rgba(255, 255, 255, 0.07)" : "#E2E8F0")}`,
+              cursor: "pointer"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: proximaReuniao ? "#10B981" : (isDark ? "#94A3B8" : "#64748B"), fontSize: "0.82rem", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <Calendar size={16} />
+                <span>Próxima Aula</span>
+              </div>
+              <span style={{ fontSize: "0.78rem", color: "#10B981", fontWeight: "800", display: "flex", alignItems: "center", gap: "3px" }}>
+                Ver Agenda ↗
+              </span>
+            </div>
+
+            {proximaReuniao ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <Clock size={22} color="#10B981" style={{ flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: "800", fontSize: "0.95rem", color: isDark ? "#F8FAFC" : "#0F172A" }}>
+                    {proximaReuniao.titulo || "Aula Agendada"}
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: isDark ? "#94A3B8" : "#64748B", marginTop: "3px" }}>
+                    📅 {proximaReuniao.data || "Data a definir"} às {proximaReuniao.horario || proximaReuniao.horario_inicio || "19:00"} {proximaReuniao.instrutor ? `• ${proximaReuniao.instrutor.replace(/\s*\(.*?\)/, "").trim()}` : ""}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: "0.88rem", color: isDark ? "#94A3B8" : "#64748B", fontWeight: "500" }}>
+                📅 Nenhuma aula pendente. Clique para abrir o calendário.
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* 3. Atalhos Rápidos */}
       <div>
-        <h3 className={styles.sectionTitle}>
-          <Sparkles size={20} color="#3B82F6" />
-          <span>Atalhos Rápidos de Acesso</span>
+        <h3 className={styles.sectionTitle} style={{ color: isDark ? "#F8FAFC" : "#0F172A" }}>
+          <Sparkles size={18} color="#3B82F6" />
+          <span>Acesso Rápido aos Módulos</span>
         </h3>
+        
         <div className={styles.quickGrid}>
           {atalhosRapidos.map((item) => {
             const Icon = item.icon;
@@ -138,101 +261,30 @@ export default function VisaoGeralSection({ user, setAbaAtiva, isDark }) {
               <div 
                 key={item.id} 
                 className={styles.quickCard}
-                onClick={() => setAbaAtiva(item.id)}
+                onClick={() => {
+                  if (item.id === "dev_ia") {
+                    window.dispatchEvent(new CustomEvent("devhub_abrir_ia"));
+                  } else {
+                    setAbaAtiva(item.id);
+                  }
+                }}
               >
                 <div className={styles.quickCardHeader}>
                   <div className={styles.quickIcon} style={{ background: item.bgIcon, color: item.color }}>
                     <Icon size={22} />
                   </div>
-                  <h4 className={styles.quickCardTitle}>{item.titulo}</h4>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h4 className={styles.quickCardTitle}>{item.titulo}</h4>
+                    <p className={styles.quickCardDesc}>{item.subtitulo}</p>
+                  </div>
+                  <ArrowRight size={18} className={styles.quickArrowIcon} />
                 </div>
-                <p className={styles.quickCardDesc}>{item.descricao}</p>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* 5. Painel Duplo: Anúncios do Admin & Próximos Compromissos */}
-      <div className={styles.dualGrid}>
-        {/* Anúncio Global */}
-        <div className={styles.infoBox}>
-          <h3 className={styles.sectionTitle} style={{ margin: 0 }}>
-            <Bell size={18} color="#F59E0B" />
-            <span>Comunicados do Super Admin</span>
-          </h3>
-          {anuncio ? (
-            <div className={styles.announcementBadge}>
-              <Sparkles size={20} style={{ flexShrink: 0 }} />
-              <div>
-                <div style={{ fontWeight: "800", fontSize: "0.92rem", marginBottom: "4px" }}>
-                  {anuncio.mensagem}
-                </div>
-                <div style={{ fontSize: "0.78rem", opacity: 0.8 }}>
-                  Publicado por: {anuncio.autor || "Super Admin"}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: "0.88rem", color: "#94a3b8", padding: "12px", textAlign: "center" }}>
-              📢 Nenhum aviso global novo no momento. Bons estudos!
-            </div>
-          )}
-        </div>
-
-        {/* Próximos Compromissos na Agenda */}
-        <div className={styles.infoBox}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h3 className={styles.sectionTitle} style={{ margin: 0 }}>
-              <Calendar size={18} color="#10B981" />
-              <span>Próxima Aula Agendada na Agenda</span>
-            </h3>
-            {setAbaAtiva && (
-              <button 
-                onClick={() => setAbaAtiva("agenda")}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "#10B981",
-                  fontSize: "0.8rem",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px"
-                }}
-              >
-                Ver Agenda ↗
-              </button>
-            )}
-          </div>
-          <div 
-            onClick={() => setAbaAtiva && setAbaAtiva("agenda")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "14px",
-              padding: "16px",
-              borderRadius: "14px",
-              background: "rgba(16, 185, 129, 0.12)",
-              border: "1px solid rgba(16, 185, 129, 0.3)",
-              color: "#34d399",
-              cursor: "pointer",
-              transition: "all 0.2s ease"
-            }}
-          >
-            <Clock size={22} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: "800", fontSize: "0.92rem" }}>
-                Mentoria ao Vivo: React & Componentização
-              </div>
-              <div style={{ fontSize: "0.8rem", opacity: 0.85, marginTop: "2px" }}>
-                Hoje às 19:00 com o Instrutor DevHub
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

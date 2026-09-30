@@ -3,8 +3,9 @@ import { useRouter } from 'next/router';
 import { Settings, MessageCircle, User, Shield, Building2 } from 'lucide-react';
 import Image from 'next/image';
 import styles from './Header.module.css';
-import EditProfileModal from './EditProfileModal';
+import PerfilModal from '../PerfilModal';
 import ThemeToggle from './ThemeToggle';
+import DevHubLogo from '../Logo';
 
 // Hook personalizado para detectar o tema atual
 const useTheme = () => {
@@ -139,11 +140,11 @@ export default function Header({ auth }) {
   };
 
   const handleNavigateToSuperadmin = () => {
-    router.push('/superadmin');
+    router.push('/super-admin');
   };
 
   const handleNavigateToAdmin = () => {
-    router.push('/admin');
+    router.push('/super-admin');
   };
 
   // Função para verificar se uma aba está ativa
@@ -180,15 +181,8 @@ export default function Header({ auth }) {
         <div className={styles.headerContent}>
           {/* Logo e Navegação */}
           <div className={styles.leftSection}>
-            <div className={styles.logo}>
-              <Image
-                src={isDark ? "/img/logo-branca.png" : "/img/logo.png"}
-                alt="Logo"
-                width={140}
-                height={32}
-                className={styles.logoImage}
-                priority
-              />
+            <div className={styles.logo} style={{ cursor: "pointer" }} onClick={() => router.push('/dashboard')}>
+              <DevHubLogo />
             </div>
 
             {/* Navegação */}
@@ -292,11 +286,12 @@ export default function Header({ auth }) {
       </header>
 
       {/* Modal de Edição de Perfil */}
-      <EditProfileModal
+      <PerfilModal
         isOpen={showEditProfileModal}
         onClose={() => setShowEditProfileModal(false)}
         user={user}
-        onSuccess={handleProfileUpdateSuccess}
+        onUpdateUser={handleProfileUpdateSuccess}
+        onLogout={handleLogout}
       />
     </>
   );
