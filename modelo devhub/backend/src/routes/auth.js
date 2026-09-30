@@ -560,6 +560,19 @@ router.post("/redefinir-senha", async (req, res) => {
   }
 });
 
+// Rota para Listar Todos os Usuários Cadastrados no Banco de Dados
+router.get("/users", verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT id, nome, email, cargo, avatar_url, base_nome, vinculos_bases, created_at AS data FROM users ORDER BY id DESC"
+    );
+    return res.json(rows);
+  } catch (error) {
+    console.error("Erro ao listar usuários:", error);
+    return res.status(500).json({ error: "Erro ao buscar usuários do banco." });
+  }
+});
+
 module.exports = router;
 
 

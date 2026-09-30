@@ -902,10 +902,10 @@ export default function ModuleHubLauncher({
     m.desc.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Lista de Atalhos e Suporte da Aba 2 (Painel de Controle SuperAdmin no topo apenas para admins)
+  // Lista de Atalhos e Suporte da Aba 2 (Painel de Controle SuperAdmin no topo apenas para SuperAdmins)
   const listAtalhos = useMemo(() => {
     const atalhos = [];
-    if (isAdminUser) {
+    if (isSuperAdmin) {
       atalhos.push({
         id: "super_admin",
         titulo: "Painel de Controle SuperAdmin",
@@ -922,6 +922,20 @@ export default function ModuleHubLauncher({
             onSelectAba("super_admin");
           }
         }
+      });
+    }
+    // Admins (não SuperAdmin) têm acesso à gestão de tickets
+    if (isAdminOrGestor && !isSuperAdmin) {
+      atalhos.push({
+        id: "gestao_tickets",
+        titulo: "Gestão de Tickets & Suporte",
+        badge: "ADMINISTRAÇÃO",
+        desc: "Gerencie chamados, atribua responsáveis, altere status e prioridades de todos os tickets da plataforma",
+        icon: Shield,
+        color: "#f97316",
+        gradient: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+        glow: "rgba(249, 115, 22, 0.45)",
+        action: onOpenTickets
       });
     }
     atalhos.push(
@@ -949,7 +963,7 @@ export default function ModuleHubLauncher({
       }
     );
     return atalhos;
-  }, [isAdminUser, onOpenTickets, onOpenPerfil, onSelectAba]);
+  }, [isSuperAdmin, isAdminOrGestor, onOpenTickets, onOpenPerfil, onSelectAba]);
 
   const handleEntrarModulo = (mod) => {
     if (mod.isModal) {
@@ -1132,16 +1146,25 @@ export default function ModuleHubLauncher({
                           0%, 100% { transform: translateY(0px) scale(1); }
                           50% { transform: translateY(-5px) scale(1.03); }
                         }
+                        @keyframes pulseAuraGlow {
+                          0%, 100% { transform: scale(1); opacity: 0.6; }
+                          50% { transform: scale(1.14); opacity: 0.95; }
+                        }
                         .orbit-ring-primary {
-                          animation: spinOrbitClockwise 10s linear infinite;
-                          transform-origin: 75px 45px;
+                          animation: spinOrbitClockwise 12s linear infinite;
+                          transform-origin: 75px 75px;
                         }
                         .orbit-ring-secondary {
-                          animation: spinOrbitCounter 16s linear infinite;
-                          transform-origin: 75px 45px;
+                          animation: spinOrbitCounter 18s linear infinite;
+                          transform-origin: 75px 75px;
                         }
                         .floating-emblem-icon {
                           animation: floatEmblemIcon 3.5s ease-in-out infinite;
+                          transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+                        }
+                        .floating-emblem-container:hover .floating-emblem-icon {
+                          transform: scale(1.08) translateY(-3px) !important;
+                          box-shadow: 0 0 45px rgba(168, 85, 247, 0.8), inset 0 -4px 12px rgba(0,0,0,0.4) !important;
                         }
                       `}</style>
                       
@@ -1192,33 +1215,36 @@ export default function ModuleHubLauncher({
                             </span>
                           </div>
 
-                          {/* Emblema Orbital 3D Cosmic Rocket com Animação Dupla da Órbita Girando */}
+                          {/* Emblema Orbital 3D Cyber com Animação Neon de Órbita Fluida */}
                           <div 
+                            className="floating-emblem-container"
                             title={podeMexerOuVerInfoDestaque ? "Clique para alterar a foto/logo desta base" : undefined}
                             onClick={podeMexerOuVerInfoDestaque ? () => {
                               setModalFotoBase(baseDestaque);
                               setInputFotoUrl(baseDestaque.logoUrl || "");
                             } : undefined}
                             style={{
-                              position: "relative", width: "150px", height: "150px",
+                              position: "relative", width: "160px", height: "160px",
                               display: "flex", alignItems: "center", justifyContent: "center",
                               cursor: podeMexerOuVerInfoDestaque ? "pointer" : "default"
                             }}
                           >
-                            {/* Brilho de Fundo Pulsante */}
+                            {/* Aura de Fundo Pulsante e Radiante */}
                             <div style={{
-                              position: "absolute", width: "115px", height: "115px", borderRadius: "50%",
-                              background: `radial-gradient(circle, ${cardGlow} 0%, rgba(109, 40, 217, 0.15) 70%, transparent 100%)`,
-                              filter: "blur(16px)"
+                              position: "absolute", width: "120px", height: "120px", borderRadius: "50%",
+                              background: `radial-gradient(circle, ${cardGlow} 0%, rgba(168, 85, 247, 0.25) 60%, transparent 100%)`,
+                              filter: "blur(18px)",
+                              animation: "pulseAuraGlow 4s ease-in-out infinite"
                             }} />
 
-                            {/* Ícone Central Flutuante */}
+                            {/* Ícone Central Flutuante com Bordas Neon */}
                             <div className="floating-emblem-icon" style={{
-                              width: "92px", height: "92px", borderRadius: "50%",
+                              width: "96px", height: "96px", borderRadius: "50%",
                               background: cardGradient,
                               display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "42px", color: "#FFF",
+                              fontSize: "44px", color: "#FFF",
                               boxShadow: `0 0 35px ${cardGlow}, inset 0 -4px 12px rgba(0,0,0,0.4)`,
+                              border: `2.5px solid ${cardColor}`,
                               zIndex: 4, overflow: "hidden",
                               position: "relative"
                             }}>
@@ -1229,13 +1255,17 @@ export default function ModuleHubLauncher({
                               )}
                             </div>
 
-                            {/* Órbita Giratória Dupla 3D (Posicionada ATRÁS da foto para não cobrir a imagem) */}
-                            <svg width="170" height="110" viewBox="0 0 150 90" style={{ position: "absolute", top: "20px", left: "-10px", pointerEvents: "none", zIndex: 1 }}>
+                            {/* Órbita Giratória Circular 3D Neon Ultra Fluida */}
+                            <svg width="160" height="160" viewBox="0 0 150 150" style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none", zIndex: 2 }}>
+                              {/* Órbita Primária Externa (Gira no sentido horário) */}
                               <g className="orbit-ring-primary">
-                                <ellipse cx="75" cy="45" rx="74" ry="28" fill="none" stroke="#38BDF8" strokeWidth="2.5" strokeDasharray="6 4" style={{ opacity: 0.9, filter: "drop-shadow(0 0 8px #38BDF8)" }} />
+                                <circle cx="75" cy="75" r="62" fill="none" stroke="#38BDF8" strokeWidth="2" strokeDasharray="18 10 6 10" style={{ opacity: 0.85, filter: "drop-shadow(0 0 10px #38BDF8)" }} />
+                                <circle cx="137" cy="75" r="4" fill="#38BDF8" style={{ filter: "drop-shadow(0 0 8px #38BDF8)" }} />
                               </g>
+                              {/* Órbita Secundária Interna (Gira no sentido anti-horário) */}
                               <g className="orbit-ring-secondary">
-                                <ellipse cx="75" cy="45" rx="70" ry="24" fill="none" stroke={cardColor} strokeWidth="1.8" strokeDasharray="2 6" style={{ opacity: 0.75, filter: `drop-shadow(0 0 6px ${cardColor})` }} />
+                                <circle cx="75" cy="75" r="54" fill="none" stroke={cardColor} strokeWidth="1.8" strokeDasharray="12 14" style={{ opacity: 0.9, filter: `drop-shadow(0 0 8px ${cardColor})` }} />
+                                <circle cx="75" cy="21" r="3.5" fill={cardColor} style={{ filter: `drop-shadow(0 0 8px ${cardColor})` }} />
                               </g>
                             </svg>
                           </div>
@@ -1327,7 +1357,7 @@ export default function ModuleHubLauncher({
                               <ArrowRight size={16} />
                             </button>
 
-                            {isAdminOrGestor && (
+                            {(isAdminOrGestor || isBasePropriaDestaque) && (
                               <button
                                 onClick={() => { setAlunosModalBase(baseDestaque); setModalSearchStudent(""); }}
                                 style={{
@@ -1351,6 +1381,7 @@ export default function ModuleHubLauncher({
                                 <span>Alunos ({totalAlunosDestaqueCount})</span>
                               </button>
                             )}
+
                           </div>
                         </div>
 
@@ -1506,40 +1537,53 @@ export default function ModuleHubLauncher({
                                 setModalCriarBaseUsuario(true);
                               }}
                               style={{
-                                border: "2px dashed rgba(168, 85, 247, 0.4)",
-                                background: "rgba(168, 85, 247, 0.05)",
+                                border: "1.5px dashed rgba(139, 92, 246, 0.5)",
+                                background: "linear-gradient(135deg, rgba(139, 92, 246, 0.07) 0%, rgba(168, 85, 247, 0.04) 100%)",
                                 borderRadius: "20px",
-                                padding: "18px 24px",
+                                padding: "20px 24px",
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center",
-                                gap: "12px",
+                                gap: "16px",
                                 cursor: "pointer",
-                                transition: "all 0.25s ease",
-                                width: "100%"
+                                transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                                width: "100%",
+                                position: "relative",
+                                overflow: "hidden"
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.borderColor = "#8B5CF6";
-                                e.currentTarget.style.background = "rgba(168, 85, 247, 0.12)";
-                                e.currentTarget.style.transform = "translateY(-2px)";
+                                e.currentTarget.style.background = "linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%)";
+                                e.currentTarget.style.transform = "translateY(-3px)";
+                                e.currentTarget.style.boxShadow = "0 12px 32px rgba(139, 92, 246, 0.25)";
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.4)";
-                                e.currentTarget.style.background = "rgba(168, 85, 247, 0.05)";
+                                e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.5)";
+                                e.currentTarget.style.background = "linear-gradient(135deg, rgba(139, 92, 246, 0.07) 0%, rgba(168, 85, 247, 0.04) 100%)";
                                 e.currentTarget.style.transform = "translateY(0)";
+                                e.currentTarget.style.boxShadow = "none";
                               }}
                             >
                               <div style={{
-                                width: "36px", height: "36px", borderRadius: "12px",
+                                width: "46px", height: "46px", borderRadius: "14px",
                                 background: "linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%)",
                                 color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
-                                boxShadow: "0 4px 15px rgba(139, 92, 246, 0.4)", flexShrink: 0
+                                boxShadow: "0 6px 20px rgba(139, 92, 246, 0.45)", flexShrink: 0
                               }}>
-                                <Plus size={20} />
+                                <Plus size={22} />
                               </div>
-                              <span style={{ fontSize: "14px", fontWeight: "800", color: "#CBD5E1" }}>
-                                {isSuperAdmin ? "Criar Nova Base (Super Admin)" : `Criar Sua Base Pessoal (${jaPossuiBasePessoal ? "1/1" : "0/1"})`}
-                              </span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: "14px", fontWeight: "800", color: "#C4B5FD", marginBottom: "3px" }}>
+                                  {isSuperAdmin ? "Criar Nova Base (Super Admin)" : `Criar Sua Base Pessoal`}
+                                </div>
+                                <div style={{ fontSize: "11.5px", color: "#94a3b8", fontWeight: "500" }}>
+                                  {isSuperAdmin
+                                    ? "Crie e gerencie bases de conhecimento para qualquer usuário"
+                                    : `Você tem direito a 1 base pessoal — seja o admin do seu próprio espaço${jaPossuiBasePessoal ? " (0/1 disponíveis)" : " (1/1 disponíveis)"}`}
+                                </div>
+                              </div>
+                              <div style={{ color: "#8B5CF6", flexShrink: 0 }}>
+                                <ChevronRight size={18} />
+                              </div>
                             </div>
                           )}
                         </div>
@@ -2904,6 +2948,19 @@ export default function ModuleHubLauncher({
         const targetId = (b.id || "").toLowerCase().trim();
         const isDevHubBase = targetId === "devhub" || targetNome === "devhub";
 
+        // Verifica se o usuário logado é o criador desta base específica sendo gerenciada
+        const userEmailLowerModal = (user?.email || "").toLowerCase().trim();
+        const userIdStrModal = String(user?.id || "");
+        const isOwnerOfThisBase = Boolean(
+          user && b && (
+            ((b.criadoPorEmail || "").toLowerCase().trim() === userEmailLowerModal && userEmailLowerModal !== "") ||
+            (String(b.criadoPorId || "") === userIdStrModal && userIdStrModal !== "")
+          )
+        );
+        // Admin do modal: global admin OU criador da base
+        const isModalAdmin = isAdminUser || isOwnerOfThisBase;
+
+
         const list = usuariosBases.filter(u => {
           let matchBase = false;
           if (b.id === "todas" || isDevHubBase) {
@@ -3143,7 +3200,7 @@ export default function ModuleHubLauncher({
 
                         {/* Opções do Aluno (3 pontinhos para alterar cargo / desvincular) */}
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                          {isAdminUser && (
+                          {isModalAdmin && (
                             <button
                               type="button"
                               onClick={() => handleAbrirPermissoes(u, b)}
@@ -3184,7 +3241,7 @@ export default function ModuleHubLauncher({
                 marginTop: "20px", paddingTop: "16px",
                 borderTop: "1px solid rgba(255,255,255,0.08)"
               }}>
-                {isAdminUser ? (
+                {isModalAdmin ? (
                   <button
                     onClick={() => {
                       const baseParaVincular = b;

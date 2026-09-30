@@ -131,9 +131,62 @@ export default function App({ Component, pageProps }) {
   const auth = useAuth()
   const [avisoReuniao, setAvisoReuniao] = useState(null);
   const [visivel, setVisivel] = useState(false);
+  const [modoManutencaoAtivo, setModoManutencaoAtivo] = useState(false);
+  const [msgManutencao, setMsgManutencao] = useState("A plataforma estará em manutenção por alguns instantes. Voltamos em breve!");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     setupAxiosInterceptors();
+  }, []);
+
+  useEffect(() => {
+    const checarManutencaoESuperAdmin = () => {
+      if (typeof window === 'undefined') return;
+
+      // 1. Checar se usuário logado é Super Admin
+      try {
+        const userDataStr = localStorage.getItem('userData');
+        if (userDataStr) {
+          const u = JSON.parse(userDataStr);
+          const cargoLower = (u.cargo || '').toLowerCase();
+          const isSuper = cargoLower === 'superadmin' || cargoLower === 'super_admin' || u.is_super_admin || (u.email && u.email.toLowerCase().includes('superadmin'));
+          setIsSuperAdmin(Boolean(isSuper));
+        } else {
+          setIsSuperAdmin(false);
+        }
+      } catch (e) {
+        setIsSuperAdmin(false);
+      }
+
+      // 2. Checar modo manutenção no storage
+      try {
+        const raw = localStorage.getItem('devhub_modo_manutencao');
+        if (raw) {
+          const data = JSON.parse(raw);
+          if (typeof data.ativo === 'boolean') {
+            setModoManutencaoAtivo(data.ativo);
+            if (data.mensagem) setMsgManutencao(data.mensagem);
+          }
+        } else {
+          setModoManutencaoAtivo(false);
+        }
+      } catch (e) {
+        setModoManutencaoAtivo(false);
+      }
+    };
+
+    checarManutencaoESuperAdmin();
+
+    const handleStorageChange = () => checarManutencaoESuperAdmin();
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('devhub_manutencao_update', handleStorageChange);
+    const interval = setInterval(checarManutencaoESuperAdmin, 2500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('devhub_manutencao_update', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -218,7 +271,87 @@ export default function App({ Component, pageProps }) {
         `}</style>
       </Head>
 
-      <Component {...pageProps} auth={auth} />
+      {/* ===== TELA DE MANUTENÇÃO GLOBAL PARA NÃO-SUPERADMINS ===== */}
+      {modoManutencaoAtivo && !isSuperAdmin ? (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 999999,
+          backgroundColor: '#090D16', color: '#F8FAFC',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '24px', textAlign: 'center', fontFamily: 'system-ui, -apple-system, sans-serif'
+        }}>
+          <div style={{
+            maxWidth: '560px', width: '100%',
+            background: 'linear-gradient(165deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
+            border: '1.5px solid rgba(239, 68, 68, 0.4)', borderRadius: '24px', padding: '36px 28px',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(239, 68, 68, 0.2)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px'
+          }}>
+            <div style={{
+              width: '72px', height: '72px', borderRadius: '20px',
+              background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '34px', boxShadow: '0 0 30px rgba(239, 68, 68, 0.5)'
+            }}>
+              🛠️
+            </div>
+
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.35)',
+              color: '#EF4444', padding: '5px 14px', borderRadius: '9999px',
+              fontSize: '12px', fontWeight: '800', letterSpacing: '0.5px'
+            }}>
+              SISTEMA EM MANUTENÇÃO PROGRAMADA
+            </div>
+
+            <h1 style={{ fontSize: '26px', fontWeight: '900', color: '#FFF', margin: 0 }}>
+              Plataforma Temporariamente Indisponível
+            </h1>
+
+            <p style={{ fontSize: '14.5px', color: '#CBD5E1', lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' }}>
+              {msgManutencao || "Estamos aplicando melhorias e atualizações no sistema. Apenas o Super Admin tem acesso no momento."}
+            </p>
+
+            <div style={{
+              marginTop: '10px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center'
+            }}>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>
+                Você é o Super Admin? Faça login com a sua conta autorizada para desligar a manutenção:
+              </span>
+              <a
+                href="/super-admin"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                  color: '#FFF', padding: '12px 24px', borderRadius: '12px',
+                  fontWeight: '800', fontSize: '14px', textDecoration: 'none',
+                  boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)'
+                }}
+              >
+                🔐 Painel Super Admin (Acesso Restrito)
+              </a>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Banner de Aviso de Manutenção para o Super Admin */}
+          {modoManutencaoAtivo && isSuperAdmin && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+              backgroundColor: '#EF4444', color: '#FFF', padding: '8px 16px',
+              display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px',
+              fontWeight: '800', fontSize: '13px', boxShadow: '0 4px 15px rgba(239, 68, 68, 0.5)'
+            }}>
+              <span>🚨 MODO MANUTENÇÃO ATIVO — Apenas você (Super Admin) pode acessar a plataforma.</span>
+              <a href="/super-admin" style={{ background: '#FFF', color: '#DC2626', padding: '3px 10px', borderRadius: '6px', textDecoration: 'none', fontWeight: '900', fontSize: '11.5px' }}>
+                ⚙️ Desativar no Painel
+              </a>
+            </div>
+          )}
+          <Component {...pageProps} auth={auth} />
+        </>
+      )}
 
       {/* ===== TOAST GLOBAL DE REUNIÃO PRÓXIMA ===== */}
       {avisoReuniao && (

@@ -182,7 +182,7 @@ export default function LandingPage() {
     <>
       <Head>
         <title>DevHub — Acelere sua Carreira em Programação</title>
-        <meta name="description" content="Aprenda programação com videoaulas práticas, duelos 1v1 na Arena de Código, Dev IA Tutor 24/7 e ranking semanal em tempo real." />
+        <meta name="description" content="Aprenda programação com videoaulas práticas, duelos 1v1 na Arena de Código, suporte técnico especializado 24/7 e ranking semanal em tempo real." />
       </Head>
 
       {/* ESTILOS DE ANIMAÇÃO E CSS GLOBAL */}
@@ -300,15 +300,6 @@ export default function LandingPage() {
             }}>
               <a href="#recursos" style={{ color: colors.textSecondary, textDecoration: "none", transition: "color 0.2s" }}>
                 Recursos
-              </a>
-              <a href="#arena" style={{ color: colors.textSecondary, textDecoration: "none", transition: "color 0.2s" }}>
-                Arena 1v1
-              </a>
-              <a href="#ia-tutor" style={{ color: colors.textSecondary, textDecoration: "none", transition: "color 0.2s" }}>
-                Dev IA
-              </a>
-              <a href="#comunidade" style={{ color: colors.textSecondary, textDecoration: "none", transition: "color 0.2s" }}>
-                Comunidade
               </a>
             </nav>
 
@@ -440,7 +431,7 @@ export default function LandingPage() {
               fontWeight: "500"
             }}>
               Aprenda programação com videoaulas dinâmicas, duelos 1v1 na Arena de Código,
-              assistente Dev IA Tutor 24/7 e ranking semanal em tempo real.
+              suporte técnico especializado 24/7 e ranking semanal em tempo real.
             </p>
 
 
@@ -530,7 +521,7 @@ export default function LandingPage() {
                     <Zap size={22} color="#C084FC" style={{ flexShrink: 0 }} />
                     <div>
                       <span style={{ fontSize: "13px", fontWeight: "800", color: "#E9D5FF", display: "block" }}>
-                        Dev IA Tutor Feedback:
+                        Feedback do Sistema:
                       </span>
                       <span style={{ fontSize: "12.5px", color: "#C084FC" }}>
                         "Excelente lógica! Sua solução é O(1) em tempo de execução. +450 XP adicionados ao seu perfil!"
@@ -566,7 +557,7 @@ export default function LandingPage() {
             </div>
             <div>
               <h3 style={{ fontSize: "36px", fontWeight: "900", color: "#10B981", margin: 0 }}>24/7</h3>
-              <p style={{ color: colors.textSecondary, fontSize: "14px", margin: "6px 0 0 0", fontWeight: "700" }}>Suporte Dev IA Tutor</p>
+              <p style={{ color: colors.textSecondary, fontSize: "14px", margin: "6px 0 0 0", fontWeight: "700" }}>Suporte & Atendimento</p>
             </div>
             <div>
               <h3 style={{ fontSize: "36px", fontWeight: "900", color: "#F59E0B", margin: 0 }}>+50</h3>

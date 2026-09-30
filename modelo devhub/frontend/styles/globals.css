@@ -402,8 +402,13 @@ select:focus {
 }
 
 /* Custom Glass Scrollbar para a Sidebar */
+aside {
+  overflow-x: hidden !important;
+}
+
 aside::-webkit-scrollbar {
   width: 5px;
+  height: 0px;
 }
 
 aside::-webkit-scrollbar-track {

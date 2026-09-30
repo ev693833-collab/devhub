@@ -479,6 +479,7 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
   const [anuncioTitulo, setAnuncioTitulo] = useState("");
   const [anuncioMsg, setAnuncioMsg] = useState("");
   const [anuncioTipo, setAnuncioTipo] = useState("info");
+  const [anuncioDuracao, setAnuncioDuracao] = useState("24h"); // duração padrão: 24 horas
   const [notifAluno, setNotifAluno] = useState("");
   const [notifMensagem, setNotifMensagem] = useState("");
   const [emailAssunto, setEmailAssunto] = useState("");
@@ -626,6 +627,7 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
   // ── GESTÃO ACADÊMICA ───────────────────────────
   const [notaAluno, setNotaAluno] = useState("");
   const [notaMateria, setNotaMateria] = useState("JavaScript");
+  const [notaProvaId, setNotaProvaId] = useState("");
   const [notaValor, setNotaValor] = useState("");
   const [notaObservacao, setNotaObservacao] = useState("");
   const [trilhaAluno, setTrilhaAluno] = useState("");
@@ -3087,14 +3089,28 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                   <option value="conquista">🏆 Conquista / Celebração</option>
                   <option value="manutencao">🔧 Manutenção</option>
                 </FormInput>
+                <FormInput isDark={isDark} label="⏱️ Duração do Anúncio" as="select" value={anuncioDuracao} onChange={e => setAnuncioDuracao(e.target.value)}>
+                  <option value="1h">1 hora</option>
+                  <option value="6h">6 horas</option>
+                  <option value="12h">12 horas</option>
+                  <option value="24h">24 horas (padrão)</option>
+                  <option value="48h">48 horas</option>
+                  <option value="72h">3 dias</option>
+                  <option value="168h">7 dias</option>
+                  <option value="never">Sem expiração</option>
+                </FormInput>
                 <PrimaryButton gradient="linear-gradient(135deg, #f97316, #ea580c)" shadow="0 4px 16px rgba(249,115,22,0.4)" onClick={() => {
                   if (!anuncioTitulo) return showToast("Digite um título para o anúncio.", "error");
+                  const duracaoMs = anuncioDuracao === "never" ? null : parseInt(anuncioDuracao) * 60 * 60 * 1000;
+                  const expiresAt = duracaoMs ? Date.now() + duracaoMs : null;
                   const novoItem = {
                     id: Date.now(),
                     titulo: anuncioTitulo,
                     mensagem: anuncioMsg,
                     tipo: anuncioTipo,
-                    data: new Date().toLocaleDateString("pt-BR")
+                    data: new Date().toLocaleDateString("pt-BR"),
+                    expiresAt,
+                    duracaoLabel: anuncioDuracao === "never" ? "Sem expiração" : `Expira em ${anuncioDuracao.replace("h", "h")}`
                   };
                   const novaLista = [novoItem, ...anunciosEnviados];
                   setAnunciosEnviados(novaLista);
@@ -3125,7 +3141,7 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                     // Dispara evento global de atualização em tempo real
                     window.dispatchEvent(new CustomEvent("devhub_anuncio_publicado"));
                   } catch (e) {}
-                  setAnuncioTitulo(""); setAnuncioMsg(""); setAnuncioTipo("info");
+                  setAnuncioTitulo(""); setAnuncioMsg(""); setAnuncioTipo("info"); setAnuncioDuracao("24h");
                   showToast("📢 Anúncio global publicado para todos os alunos!");
                 }}>
                   <Send size={17} /> Publicar Anúncio
@@ -3135,28 +3151,39 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                 <div style={{ marginTop: "6px" }}>
                   <div style={{ fontSize: "0.8rem", fontWeight: "700", color: isDark ? "#94a3b8" : "#64748b", marginBottom: "10px" }}>HISTÓRICO DE ANÚNCIOS</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {anunciosEnviados.map((a, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC", borderRadius: "12px", border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0"}` }}>
-                        <div>
-                          <div style={{ fontSize: "0.85rem", fontWeight: "700", color: isDark ? "#FFF" : "#0F172A" }}>{a.titulo}</div>
-                          <div style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b" }}>{a.data} · {a.tipo}</div>
+                    {anunciosEnviados.map((a, i) => {
+                      const expirado = a.expiresAt && Date.now() > a.expiresAt;
+                      const expiraEm = a.expiresAt ? new Date(a.expiresAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
+                      return (
+                        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", backgroundColor: expirado ? (isDark ? "rgba(239,68,68,0.05)" : "rgba(239,68,68,0.04)") : (isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC"), borderRadius: "12px", border: `1px solid ${expirado ? "rgba(239,68,68,0.3)" : (isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0")}`, opacity: expirado ? 0.6 : 1 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "0.85rem", fontWeight: "700", color: isDark ? "#FFF" : "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>
+                              {a.titulo}
+                              {expirado && <span style={{ fontSize: "0.7rem", background: "rgba(239,68,68,0.15)", color: "#EF4444", padding: "2px 6px", borderRadius: "6px", fontWeight: "600" }}>EXPIRADO</span>}
+                            </div>
+                            <div style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                              {a.data} · {a.tipo}
+                              {expiraEm && <span style={{ marginLeft: "6px", color: expirado ? "#EF4444" : "#f97316" }}>⏱️ {expirado ? `Expirou em ${expiraEm}` : `Expira em ${expiraEm}`}</span>}
+                              {!a.expiresAt && <span style={{ marginLeft: "6px", color: isDark ? "#64748b" : "#94a3b8" }}>∞ Sem expiração</span>}
+                            </div>
+                          </div>
+                          <button onClick={() => {
+                            const novaLista = anunciosEnviados.filter(x => x.id !== a.id);
+                            setAnunciosEnviados(novaLista);
+                            try {
+                              localStorage.setItem("devhub_anuncios_globais", JSON.stringify(novaLista));
+                              if (novaLista.length === 0) {
+                                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+                                fetch(`${apiUrl}/superadmin/anuncio`, { method: "DELETE" }).catch(() => {});
+                              }
+                              window.dispatchEvent(new CustomEvent("devhub_anuncio_publicado"));
+                            } catch (e) {}
+                          }} style={{ background: "rgba(239,68,68,0.12)", border: "none", color: "#EF4444", padding: "6px", borderRadius: "8px", cursor: "pointer", flexShrink: 0 }}>
+                            <Trash2 size={14} />
+                          </button>
                         </div>
-                        <button onClick={() => {
-                          const novaLista = anunciosEnviados.filter(x => x.id !== a.id);
-                          setAnunciosEnviados(novaLista);
-                          try {
-                            localStorage.setItem("devhub_anuncios_globais", JSON.stringify(novaLista));
-                            if (novaLista.length === 0) {
-                              const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-                              fetch(`${apiUrl}/superadmin/anuncio`, { method: "DELETE" }).catch(() => {});
-                            }
-                            window.dispatchEvent(new CustomEvent("devhub_anuncio_publicado"));
-                          } catch (e) {}
-                        }} style={{ background: "rgba(239,68,68,0.12)", border: "none", color: "#EF4444", padding: "6px", borderRadius: "8px", cursor: "pointer" }}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -3210,21 +3237,7 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                 </div>
               </SectionCard>
 
-              {/* E-mail para Turma */}
-              <SectionCard isDark={isDark} icon={<Mail size={20} color="#FFF" />} gradient="linear-gradient(135deg, #3b82f6, #1d4ed8)" title="📧 E-mail para a Turma" subtitle="Disparo de e-mail para todos ou grupo selecionado">
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <FormInput isDark={isDark} label="Assunto" value={emailAssunto} onChange={e => setEmailAssunto(e.target.value)} placeholder="Assunto do e-mail..." />
-                  <FormInput isDark={isDark} label="Corpo do E-mail" as="textarea" value={emailCorpo} onChange={e => setEmailCorpo(e.target.value)} placeholder="Escreva o conteúdo do e-mail..." style={{ minHeight: "90px" }} />
-                  <PrimaryButton
-                    disabled={enviandoEmail}
-                    gradient="linear-gradient(135deg, #3b82f6, #1d4ed8)"
-                    shadow="0 4px 16px rgba(59,130,246,0.4)"
-                    onClick={handleDispararEmail}
-                  >
-                    <Send size={17} /> {enviandoEmail ? "Enviando..." : "Disparar E-mail"}
-                  </PrimaryButton>
-                </div>
-              </SectionCard>
+
             </div>
           </div>
         </>
@@ -3303,6 +3316,16 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                        <button onClick={() => {
+                          setNotaProvaId(String(p.id));
+                          setNotaMateria(p.materia);
+                          setNotaObservacao(`Referente à prova: "${p.titulo}"`);
+                          setAbaAdmin("academico");
+                          showToast(`Lançando notas para a prova "${p.titulo}"`);
+                        }} title="Lançar / Corrigir Notas desta Prova" style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", color: "#f59e0b", padding: "7px 11px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", fontSize: "0.75rem", fontWeight: "700" }}>
+                          <Award size={14} />
+                          <span>Lançar Nota</span>
+                        </button>
                         <button onClick={() => { setModalQuestoesProva(p); setModalMsg(null); }} title="Cadastrar / Editar Questões da Prova" style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.4)", color: "#a855f7", padding: "7px 11px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", fontSize: "0.75rem", fontWeight: "700" }}>
                           <HelpCircle size={14} />
                           <span>Questões ({p.questoes?.length || 0})</span>
@@ -3571,18 +3594,74 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                   <option value="">— Selecione o aluno —</option>
                   {usuarios.map(u => <option key={u.id} value={u.nome}>{u.nome}</option>)}
                 </FormInput>
+
+                <FormInput isDark={isDark} label="Vincular à Prova Criada *" as="select" value={notaProvaId} onChange={e => {
+                  const pId = e.target.value;
+                  setNotaProvaId(pId);
+                  const pEncontrada = provas.find(p => String(p.id) === String(pId));
+                  if (pEncontrada) {
+                    setNotaMateria(pEncontrada.materia);
+                    setNotaObservacao(`Referente à prova: "${pEncontrada.titulo}"`);
+                  }
+                }}>
+                  <option value="">— Selecione a prova (Obrigatório) —</option>
+                  {provas.map(p => (
+                    <option key={p.id} value={p.id}>{p.titulo} ({p.materia})</option>
+                  ))}
+                </FormInput>
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <FormInput isDark={isDark} label="Matéria" as="select" value={notaMateria} onChange={e => setNotaMateria(e.target.value)}>
-                    {["JavaScript", "React.js", "Node.js", "Banco de Dados", "Estruturas de Dados"].map(m => <option key={m}>{m}</option>)}
+                  <FormInput isDark={isDark} label="Matéria / Conteúdo (Opcional - Auto-preenchida)" as="select" value={notaMateria} onChange={e => setNotaMateria(e.target.value)}>
+                    <option value="">— Manter Matéria da Prova —</option>
+                    {(() => {
+                      const materiasProvas = Array.from(new Set(provas.map(p => p.materia).filter(Boolean)));
+                      const materiasPadrao = ["JavaScript", "React.js", "Node.js", "Banco de Dados", "Estruturas de Dados", "Git & GitHub"];
+                      const todas = Array.from(new Set([...materiasPadrao, ...materiasProvas]));
+                      return todas.map(m => <option key={m} value={m}>{m}</option>);
+                    })()}
                   </FormInput>
-                  <FormInput isDark={isDark} label="Nota (0-10)" type="number" value={notaValor} onChange={e => setNotaValor(e.target.value)} placeholder="Ex: 8.5" />
+                  <FormInput isDark={isDark} label="Nota (0-10) *" type="number" value={notaValor} onChange={e => setNotaValor(e.target.value)} placeholder="Ex: 8.5" />
                 </div>
                 <FormInput isDark={isDark} label="Observação (opcional)" as="textarea" value={notaObservacao} onChange={e => setNotaObservacao(e.target.value)} placeholder="Justificativa da nota..." style={{ minHeight: "70px" }} />
                 <PrimaryButton gradient="linear-gradient(135deg, #f59e0b, #d97706)" shadow="0 4px 16px rgba(245,158,11,0.4)" onClick={() => {
-                  if (!notaAluno || !notaValor) return showToast("Selecione o aluno e informe a nota.", "error");
-                  setNotasLancadas(prev => [{ aluno: notaAluno, materia: notaMateria, nota: parseFloat(notaValor), obs: notaObservacao, data: "Agora" }, ...prev]);
-                  showToast(`✅ Nota ${notaValor} lançada para ${notaAluno} em ${notaMateria}!`);
-                  setNotaAluno(""); setNotaValor(""); setNotaObservacao("");
+                  if (!notaAluno) return showToast("Selecione o aluno.", "error");
+                  if (!notaProvaId) return showToast("A seleção da prova é obrigatória!", "error");
+                  if (!notaValor) return showToast("Informe a nota de 0 a 10.", "error");
+
+                  const pEncontrada = provas.find(p => String(p.id) === String(notaProvaId));
+                  const materiaFinal = notaMateria || (pEncontrada ? pEncontrada.materia : "Geral");
+                  const provaTitulo = pEncontrada ? pEncontrada.titulo : "Prova";
+
+                  // Registra a nota no histórico
+                  const novaNota = {
+                    aluno: notaAluno,
+                    materia: materiaFinal,
+                    prova: provaTitulo,
+                    nota: parseFloat(notaValor),
+                    obs: notaObservacao,
+                    data: "Agora"
+                  };
+                  setNotasLancadas(prev => [novaNota, ...prev]);
+
+                  // Envia notificação ao aluno e atualiza o storage
+                  try {
+                    const savedNotifs = localStorage.getItem("devhub_notifications") || "[]";
+                    const notifsList = JSON.parse(savedNotifs);
+                    const notifObj = {
+                      id: Date.now(),
+                      alunoAlvo: notaAluno,
+                      titulo: `📝 Nota Lançada: ${provaTitulo}`,
+                      mensagem: `Sua nota na prova "${provaTitulo}" (${materiaFinal}) foi lançada pelo professor: ${notaValor}/10.`,
+                      tipo: "nota",
+                      data: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                      lida: false
+                    };
+                    localStorage.setItem("devhub_notifications", JSON.stringify([notifObj, ...notifsList]));
+                    window.dispatchEvent(new Event("storage"));
+                  } catch (e) {}
+
+                  showToast(`✅ Nota ${notaValor} lançada para ${notaAluno} na prova "${provaTitulo}"!`);
+                  setNotaAluno(""); setNotaProvaId(""); setNotaValor(""); setNotaObservacao(""); setNotaMateria("");
                 }}>
                   <CheckCircle size={17} /> Lançar Nota
                 </PrimaryButton>
@@ -3623,51 +3702,7 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
                 </div>
               </SectionCard>
 
-              {/* Trilha Individual */}
-              <SectionCard isDark={isDark} icon={<Map size={20} color="#FFF" />} gradient="linear-gradient(135deg, #6366f1, #4f46e5)" title="🗺️ Definir Trilha Individual" subtitle="Personalizar o roteiro de estudos de um aluno">
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <FormInput isDark={isDark} label="Aluno" as="select" value={trilhaAluno} onChange={e => setTrilhaAluno(e.target.value)}>
-                    <option value="">— Selecione o aluno —</option>
-                    {usuarios.map(u => <option key={u.id} value={u.nome}>{u.nome}</option>)}
-                  </FormInput>
-                  <FormInput isDark={isDark} label="Próximo Tópico / Foco" value={trilhaTema} onChange={e => setTrilhaTema(e.target.value)} placeholder="Ex: Closures e Prototype em JS" />
-                  <FormInput isDark={isDark} label="Meta de XP Semanal" type="number" value={trilhaMeta} onChange={e => setTrilhaMeta(e.target.value)} placeholder="Ex: 500" />
-                  <PrimaryButton gradient="linear-gradient(135deg, #6366f1, #4f46e5)" shadow="0 4px 16px rgba(99,102,241,0.4)" onClick={() => {
-                    if (!trilhaAluno || !trilhaTema) return showToast("Selecione o aluno e defina o foco.", "error");
 
-                    try {
-                      const savedTrilhas = localStorage.getItem("devhub_trilhas_individuais");
-                      const mapa = savedTrilhas ? JSON.parse(savedTrilhas) : {};
-                      mapa[trilhaAluno] = {
-                        tema: trilhaTema,
-                        metaXp: trilhaMeta || 500,
-                        data: new Date().toLocaleDateString("pt-BR"),
-                        instrutor: user?.nome || "Super Admin"
-                      };
-                      localStorage.setItem("devhub_trilhas_individuais", JSON.stringify(mapa));
-
-                      const savedNotifs = localStorage.getItem("devhub_notifications");
-                      const notifsList = savedNotifs ? JSON.parse(savedNotifs) : [];
-                      const novaNotif = {
-                        id: Date.now(),
-                        alunoAlvo: trilhaAluno,
-                        titulo: "🎯 Nova Trilha Individual Definida!",
-                        mensagem: `Seu professor definiu um novo foco de estudos: "${trilhaTema}" com meta de ${trilhaMeta || 500} XP/semana.`,
-                        tipo: "trilha",
-                        data: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-                        lida: false
-                      };
-                      localStorage.setItem("devhub_notifications", JSON.stringify([novaNotif, ...notifsList]));
-                      window.dispatchEvent(new Event("storage"));
-                    } catch (e) {}
-
-                    showToast(`🗺️ Trilha personalizada definida para ${trilhaAluno}!`);
-                    setTrilhaAluno(""); setTrilhaTema(""); setTrilhaMeta("");
-                  }}>
-                    <Target size={17} /> Salvar Trilha
-                  </PrimaryButton>
-                </div>
-              </SectionCard>
             </div>
           </div>
         </>
@@ -3723,28 +3758,7 @@ export default function SuperAdminModule({ isDark = true, colors = {}, currentUs
               </div>
             </SectionCard>
 
-            {/* Exportar Dados */}
-            <SectionCard isDark={isDark} icon={<Database size={20} color="#FFF" />} gradient="linear-gradient(135deg, #10b981, #059669)" title="💾 Exportar Relatório & Dados da Turma" subtitle="Gerar relatório em PDF com visual executivo ou backups em CSV/JSON">
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div style={{ padding: "16px", backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC", borderRadius: "14px", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"}` }}>
-                  <div style={{ fontSize: "0.85rem", fontWeight: "700", color: isDark ? "#FFF" : "#0F172A", marginBottom: "10px" }}>📦 Conteúdo dos arquivos:</div>
-                  {["Relatório Gerencial completo em PDF estilizado", "Dados cadastrais e e-mails de todos os alunos", "Desempenho por matéria e taxas de aprovação", "Registros da Arena 1v1 e provas diárias"].map((item, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem", color: isDark ? "#94a3b8" : "#64748b", marginBottom: "6px" }}>
-                      <CheckCircle size={14} color="#10B981" />
-                      {item}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <PrimaryButton style={{ flex: 1, justifyContent: "center" }} gradient="linear-gradient(135deg, #10b981, #059669)" shadow="0 4px 16px rgba(16,185,129,0.4)" onClick={exportarCSV}>
-                    <Download size={17} /> Exportar CSV
-                  </PrimaryButton>
-                  <PrimaryButton style={{ flex: 1, justifyContent: "center" }} gradient="linear-gradient(135deg, #6366f1, #4f46e5)" shadow="0 4px 16px rgba(99,102,241,0.4)" onClick={exportarJSON}>
-                    <Download size={17} /> Exportar JSON
-                  </PrimaryButton>
-                </div>
-              </div>
-            </SectionCard>
+
           </div>
 
           {/* Logs de Auditoria */}
