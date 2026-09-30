@@ -1,0 +1,484 @@
+/* ==========================================================================
+   HALL DA FAMA - LUXURY 3D ESPORTS LEADERBOARD & PODIUM STAGE
+   ========================================================================== */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #f8fafc;
+}
+
+.headerTitle {
+  font-size: 1.75rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #ffffff 0%, #fef3c7 40%, #f59e0b 70%, #f97316 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 30px rgba(245, 158, 11, 0.3);
+}
+
+.headerDesc {
+  font-size: 0.9rem;
+  margin: 0;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   BARRA DE NAVEGAÇÃO DE CATEGORIAS / FILTROS
+   ========================================================================== */
+.categoryBar {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  max-width: 100%;
+}
+
+.categoryBtn {
+  padding: 10px 20px;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(12px);
+}
+
+.categoryBtn:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* ==========================================================================
+   PÓDIO 3D DOS TOP 3 (3D ELEVATION STAGE)
+   ========================================================================== */
+.podiumWrapper {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 27, 75, 0.6) 100%);
+  backdrop-filter: blur(24px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 36px 28px 24px 28px;
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.6), 
+              0 0 40px rgba(245, 158, 11, 0.12),
+              inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.podiumWrapper::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 300px;
+  background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.25) 0%, rgba(249, 115, 22, 0.08) 50%, transparent 75%);
+  pointer-events: none;
+  filter: blur(40px);
+}
+
+.podiumContainer {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 20px;
+  align-items: end;
+  position: relative;
+  z-index: 1;
+}
+
+/* CARTÃO INDIVIDUAL DO PÓDIO */
+.podiumCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.podiumCard:hover {
+  transform: translateY(-8px);
+}
+
+/* 1º LUGAR - OURO (CENTRO MÁXIMO) */
+.podiumCardGold {
+  order: 2;
+}
+
+.podiumBoxGold {
+  width: 100%;
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.25) 0%, rgba(180, 83, 9, 0.15) 100%);
+  backdrop-filter: blur(16px);
+  border: 2px solid #f59e0b;
+  border-radius: 24px;
+  padding: 28px 20px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(245, 158, 11, 0.4), 
+              0 0 30px rgba(251, 191, 36, 0.3),
+              inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  position: relative;
+  min-height: 240px;
+  justify-content: space-between;
+}
+
+.crownFloating {
+  font-size: 2.4rem;
+  margin-bottom: -12px;
+  filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8));
+  animation: floatCrown 3s ease-in-out infinite alternate;
+}
+
+@keyframes floatCrown {
+  0% { transform: translateY(0) rotate(-2deg); }
+  100% { transform: translateY(-6px) rotate(2deg); }
+}
+
+.avatarCircleGold {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 3px solid #fef08a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.7);
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.userNameGold {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.userTitleGold {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  margin-bottom: 10px;
+}
+
+.flameStreakGold {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #f59e0b;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+  margin-bottom: 6px;
+}
+
+.xpBadgeGold {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.pedestalGold {
+  width: 100%;
+  padding: 8px 0;
+  margin-top: 14px;
+  background: linear-gradient(90deg, #d97706 0%, #f59e0b 50%, #d97706 100%);
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+/* 2º LUGAR - PRATA (ESQUERDA) */
+.podiumCardSilver {
+  order: 1;
+}
+
+.podiumBoxSilver {
+  width: 100%;
+  background: linear-gradient(145deg, rgba(51, 65, 85, 0.7) 0%, rgba(30, 41, 59, 0.8) 100%);
+  backdrop-filter: blur(16px);
+  border: 2px solid #cbd5e1;
+  border-radius: 22px;
+  padding: 24px 18px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  position: relative;
+  min-height: 210px;
+  justify-content: space-between;
+}
+
+.avatarCircleSilver {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+  border: 3px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(203, 213, 225, 0.5);
+  margin-bottom: 10px;
+}
+
+.pedestalSilver {
+  width: 100%;
+  padding: 7px 0;
+  margin-top: 12px;
+  background: linear-gradient(90deg, #64748b 0%, #cbd5e1 50%, #64748b 100%);
+  color: #0f172a;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border-radius: 10px;
+}
+
+/* 3º LUGAR - BRONZE (DIREITA) */
+.podiumCardBronze {
+  order: 3;
+}
+
+.podiumBoxBronze {
+  width: 100%;
+  background: linear-gradient(145deg, rgba(67, 40, 24, 0.6) 0%, rgba(30, 41, 59, 0.8) 100%);
+  backdrop-filter: blur(16px);
+  border: 2px solid #d97706;
+  border-radius: 22px;
+  padding: 24px 18px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  position: relative;
+  min-height: 190px;
+  justify-content: space-between;
+}
+
+.avatarCircleBronze {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  border: 3px solid #fde68a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(217, 119, 6, 0.5);
+  margin-bottom: 10px;
+}
+
+.pedestalBronze {
+  width: 100%;
+  padding: 7px 0;
+  margin-top: 12px;
+  background: linear-gradient(90deg, #b45309 0%, #d97706 50%, #b45309 100%);
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border-radius: 10px;
+}
+
+.userName {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.userTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  margin-bottom: 8px;
+}
+
+.userTitleBronze {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fde68a;
+  margin-bottom: 8px;
+}
+
+.flameStreak {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #f59e0b;
+  margin-bottom: 4px;
+}
+
+.xpBadge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #818cf8;
+}
+
+/* ==========================================================================
+   TABELA DE CLASSIFICAÇÃO (POSIÇÕES #4 A #10+)
+   ========================================================================== */
+.tableWrapper {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.leaderTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.tableHeader {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+
+.tableHeader th {
+  padding: 18px 24px;
+}
+
+.tableRow {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.25s ease;
+}
+
+.tableRow:hover {
+  background: rgba(168, 85, 247, 0.08);
+  transform: translateX(4px);
+}
+
+.tableRow td {
+  padding: 16px 24px;
+  vertical-align: middle;
+}
+
+.rankNumber {
+  font-weight: 900;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+.studentCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.studentAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.studentName {
+  font-weight: 800;
+  color: #f8fafc;
+  font-size: 0.92rem;
+}
+
+.titleBadge {
+  font-size: 0.76rem;
+  padding: 5px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.titleBadgeActive {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}
+
+.titleBadgeOff {
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #94a3b8;
+}
+
+.streakCell {
+  font-weight: 800;
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.xpCell {
+  text-align: right;
+  font-weight: 900;
+  color: #38bdf8;
+  font-size: 0.95rem;
+}
+
+/* RESPONSIVIDADE */
+@media (max-width: 840px) {
+  .podiumContainer {
+    grid-template-columns: 1fr;
+  }
+  .podiumCardGold {
+    order: 1;
+  }
+  .podiumCardSilver {
+    order: 2;
+  }
+  .podiumCardBronze {
+    order: 3;
+  }
+}

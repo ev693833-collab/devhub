@@ -1,128 +1,183 @@
 import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
-import { Users, Code, Send, Mic, Video, Share2, Play, Copy, Check, MessageSquare, AlertCircle, Sparkles, RefreshCw, HelpCircle, CheckCircle2, Award, User, Terminal, Layers, Globe } from "lucide-react";
+import { Users, Code, Send, Mic, Video, Share2, Play, Copy, Check, MessageSquare, AlertCircle, Sparkles, RefreshCw, HelpCircle, CheckCircle2, Award, User, Terminal, Layers, Globe, ArrowRight, X } from "lucide-react";
 
 export default function PairProgrammingModule({ user, isDark, colors }) {
   const [salaAtiva, setSalaAtiva] = useState(null);
   const [nomeNovaSala, setNomeNovaSala] = useState("");
   const [codigoSalaEntrar, setCodigoSalaEntrar] = useState("");
   const [desafioIndex, setDesafioIndex] = useState(0);
+  const [modalSucessoConcluido, setModalSucessoConcluido] = useState(false);
 
-  // Múltiplos Exercícios Diversificados em JavaScript, React, TypeScript e HTML/DOM
+  // Múltiplos Exercícios Diversificados sem resolução pronta + Validação automática + Exemplos explícitos
   const DESAFIOS_PAIR = [
     {
       id: 1,
       titulo: "Exercício 1: Formatador de Perfil & Tag de Dev 🏷️",
       tecnologia: "🟨 JavaScript (ES6)",
       dificuldade: "Fácil / Iniciante",
-      instrucao: "Crie a função 'formatarDev(nome, nivel, skillPrincipal)' que receba os dados do dev e retorne um objeto formatado com a tag de perfil da dupla.",
+      instrucao: "Implemente a função 'formatarDev(nome, nivel, skillPrincipal)' que receba os 3 argumentos e retorne um objeto no formato: { nome, tag, ativo: true }.\n\nA propriedade 'tag' deve seguir estritamente o padrão: \"[DEV-LVL{nivel}] {nome} - {skillPrincipal}\".",
+      exemplo: "formatarDev('Breno', 3, 'JavaScript') => { nome: 'Breno', tag: '[DEV-LVL3] Breno - JavaScript', ativo: true }",
       codigoInicial: `// 🎯 DESAFIO #1: Formatador de Perfil Dev (JavaScript)
-const piloto = "${user?.nome || "Enzo"}";
+const piloto = "${user?.nome || "Breno"}";
 const copiloto = "Nicholas";
 
 function formatarDev(nome, nivel, skillPrincipal) {
-  const tag = \`[DEV-LVL\${nivel}] \${nome} - \${skillPrincipal}\`;
-  return { nome, tag, ativo: true };
+  // 💡 TODO: Escreva sua solução aqui!
+  // Retorne um objeto com: { nome, tag, ativo: true }
+  // A propriedade 'tag' deve ser: "[DEV-LVL" + nivel + "] " + nome + " - " + skillPrincipal
+  
 }
 
-// Testando a execução:
+// Testando a execução (execute quando pronto):
 const dev1 = formatarDev(piloto, 3, "JavaScript");
 const dev2 = formatarDev(copiloto, 5, "React");
 
-console.log("Dev 1:", dev1.tag);
-console.log("Dev 2:", dev2.tag);`
+console.log("Dev 1:", dev1 ? dev1.tag : "Aguardando implementação...");
+console.log("Dev 2:", dev2 ? dev2.tag : "Aguardando implementação...");`,
+      testar: (customConsole, codeText) => {
+        try {
+          const runFn = new Function("console", codeText + "; return formatarDev;");
+          const formatarDev = runFn(customConsole);
+          if (typeof formatarDev !== "function") return false;
+          const res1 = formatarDev("Breno", 3, "JavaScript");
+          const res2 = formatarDev("Dev", 5, "React");
+          return res1 && res1.tag === "[DEV-LVL3] Breno - JavaScript" && res1.nome === "Breno" && res1.ativo === true &&
+                 res2 && res2.tag === "[DEV-LVL5] Dev - React";
+        } catch (e) {
+          return false;
+        }
+      }
     },
     {
       id: 2,
       titulo: "Exercício 2: Componente Card de Perfil Dev ⚛️",
       tecnologia: "⚛️ React & JSX",
       dificuldade: "Médio / Intermediário",
-      instrucao: "Crie um componente React 'PerfilDevCard({ dev })' que receba as props e retorne o elemento renderizado com a lista de habilidades.",
-      codigoInicial: `// 🎯 DESAFIO #2: Componente React (JSX & State)
+      instrucao: "Implemente a função 'PerfilDevCard(props)' que receba 'props' com { dev: { nome, nivel, stack } } e retorne um objeto contendo:\n- componente: \"PerfilDevCard\"\n- renderHTML: \"<div class=\\\"card\\\"><h2>{nome}</h2><p>Nível {nivel}</p></div>\"\n- skills: string das tecnologias unidas por vírgula e espaço (ex: \"React, Next.js, Node.js\").",
+      exemplo: "PerfilDevCard({ dev: { nome: 'Breno', nivel: 4, stack: ['React', 'Node.js'] } }) => { componente: 'PerfilDevCard', renderHTML: '<div class=\"card\"><h2>Breno</h2><p>Nível 4</p></div>', skills: 'React, Node.js' }",
+      codigoInicial: `// 🎯 DESAFIO #2: Componente React (JSX & Props)
 const devExemplo = {
-  nome: "${user?.nome || "Enzo"}",
+  nome: "${user?.nome || "Breno"}",
   nivel: 4,
   stack: ["React", "Next.js", "Node.js"]
 };
 
 function PerfilDevCard(props) {
-  const { dev } = props;
-  return {
-    componente: "PerfilDevCard",
-    renderHTML: \`<div class="card"><h2>\${dev.nome}</h2><p>Nível \${dev.nivel}</p></div>\`,
-    skills: dev.stack.join(", ")
-  };
+  // 💡 TODO: Extraia 'dev' de props e monte o objeto de retorno esperado:
+  // 1. renderHTML: \`<div class="card"><h2>\${dev.nome}</h2><p>Nível \${dev.nivel}</p></div>\`
+  // 2. skills: dev.stack unidas por vírgula e espaço (ex: dev.stack.join(", "))
+  
 }
 
 const resultadoRender = PerfilDevCard({ dev: devExemplo });
-console.log("HTML Renderizado:", resultadoRender.renderHTML);
-console.log("Tecnologias:", resultadoRender.skills);`
+console.log("HTML Renderizado:", resultadoRender ? resultadoRender.renderHTML : "Aguardando implementação...");
+console.log("Tecnologias:", resultadoRender ? resultadoRender.skills : "Aguardando implementação...");`,
+      testar: (customConsole, codeText) => {
+        try {
+          const runFn = new Function("console", codeText + "; return PerfilDevCard;");
+          const PerfilDevCard = runFn(customConsole);
+          if (typeof PerfilDevCard !== "function") return false;
+          const res = PerfilDevCard({ dev: { nome: "Breno", nivel: 4, stack: ["React", "Node.js"] } });
+          return res && res.componente === "PerfilDevCard" && res.skills === "React, Node.js" && res.renderHTML.includes("<h2>Breno</h2>");
+        } catch (e) {
+          return false;
+        }
+      }
     },
     {
       id: 3,
       titulo: "Exercício 3: Validação com Tipagem de Dados 💙",
-      tecnologia: "💙 TypeScript / Logica",
+      tecnologia: "💙 TypeScript / Lógica",
       dificuldade: "Médio / Avançado",
-      instrucao: "Crie a função 'validarUsuarioTS(usuario)' para conferir se os tipos de dados batem com a interface de um Aluno Dev (id: number, nome: string, xp: number).",
-      codigoInicial: `// 🎯 DESAFIO #3: Validação de Tipos & Interface (TypeScript)
-const aluno = { id: 101, nome: "${user?.nome || "Enzo"}", xp: 1250, ativo: true };
+      instrucao: "Implemente a função 'validarUsuarioTS(user)' que receba um objeto e verifique seus tipos:\n- Se typeof user.id !== 'number', retorne \"Erro: id deve ser number\"\n- Se typeof user.nome !== 'string', retorne \"Erro: nome deve ser string\"\n- Se typeof user.xp !== 'number', retorne \"Erro: xp deve ser number\"\n- Se todos forem válidos, retorne: \"✅ Aluno {nome} validado com sucesso com {xp} XP!\".",
+      exemplo: "validarUsuarioTS({ id: 101, nome: 'Breno', xp: 1250 }) => '✅ Aluno Breno validado com sucesso com 1250 XP!'",
+      codigoInicial: `// 🎯 DESAFIO #3: Validação de Tipos (TypeScript)
+const aluno = { id: 101, nome: "${user?.nome || "Breno"}", xp: 1250, ativo: true };
 
 function validarUsuarioTS(user) {
-  if (typeof user.id !== "number") return "Erro: id deve ser number";
-  if (typeof user.nome !== "string") return "Erro: nome deve ser string";
-  if (typeof user.xp !== "number") return "Erro: xp deve ser number";
+  // 💡 TODO: Implemente as validações comtypeof:
+  // 1. Cheque se user.id é number
+  // 2. Cheque se user.nome é string
+  // 3. Cheque se user.xp é number
+  // Retorne a mensagem de sucesso se todos os tipos forem válidos!
   
-  return \`✅ Aluno \${user.nome} validado com sucesso com \${user.xp} XP!\`;
 }
 
 const resultadoValidacao = validarUsuarioTS(aluno);
-console.log(resultadoValidacao);`
+console.log(resultadoValidacao || "Aguardando implementação...");`,
+      testar: (customConsole, codeText) => {
+        try {
+          const runFn = new Function("console", codeText + "; return validarUsuarioTS;");
+          const validarUsuarioTS = runFn(customConsole);
+          if (typeof validarUsuarioTS !== "function") return false;
+          const resOk = validarUsuarioTS({ id: 101, nome: "Breno", xp: 1250 });
+          const resErr = validarUsuarioTS({ id: "101", nome: "Breno", xp: 1250 });
+          return resOk && resOk.includes("✅") && resErr && resErr.includes("Erro");
+        } catch (e) {
+          return false;
+        }
+      }
     },
     {
       id: 4,
       titulo: "Exercício 4: Calculadora de Desempenho & Bônus de XP 🚀",
       tecnologia: "🟨 JavaScript (Lógica & Math)",
       dificuldade: "Fácil",
-      instrucao: "Crie a função 'calcularDesempenho(notas)' que calcule a média e informe o bônus de XP obtido.",
-      codigoInicial: `// 🎯 DESAFIO #4: Calculadora de Desempenho
+      instrucao: "Implemente a função 'calcularDesempenho(notas)' que receba um array de números (notas).\n\nCalcule a média arredondada com Math.round(). Se a média for >= 70, a dupla é aprovada (aprovado = true) e o bônus de XP é 150 (xpBonus = 150). Senão, aprovado = false e xpBonus = 50.\n\nRetorne o objeto: { media, aprovado, xpBonus }.",
+      exemplo: "calcularDesempenho([85, 90, 78, 92]) => { media: 86, aprovado: true, xpBonus: 150 }",
+      codigoInicial: `// 🎯 DESAFIO #4: Calculadora de Desempenho e XP
 const pontuacoes = [85, 90, 78, 92];
 
 function calcularDesempenho(notas) {
-  const soma = notas.reduce((acc, n) => acc + n, 0);
-  const media = Math.round(soma / notas.length);
-  const aprovado = media >= 70;
-  const xpBonus = aprovado ? 150 : 50;
-
-  return { media, aprovado, xpBonus };
+  // 💡 TODO: Calcule a média e retorne o objeto { media, aprovado, xpBonus }
+  // 1. Calcule a soma das notas e a média arredondada com Math.round()
+  // 2. Determine se aprovado (media >= 70)
+  // 3. Define xpBonus = 150 se aprovado, senão 50
+  
 }
 
 const res = calcularDesempenho(pontuacoes);
-console.log(\`Média da Dupla: \${res.media} | Aprovado: \${res.aprovado} | Bônus: +\${res.xpBonus} XP!\`);`
+console.log(res ? \`Média da Dupla: \${res.media} | Aprovado: \${res.aprovado} | Bônus: +\${res.xpBonus} XP!\` : "Aguardando implementação...");`,
+      testar: (customConsole, codeText) => {
+        try {
+          const runFn = new Function("console", codeText + "; return calcularDesempenho;");
+          const calcularDesempenho = runFn(customConsole);
+          if (typeof calcularDesempenho !== "function") return false;
+          const res = calcularDesempenho([80, 90]);
+          return res && res.media === 85 && res.aprovado === true && res.xpBonus === 150;
+        } catch (e) {
+          return false;
+        }
+      }
     },
     {
       id: 5,
       titulo: "Exercício 5: Elemento DOM & Estilos Dinâmicos CSS 🌐",
       tecnologia: "🌐 HTML5, CSS & DOM",
       dificuldade: "Médio",
-      instrucao: "Crie a função 'criarBotaoDOM(texto, corBg)' que monte um objeto representando um elemento de botão HTML estilizado.",
+      instrucao: "Implemente a função 'criarBotaoDOM(texto, corBg)' que receba o texto (string) e a cor de fundo (string) e retorne o objeto estilizado representando o elemento DOM:\n{ tag: \"button\", texto, estilos: { backgroundColor: corBg, color: \"#FFFFFF\", padding: \"10px 20px\", borderRadius: \"8px\", border: \"none\" } }.",
+      exemplo: "criarBotaoDOM('🚀 Clique Aqui', '#10B981') => { tag: 'button', texto: '🚀 Clique Aqui', estilos: { backgroundColor: '#10B981', ... } }",
       codigoInicial: `// 🎯 DESAFIO #5: Manipulação de Elementos HTML/DOM
 function criarBotaoDOM(texto, corBg) {
-  const elemento = {
-    tag: "button",
-    texto: texto,
-    estilos: {
-      backgroundColor: corBg,
-      color: "#FFFFFF",
-      padding: "10px 20px",
-      borderRadius: "8px",
-      border: "none"
-    }
-  };
-  return elemento;
+  // 💡 TODO: Retorne o objeto do elemento DOM estilizado:
+  // { tag: "button", texto: texto, estilos: { backgroundColor: corBg, color: "#FFFFFF", padding: "10px 20px", borderRadius: "8px", border: "none" } }
+  
 }
 
 const meuBotao = criarBotaoDOM("🚀 Clique Aqui", "#10B981");
-console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.estilos.backgroundColor}">\${meuBotao.texto}</button>\`);`
+console.log("Elemento DOM criado:", meuBotao ? \`<button style="background: \${meuBotao.estilos?.backgroundColor}">\${meuBotao.texto}</button>\` : "Aguardando implementação...");`,
+      testar: (customConsole, codeText) => {
+        try {
+          const runFn = new Function("console", codeText + "; return criarBotaoDOM;");
+          const criarBotaoDOM = runFn(customConsole);
+          if (typeof criarBotaoDOM !== "function") return false;
+          const res = criarBotaoDOM("Teste", "#10B981");
+          return res && res.tag === "button" && res.texto === "Teste" && res.estilos && res.estilos.backgroundColor === "#10B981";
+        } catch (e) {
+          return false;
+        }
+      }
     }
   ];
 
@@ -206,7 +261,7 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
     }
   };
 
-  // Execução Real do Código em Tempo Real com Captura de Console
+  // Execução Real do Código em Tempo Real com Captura de Console & Validação Automática
   const handleExecutarCodigo = () => {
     try {
       let logs = [];
@@ -220,7 +275,18 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
       runFn(customConsole);
 
       const logText = logs.join("\n");
-      setResultadoConsole(logText || "✅ Código executado com sucesso sem erros!");
+
+      // Validar se o código passou no teste do desafio atual
+      if (desafioAtual && desafioAtual.testar) {
+        const passouNoTeste = desafioAtual.testar(customConsole, codigo);
+        if (passouNoTeste) {
+          setResultadoConsole((logText ? logText + "\n\n" : "") + "🎉 DESAFIO RESOLVIDO E TESTADO COM SUCESSO! 🏆 (+200 XP)");
+          setModalSucessoConcluido(true);
+          return;
+        }
+      }
+
+      setResultadoConsole(logText || "⚡ Código executado sem saídas do console. Implemente a função exigida e clique em Executar!");
     } catch (err) {
       setResultadoConsole(`❌ Erro na execução: ${err.message}`);
     }
@@ -462,7 +528,6 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
                 🤝 Pair Programming — Exercício #{desafioIndex + 1} de {DESAFIOS_PAIR.length}
               </span>
 
-              {/* TECOLOGIA ESPECIFICADA EM DESTAQUE */}
               <span style={{
                 background: "rgba(168,85,247,0.2)", border: "1px solid rgba(168,85,247,0.4)",
                 borderRadius: "10px", padding: "3px 10px", fontSize: "11px", fontWeight: "900", color: "#A855F7"
@@ -478,9 +543,19 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
             <h4 style={{ fontSize: "17px", fontWeight: "900", margin: "4px 0 6px 0", color: isDark ? "#F1F5F9" : "#0F172A" }}>
               {desafioAtual.titulo}
             </h4>
-            <p style={{ fontSize: "13.5px", color: isDark ? "#CBD5E1" : "#475569", margin: 0, lineHeight: "1.5" }}>
+            <p style={{ fontSize: "13.5px", color: isDark ? "#CBD5E1" : "#475569", margin: "0 0 10px 0", lineHeight: "1.5", whiteSpace: "pre-line" }}>
               {desafioAtual.instrucao}
             </p>
+
+            {desafioAtual.exemplo && (
+              <div style={{
+                backgroundColor: isDark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.8)",
+                padding: "8px 12px", borderRadius: "10px", border: "1px solid rgba(16,185,129,0.3)",
+                fontSize: "12px", fontFamily: "monospace", color: "#10B981"
+              }}>
+                💡 <strong>Exemplo Esperado:</strong> {desafioAtual.exemplo}
+              </div>
+            )}
           </div>
         </div>
 
@@ -582,7 +657,7 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
             display: "flex", flexDirection: "column", gap: "12px"
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", color: "#94A3B8", fontSize: "13px", fontWeight: "700" }}>
-              <span>👤 PILOTO: <strong>{user?.nome || "Enzo"} (Você)</strong></span>
+              <span>👤 PILOTO: <strong>{user?.nome || "Breno"} (Você)</strong></span>
               {salaAtiva.modo === "dupla" ? (
                 <span>👥 CO-PILOTO: <strong>Nicholas (Online 🟢)</strong></span>
               ) : (
@@ -618,7 +693,7 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
           {/* PAINEL DE CONSOLE INTEGRADO PERMANENTE */}
           <div style={{
             backgroundColor: "#020617", borderRadius: "18px", padding: "18px 22px",
-            border: `1.5px solid ${resultadoConsole.includes("❌") ? "rgba(239,68,68,0.4)" : (resultadoConsole ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.1)")}`
+            border: `1.5px solid ${resultadoConsole.includes("❌") ? "rgba(239,68,68,0.4)" : (resultadoConsole.includes("🎉") ? "rgba(16,185,129,0.6)" : "rgba(255,255,255,0.1)")}`
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
               <span style={{ fontSize: "13px", fontWeight: "900", color: "#CBD5E1", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -626,10 +701,10 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
               </span>
               <span style={{
                 fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "6px",
-                background: resultadoConsole.includes("❌") ? "rgba(239,68,68,0.2)" : (resultadoConsole ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.05)"),
-                color: resultadoConsole.includes("❌") ? "#F87171" : (resultadoConsole ? "#34D399" : "#64748B")
+                background: resultadoConsole.includes("❌") ? "rgba(239,68,68,0.2)" : (resultadoConsole.includes("🎉") ? "rgba(16,185,129,0.25)" : "rgba(255,255,255,0.05)"),
+                color: resultadoConsole.includes("❌") ? "#F87171" : (resultadoConsole.includes("🎉") ? "#34D399" : "#64748B")
               }}>
-                {resultadoConsole.includes("❌") ? "❌ Erro no Console" : (resultadoConsole ? "🟢 Código Executado" : "⚪ Aguardando Execução")}
+                {resultadoConsole.includes("❌") ? "❌ Erro no Console" : (resultadoConsole.includes("🎉") ? "🏆 Desafio Concluído" : (resultadoConsole ? "🟢 Código Executado" : "⚪ Aguardando Execução"))}
               </span>
             </div>
 
@@ -642,7 +717,7 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
               </pre>
             ) : (
               <div style={{ color: "#64748B", fontSize: "13px", fontStyle: "italic" }}>
-                💡 Clique no botão <strong>"▶️ Executar & Testar Código"</strong> acima para rodar seu código e ver as saídas do `console.log` aqui!
+                💡 Escreva sua função acima e clique em <strong>"▶️ Executar & Testar Código"</strong> para validar seu desafio!
               </div>
             )}
           </div>
@@ -694,6 +769,98 @@ console.log("Elemento DOM criado:", \`<button style="background: \${meuBotao.est
         )}
 
       </div>
+
+      {/* MODAL DE SUCESSO DO DESAFIO */}
+      {modalSucessoConcluido && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.78)",
+          backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 9999, padding: "20px"
+        }}>
+          <div style={{
+            backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
+            border: "2px solid #10B981",
+            borderRadius: "24px",
+            padding: "32px 28px",
+            maxWidth: "480px",
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "0 20px 50px rgba(16,185,129,0.35)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "16px"
+          }}>
+            <div style={{
+              width: "72px", height: "72px", borderRadius: "50%",
+              backgroundColor: "rgba(16,185,129,0.15)",
+              border: "2px solid #10B981",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "36px"
+            }}>
+              🎉
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: "22px", fontWeight: "900", color: isDark ? "#FFF" : "#0F172A", margin: "0 0 6px 0" }}>
+                Desafio Concluído! 🏆
+              </h3>
+              <p style={{ fontSize: "14px", color: isDark ? "#94A3B8" : "#64748B", margin: 0, lineHeight: "1.5" }}>
+                Parabéns! Você resolveu com sucesso o <strong>{desafioAtual.titulo}</strong>!
+              </p>
+            </div>
+
+            <div style={{
+              width: "100%", padding: "14px", borderRadius: "14px",
+              backgroundColor: isDark ? "rgba(16,185,129,0.1)" : "#ECFDF5",
+              border: "1px solid rgba(16,185,129,0.3)",
+              fontSize: "13px", color: "#10B981", fontWeight: "700"
+            }}>
+              ✨ +200 XP concedidos por esta conquista!
+            </div>
+
+            <p style={{ fontSize: "13px", color: isDark ? "#CBD5E1" : "#475569", margin: 0 }}>
+              Deseja avançar para o próximo desafio ou sair da sala?
+            </p>
+
+            <div style={{ display: "flex", gap: "12px", width: "100%", marginTop: "8px" }}>
+              <button
+                onClick={() => {
+                  setModalSucessoConcluido(false);
+                  handleMudarDesafio();
+                }}
+                style={{
+                  flex: 1, padding: "14px", borderRadius: "14px", border: "none",
+                  background: "linear-gradient(135deg, #10B981, #059669)",
+                  color: "#FFF", fontWeight: "800", fontSize: "14px", cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(16,185,129,0.4)",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
+                }}
+              >
+                <span>🚀 Continuar Próximo Desafio</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setModalSucessoConcluido(false);
+                  setSalaAtiva(null);
+                }}
+                style={{
+                  padding: "14px 20px", borderRadius: "14px",
+                  border: `1px solid ${isDark ? "rgba(255,255,255,0.15)" : "#CBD5E1"}`,
+                  backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9",
+                  color: isDark ? "#FFF" : "#0F172A", fontWeight: "700", fontSize: "14px", cursor: "pointer"
+                }}
+              >
+                🚪 Sair da Sala
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

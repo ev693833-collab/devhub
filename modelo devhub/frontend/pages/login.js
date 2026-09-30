@@ -1,207 +1,548 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import Head from "next/head";
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({ type, message, duration = 2500, onDone }) {
+  const [progress, setProgress] = useState(100);
+  const [visible, setVisible] = useState(false);
+  const startRef = useRef(null);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setVisible(true));
+    startRef.current = performance.now();
+    const tick = (now) => {
+      const pct = Math.max(0, 100 - ((now - startRef.current) / duration) * 100);
+      setProgress(pct);
+      if (pct > 0) rafRef.current = requestAnimationFrame(tick);
+      else { setVisible(false); setTimeout(onDone, 350); }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const ok = type === "success";
+  return (
+    <div style={{
+      position: "fixed", top: 24, right: 24, zIndex: 99999,
+      minWidth: 320, maxWidth: 400, borderRadius: 18, overflow: "hidden",
+      background: ok ? "linear-gradient(135deg,#0d1f17,#0f2318)" : "linear-gradient(135deg,#1f0d0d,#230f0f)",
+      border: `1.5px solid ${ok ? "rgba(16,185,129,.35)" : "rgba(239,68,68,.35)"}`,
+      boxShadow: `0 20px 60px rgba(0,0,0,.7),0 0 40px ${ok ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)"}`,
+      transform: visible ? "translateY(0) scale(1)" : "translateY(-20px) scale(.95)",
+      opacity: visible ? 1 : 0,
+      transition: "transform .35s cubic-bezier(.16,1,.3,1),opacity .35s ease",
+      fontFamily: "'Inter',system-ui,sans-serif"
+    }}>
+      <div style={{ padding: "18px 20px 14px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+          background: ok ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)",
+          border: `1.5px solid ${ok ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          {ok
+            ? <svg width="18" height="18" fill="none" stroke="#10B981" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+            : <svg width="18" height="18" fill="none" stroke="#EF4444" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>}
+        </div>
+        <div>
+          <p style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginBottom: 3 }}>
+            {ok ? "Login realizado!" : "Erro ao entrar"}
+          </p>
+          <p style={{ fontSize: 13, fontWeight: 500, color: ok ? "rgba(110,231,183,.85)" : "rgba(252,165,165,.85)", lineHeight: 1.5 }}>
+            {message}
+          </p>
+        </div>
+      </div>
+      <div style={{ height: 3, background: "rgba(255,255,255,.06)" }}>
+        <div style={{
+          height: "100%", width: `${progress}%`,
+          background: ok ? "linear-gradient(90deg,#10B981,#34D399)" : "linear-gradient(90deg,#EF4444,#F87171)",
+          borderRadius: "0 2px 2px 0", transition: "width .05s linear"
+        }}/>
+      </div>
+    </div>
+  );
+}
+
+
+
+// ── DevHub SVG Logo Inline ─────────────────────────────────────────────────────
+function DevHubIcon({ size = 48 }) {
+  return (
+    <img
+      src="/img/devhub_logo_emblem.png?v=5"
+      alt="DevHub"
+      style={{
+        height: size, width: "auto",
+        filter: "drop-shadow(0 0 18px rgba(139,92,246,.7)) drop-shadow(0 0 6px rgba(59,130,246,.5))",
+      }}
+    />
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function Login() {
   const router = useRouter();
-
-  // Estados do formulário
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  
-  // Estados de controle de interface (carregamento e erro)
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [lembrar, setLembrar] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
+  const [toast, setToast] = useState(null);
+  const [cardVisible, setCardVisible] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) { router.push("/dashboard"); return; }
+
+    const savedEmail = localStorage.getItem("devhub_remembered_email");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setLembrar(true);
+    }
+
+    setTimeout(() => setCardVisible(true), 80);
+  }, []);
+
+  const showToast = (type, message) => setToast({ type, message });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErro("");
-    setSucesso("");
-
-    // Validação básica no frontend
-    if (!email || !senha) {
-      setErro("Por favor, preencha todos os campos.");
-      return;
-    }
-
+    if (!email || !senha) { showToast("error", "Preencha e-mail e senha para continuar."); return; }
     setLoading(true);
-
     try {
-      // URL base do Backend
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
-      // Chamada HTTP para a rota de login do backend
-      const response = await fetch(`${apiUrl}/auth/login`, {
+      const api = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const res = await fetch(`${api}/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Falha ao realizar login.");
-      }
-
-      // Sucesso: armazena token e dados no localStorage
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao realizar login.");
       localStorage.setItem("token", data.token);
       localStorage.setItem("userData", JSON.stringify(data.user));
 
-      setSucesso("Login realizado com sucesso! Redirecionando...");
+      if (lembrar) {
+        localStorage.setItem("devhub_remembered_email", email.trim());
+      } else {
+        localStorage.removeItem("devhub_remembered_email");
+      }
 
-      // Redireciona para a página principal após 1 segundo
-      setTimeout(() => {
-        router.push("/");
-      }, 1000);
-
+      showToast("success", "Redirecionando para o dashboard...");
+      setTimeout(() => router.push("/dashboard"), 2400);
     } catch (err) {
-      setErro(err.message);
+      let msg = err.message || "Falha ao realizar login.";
+      if (msg === "Failed to fetch") msg = "Não foi possível conectar ao servidor.";
+      showToast("error", msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "var(--color-bg-primary, #1A1A2E)",
-      color: "var(--color-text-primary, #F0F2F5)",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      padding: "20px"
-    }}>
-      <div style={{
-        width: "100%",
-        maxWidth: "420px",
-        backgroundColor: "var(--color-form-bg, #2A2A4A)",
-        padding: "40px 32px",
-        borderRadius: "16px",
-        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)",
-        border: "1px solid var(--color-form-border, #4A4A6A)"
-      }}>
-        {/* Cabeçalho */}
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <h1 style={{ fontSize: "28px", fontWeight: "700", marginBottom: "8px" }}>
-            Bem-vindo(a) de volta! 👋
-          </h1>
-          <p style={{ color: "var(--color-text-secondary, #888)", fontSize: "14px" }}>
-            Digite suas credenciais para acessar sua conta.
+    <>
+      <Head>
+        <title>Entrar — DevHub</title>
+        <meta name="description" content="Faça login na sua conta DevHub." />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+      </Head>
+
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; background: #050508; }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(32px) scale(.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+        @keyframes spinSlow { to { transform: rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes logoPulse {
+          0%,100% { filter: drop-shadow(0 0 18px rgba(139,92,246,.7)) drop-shadow(0 0 6px rgba(59,130,246,.5)); }
+          50%      { filter: drop-shadow(0 0 30px rgba(139,92,246,1))  drop-shadow(0 0 12px rgba(59,130,246,.9)); }
+        }
+        @keyframes borderRotate {
+          from { --angle: 0deg; }
+          to   { --angle: 360deg; }
+        }
+        @keyframes glowPulse {
+          0%,100% { box-shadow: 0 0 40px rgba(139,92,246,.15), 0 32px 80px rgba(0,0,0,.8); }
+          50%      { box-shadow: 0 0 60px rgba(139,92,246,.28), 0 32px 80px rgba(0,0,0,.8); }
+        }
+
+        .login-page {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          font-family: 'Inter', system-ui, sans-serif;
+          padding: 32px 16px;
+          position: relative;
+          z-index: 1;
+        }
+
+        /* Card */
+        .card-wrap {
+          width: 100%; max-width: 460px;
+          opacity: 0; transform: translateY(32px) scale(.97);
+          transition: opacity .55s cubic-bezier(.16,1,.3,1), transform .55s cubic-bezier(.16,1,.3,1);
+        }
+        .card-wrap.visible { opacity: 1; transform: translateY(0) scale(1); }
+
+        .logo-block {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 14px; margin-bottom: 32px;
+        }
+        .logo-img {
+          animation: logoPulse 3s ease-in-out infinite;
+        }
+        .logo-name {
+          font-size: 13px; font-weight: 700; letter-spacing: 2px;
+          text-transform: uppercase; color: rgba(255,255,255,.35);
+        }
+
+        .card-title {
+          font-size: 30px; font-weight: 900; color: #FFFFFF;
+          text-align: center; line-height: 1.15; margin-bottom: 8px;
+          letter-spacing: -.5px;
+        }
+        .card-sub {
+          font-size: 14.5px; color: rgba(255,255,255,.4); font-weight: 500;
+          text-align: center; margin-bottom: 36px;
+        }
+        .card-sub a {
+          color: #A78BFA; font-weight: 700; text-decoration: none;
+          transition: color .2s;
+        }
+        .card-sub a:hover { color: #C4B5FD; }
+
+        /* Glass card */
+        .glass-card {
+          background: rgba(10,10,20,.72);
+          backdrop-filter: blur(24px);
+          -webkit-backdrop-filter: blur(24px);
+          border: 1px solid rgba(139,92,246,.22);
+          border-radius: 24px;
+          padding: 40px 36px;
+          animation: glowPulse 4s ease-in-out infinite;
+          position: relative;
+          overflow: hidden;
+        }
+        .glass-card::before {
+          content: '';
+          position: absolute; inset: 0; border-radius: 24px;
+          background: linear-gradient(135deg,rgba(139,92,246,.06) 0%,transparent 60%);
+          pointer-events: none;
+        }
+
+        /* Form */
+        .form-group { margin-bottom: 20px; }
+        .form-label {
+          display: block; font-size: 12.5px; font-weight: 700;
+          color: rgba(255,255,255,.55); margin-bottom: 9px;
+          letter-spacing: .5px; text-transform: uppercase;
+        }
+        .input-wrap { position: relative; }
+        .form-input {
+          width: 100% !important; padding: 14px 18px !important;
+          background: rgba(13, 15, 29, 0.92) !important;
+          border: 1.5px solid rgba(139, 92, 246, 0.35) !important;
+          border-radius: 13px !important; color: #FFFFFF !important;
+          font-size: 15px !important; font-family: inherit !important; outline: none !important;
+          transition: all .2s ease !important;
+        }
+        .form-input::placeholder { color: rgba(255,255,255,.35) !important; }
+        .form-input:focus {
+          border-color: rgba(139,92,246,.85) !important;
+          background: rgba(139,92,246,.15) !important;
+          box-shadow: 0 0 0 4px rgba(139,92,246,.25) !important;
+        }
+        .form-input:-webkit-autofill,
+        .form-input:-webkit-autofill:hover,
+        .form-input:-webkit-autofill:focus,
+        .form-input:-webkit-autofill:active {
+          -webkit-text-fill-color: #ffffff !important;
+          transition: background-color 50000s ease-in-out 0s !important;
+          box-shadow: 0 0 0px 1000px #0d0f1d inset !important;
+          border-color: rgba(139, 92, 246, 0.4) !important;
+        }
+        .form-input.pr { padding-right: 52px; }
+
+        .eye-btn {
+          position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+          background: none; border: none; cursor: pointer;
+          color: rgba(255,255,255,.3); display: flex; align-items: center;
+          transition: color .2s; padding: 4px;
+        }
+        .eye-btn:hover { color: rgba(255,255,255,.7); }
+
+        /* Row: remember + forgot */
+        .row-mid {
+          display: flex; align-items: center; justify-content: space-between;
+          margin-bottom: 26px; gap: 12px;
+        }
+        .check-label {
+          display: flex; align-items: center; gap: 9px;
+          font-size: 13.5px; font-weight: 600; color: rgba(255,255,255,.65);
+          cursor: pointer; user-select: none; transition: color .2s;
+        }
+        .check-label:hover { color: rgba(255,255,255,.9); }
+        .check-box {
+          width: 18px; height: 18px; border-radius: 5px;
+          border: 1.5px solid rgba(139, 92, 246, 0.4);
+          background: rgba(13, 15, 29, 0.85);
+          appearance: none; -webkit-appearance: none; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+          flex-shrink: 0; outline: none; position: relative;
+        }
+        .check-box:hover {
+          border-color: rgba(139, 92, 246, 0.8);
+          background: rgba(139, 92, 246, 0.15);
+          box-shadow: 0 0 8px rgba(139, 92, 246, 0.25);
+        }
+        .check-box:checked {
+          background: linear-gradient(135deg, #7C3AED, #4F46E5);
+          border-color: #8B5CF6;
+          box-shadow: 0 0 12px rgba(124, 58, 237, 0.55);
+        }
+        .check-box:checked::after {
+          content: '';
+          width: 5px; height: 9px;
+          border: solid #ffffff;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+          margin-bottom: 2px;
+          display: block;
+        }
+        .forgot-link {
+          font-size: 13px; font-weight: 700; color: #A78BFA;
+          text-decoration: none; transition: color .2s; white-space: nowrap;
+        }
+        .forgot-link:hover { color: #C4B5FD; }
+
+        /* Main button */
+        .btn-main {
+          width: 100%; padding: 16px; border-radius: 13px; border: none;
+          cursor: pointer; font-size: 15.5px; font-weight: 800;
+          font-family: inherit; color: #FFFFFF;
+          background: linear-gradient(135deg,#7C3AED,#4F46E5);
+          box-shadow: 0 8px 28px rgba(109,40,217,.5);
+          display: flex; align-items: center; justify-content: center; gap: 10px;
+          transition: all .25s ease; letter-spacing: .2px;
+          position: relative; overflow: hidden;
+        }
+        .btn-main::after {
+          content: '';
+          position: absolute; inset: 0;
+          background: linear-gradient(135deg,rgba(255,255,255,.12),transparent);
+          opacity: 0; transition: opacity .25s;
+        }
+        .btn-main:hover:not(:disabled)::after { opacity: 1; }
+        .btn-main:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 14px 40px rgba(109,40,217,.65);
+        }
+        .btn-main:active:not(:disabled) { transform: translateY(0); }
+        .btn-main:disabled { opacity: .65; cursor: not-allowed; }
+
+        .spinner {
+          width: 18px; height: 18px;
+          border: 2.5px solid rgba(255,255,255,.3);
+          border-top-color: #fff; border-radius: 50%;
+          animation: spin .7s linear infinite;
+        }
+
+        /* Divider */
+        .divider {
+          display: flex; align-items: center; gap: 14px;
+          margin: 24px 0; color: rgba(255,255,255,.15);
+          font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+        }
+        .divider::before,.divider::after {
+          content:''; flex:1; height:1px; background: rgba(255,255,255,.08);
+        }
+
+        /* Footer */
+        .card-footer {
+          text-align: center; font-size: 13.5px;
+          color: rgba(255,255,255,.35); font-weight: 500;
+        }
+        .card-footer a { color: #A78BFA; font-weight: 700; text-decoration: none; transition: color .2s; }
+        .card-footer a:hover { color: #C4B5FD; }
+
+        /* Terms */
+        .terms {
+          text-align: center; margin-top: 28px;
+          font-size: 12px; color: rgba(255,255,255,.2); font-weight: 500;
+        }
+        .terms a { color: rgba(167,139,250,.6); text-decoration: none; transition: color .2s; }
+        .terms a:hover { color: #A78BFA; }
+
+        /* Back */
+        .back-btn {
+          display: inline-flex; align-items: center; gap: 8px;
+          margin-bottom: 36px; font-size: 13px; font-weight: 700;
+          color: rgba(255,255,255,.4); text-decoration: none;
+          background: rgba(255,255,255,.05);
+          border: 1px solid rgba(255,255,255,.1);
+          padding: 9px 18px; border-radius: 50px;
+          transition: all .25s ease; backdrop-filter: blur(8px);
+        }
+        .back-btn:hover {
+          color: #fff; background: rgba(139,92,246,.15);
+          border-color: rgba(139,92,246,.45);
+          box-shadow: 0 4px 20px rgba(139,92,246,.2);
+          transform: translateY(-1px);
+        }
+
+        /* Responsive */
+        @media (max-width: 500px) {
+          .glass-card { padding: 32px 24px; }
+          .card-title { font-size: 26px; }
+        }
+      `}</style>
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          duration={toast.type === "success" ? 2400 : 3500}
+          onDone={() => setToast(null)}
+        />
+      )}
+
+      <div className="login-page">
+        <div className={`card-wrap ${cardVisible ? "visible" : ""}`}>
+
+          {/* Logo */}
+          <div className="logo-block">
+            <img
+              src="/img/devhub_logo_emblem.png?v=5"
+              alt="DevHub"
+              className="logo-img"
+              style={{ height: 56, width: "auto" }}
+            />
+            <span className="logo-name">DevHub Platform</span>
+          </div>
+
+          {/* Título */}
+          <h1 className="card-title" style={{ marginBottom: 28 }}>Entre na sua conta</h1>
+
+          {/* Card */}
+          <div className="glass-card">
+            <form onSubmit={handleSubmit} noValidate>
+
+              {/* E-mail */}
+              <div className="form-group">
+                <label className="form-label" htmlFor="email">E-mail</label>
+                <div className="input-wrap">
+                  <input
+                    id="email" type="email" className="form-input"
+                    placeholder="seu@email.com" value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    autoComplete="email" required
+                  />
+                </div>
+              </div>
+
+              {/* Senha */}
+              <div className="form-group">
+                <label className="form-label" htmlFor="senha">Senha</label>
+                <div className="input-wrap">
+                  <input
+                    id="senha"
+                    type={mostrarSenha ? "text" : "password"}
+                    className="form-input pr"
+                    placeholder="••••••••"
+                    value={senha}
+                    onChange={e => setSenha(e.target.value)}
+                    autoComplete="current-password" required
+                  />
+                  <button
+                    type="button" className="eye-btn"
+                    onClick={() => setMostrarSenha(!mostrarSenha)}
+                    aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {mostrarSenha
+                      ? <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                          <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                          <line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                      : <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    }
+                  </button>
+                </div>
+              </div>
+
+              {/* Lembrar + Esqueci */}
+              <div className="row-mid">
+                <label className="check-label">
+                  <input
+                    type="checkbox"
+                    className="check-box"
+                    checked={lembrar}
+                    onChange={e => setLembrar(e.target.checked)}
+                  />
+                  Lembrar de mim
+                </label>
+                <Link href="/recuperar-senha" className="forgot-link">
+                  Esqueceu a senha?
+                </Link>
+              </div>
+
+              {/* Botão */}
+              <button type="submit" className="btn-main" disabled={loading} id="btn-login">
+                {loading
+                  ? <><div className="spinner" />Autenticando...</>
+                  : <>
+                      Entrar
+                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                      </svg>
+                    </>
+                }
+              </button>
+            </form>
+
+            <div className="divider">ou</div>
+
+            <div className="card-footer">
+              Não tem uma conta?{" "}
+              <Link href="/cadastro">Cadastre-se grátis</Link>
+            </div>
+          </div>
+
+          {/* Termos */}
+          <p className="terms">
+            Ao continuar, você concorda com nossos{" "}
+            <a href="#">Termos de Uso</a> e{" "}
+            <a href="#">Política de Privacidade</a>
           </p>
-        </div>
 
-        {/* Mensagem de Erro */}
-        {erro && (
-          <div style={{
-            backgroundColor: "rgba(239, 68, 68, 0.15)",
-            border: "1px solid #EF4444",
-            color: "#EF4444",
-            padding: "12px 16px",
-            borderRadius: "8px",
-            fontSize: "14px",
-            marginBottom: "20px"
-          }}>
-            ⚠️ {erro}
-          </div>
-        )}
-
-        {/* Mensagem de Sucesso */}
-        {sucesso && (
-          <div style={{
-            backgroundColor: "rgba(16, 185, 129, 0.15)",
-            border: "1px solid #10B981",
-            color: "#10B981",
-            padding: "12px 16px",
-            borderRadius: "8px",
-            fontSize: "14px",
-            marginBottom: "20px"
-          }}>
-            ✅ {sucesso}
-          </div>
-        )}
-
-        {/* Formulário de Login */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "20px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "500", marginBottom: "8px" }}>
-              E-mail
-            </label>
-            <input
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--color-form-border, #4A4A6A)",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                color: "inherit",
-                fontSize: "15px",
-                outline: "none"
-              }}
-              required
-            />
+          {/* Voltar */}
+          <div style={{ textAlign: "center", marginTop: 28 }}>
+            <Link href="/" className="back-btn">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+              </svg>
+              Voltar para o início
+            </Link>
           </div>
 
-          <div style={{ marginBottom: "24px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "500", marginBottom: "8px" }}>
-              Senha
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--color-form-border, #4A4A6A)",
-                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                color: "inherit",
-                fontSize: "15px",
-                outline: "none"
-              }}
-              required
-            />
-          </div>
-
-          {/* Botão Entrar */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
-              padding: "14px",
-              borderRadius: "8px",
-              backgroundColor: "var(--color-primary, #8b5cf6)",
-              color: "#FFFFFF",
-              fontWeight: "600",
-              fontSize: "16px",
-              border: "none",
-              cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.7 : 1,
-              transition: "all 0.2s ease"
-            }}
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
-
-        {/* Rodapé com Link para Cadastro */}
-        <div style={{ textAlign: "center", marginTop: "24px", fontSize: "14px", color: "var(--color-text-secondary, #888)" }}>
-          Não tem uma conta ainda?{" "}
-          <Link href="/cadastro" style={{ color: "var(--color-primary, #8b5cf6)", fontWeight: "600", textDecoration: "none" }}>
-            Cadastre-se
-          </Link>
         </div>
       </div>
-    </div>
+    </>
   );
 }

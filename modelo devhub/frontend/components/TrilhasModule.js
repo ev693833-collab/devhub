@@ -68,18 +68,38 @@ export default function TrilhasModule({ user, onSelectAba }) {
     }
   };
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedCp = localStorage.getItem("devhub_checkpoints_trilhas");
+        if (savedCp) {
+          setCheckpointsState(JSON.parse(savedCp));
+        }
+      } catch (e) {}
+    }
+  }, []);
+
   const checkpointsAtuais = checkpointsState[trilhaAtivaKey] || [];
   const concluidosCount = checkpointsAtuais.filter(c => c.feito).length;
   const progressoPercent = Math.round((concluidosCount / (checkpointsAtuais.length || 1)) * 100);
   const infoAtual = infoTrilhas[trilhaAtivaKey];
 
   const toggleCheckpoint = (id) => {
-    setCheckpointsState(prev => ({
-      ...prev,
-      [trilhaAtivaKey]: prev[trilhaAtivaKey].map(cp => 
-        cp.id === id ? { ...cp, feito: !cp.feito } : cp
-      )
-    }));
+    setCheckpointsState(prev => {
+      const next = {
+        ...prev,
+        [trilhaAtivaKey]: prev[trilhaAtivaKey].map(cp => 
+          cp.id === id ? { ...cp, feito: !cp.feito } : cp
+        )
+      };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("devhub_checkpoints_trilhas", JSON.stringify(next));
+          window.dispatchEvent(new CustomEvent("devhub_estudo_realizado"));
+        } catch (e) {}
+      }
+      return next;
+    });
   };
 
   const handleIrEstudar = (cp) => {
@@ -216,42 +236,38 @@ export default function TrilhasModule({ user, onSelectAba }) {
       </div>
 
       <div className={styles.checkpointsList}>
-        <h5 style={{ margin: '10px 0 0 0', fontSize: '0.95rem', color: '#cbd5e1' }}>Módulos de Ação Direta (Estude & Pratique):</h5>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 4px 0' }}>
+          <h5 style={{ margin: 0, fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>Módulos da Trilha</h5>
+          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Clique na caixa para alternar conclusão</span>
+        </div>
         {checkpointsAtuais.map((cp) => (
-          <div key={cp.id} className={styles.checkpointItem} style={{ flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-              <div 
-                style={{ cursor: 'pointer' }} 
-                onClick={() => toggleCheckpoint(cp.id)}
-                title="Clique para alternar status de conclusão"
-              >
-                {cp.feito ? (
-                  <div className={styles.checkIconDone}><CheckCircle2 size={20} /></div>
-                ) : (
-                  <div className={styles.checkIconPending}><Circle size={20} /></div>
-                )}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: cp.feito ? '#f8fafc' : '#94a3b8', fontSize: '0.95rem' }}>{cp.titulo}</div>
-                <div style={{ fontSize: '0.8rem', color: cp.feito ? '#34d399' : '#64748b', marginTop: 2 }}>
-                  {cp.feito ? "✅ Módulo Concluído e Validado" : "⏳ Módulo Pendente"}
-                </div>
-              </div>
-              <div style={{ background: '#0f172a', padding: '4px 10px', borderRadius: 8, fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600 }}>
-                +{cp.xp} XP
+          <div key={cp.id} className={styles.checkpointItem}>
+            <div 
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }} 
+              onClick={() => toggleCheckpoint(cp.id)}
+              title="Alternar conclusão"
+            >
+              {cp.feito ? (
+                <div className={styles.checkIconDone}><CheckCircle2 size={18} /></div>
+              ) : (
+                <div className={styles.checkIconPending}><Circle size={18} /></div>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, color: cp.feito ? '#f8fafc' : '#cbd5e1', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cp.titulo}</div>
+              <div style={{ fontSize: '0.75rem', color: cp.feito ? '#34d399' : '#64748b', marginTop: 1 }}>
+                {cp.feito ? "Concluído" : "Pendente"}
               </div>
             </div>
-
-            {/* BARRAS DE AÇÃO DIRETA - O Aluno pode clicar para Estudar ou Praticar */}
-            <div className={styles.actionBtns} style={{ width: '100%', borderTop: '1px solid #334155', paddingTop: 10 }}>
-              <button className={styles.btnStudy} onClick={() => handleIrEstudar(cp)}>
-                <BookOpen size={14} /> 📖 Estudar Teoria
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <span style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '3px 8px', borderRadius: 6, fontSize: '0.75rem', color: '#f59e0b', fontWeight: 700 }}>
+                +{cp.xp} XP
+              </span>
+              <button className={styles.btnStudy} onClick={() => handleIrEstudar(cp)} title="Estudar Teoria">
+                <BookOpen size={13} /> <span>Teoria</span>
               </button>
-              <button className={styles.btnPractice} onClick={() => handleIrPraticar(cp)}>
-                <Code size={14} /> 💻 Praticar Exercício
-              </button>
-              <button className={styles.btnToggle} onClick={() => toggleCheckpoint(cp.id)}>
-                <Check size={14} /> {cp.feito ? "Desmarcar Módulo" : "Concluir Módulo (+XP)"}
+              <button className={styles.btnPractice} onClick={() => handleIrPraticar(cp)} title="Praticar Exercício">
+                <Code size={13} /> <span>Prática</span>
               </button>
             </div>
           </div>

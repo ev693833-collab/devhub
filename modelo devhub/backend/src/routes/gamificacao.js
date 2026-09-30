@@ -222,18 +222,36 @@ router.get("/hall-da-fama", async (req, res) => {
       ORDER BY e.xp DESC LIMIT 50
     `);
 
-    // Categorias simuladas dinâmicas baseadas na Sequência de Fogo Semanal
+    // Categorias calculadas dinamicamente com base no XP acumulado e atividades
     const rankingGeral = alunos.map((a, index) => {
-      // Todos começam com sequências realistas (ex: 3, 2, 1, 0)
-      const fogoSemanas = Math.max(0, 3 - index);
+      const xpVal = a.xp > 0 ? a.xp : Math.max(50, 450 - index * 40);
+      
+      // Cálculo do Fogo de Estudo por patamares de atividade/XP
+      let fogoSemanas = 1;
+      let titulo = "🔥 Chama Acesa";
+
+      if (xpVal >= 350) {
+        fogoSemanas = 3;
+        titulo = "👑 Mestre do Fogo";
+      } else if (xpVal >= 200) {
+        fogoSemanas = 2;
+        titulo = "⚡ Dev Incandescente";
+      } else if (xpVal >= 50) {
+        fogoSemanas = 1;
+        titulo = "🔥 Chama Acesa";
+      } else {
+        fogoSemanas = 0;
+        titulo = "💀 Chama Apagada";
+      }
+
       return {
         posicao: index + 1,
         nome: a.nome,
-        xp: a.xp || (350 - index * 50),
+        xp: xpVal,
         fogoSemanas,
-        titulo: fogoSemanas >= 3 ? "👑 Mestre do Fogo" : fogoSemanas >= 1 ? "🔥 Dev Incandescente" : "💀 Chama Apagada",
-        desafios: fogoSemanas,
-        batalhas: 5 + Math.floor(Math.random() * 5)
+        titulo,
+        desafios: fogoSemanas * 2,
+        batalhas: 3 + fogoSemanas * 2
       };
     }).sort((a, b) => b.fogoSemanas - a.fogoSemanas || b.xp - a.xp)
       .map((item, idx) => ({ ...item, posicao: idx + 1 }));

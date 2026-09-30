@@ -130,7 +130,7 @@ export default function NotificationCenterModal({ isOpen, onClose, onUpdateUnrea
                 onClick={() => marcarItemComoLido(n.id)}
                 title="Clique para alternar o status de leitura"
               >
-                <div className={styles.iconWrap} style={{ background: n.lida ? '#0f172a' : '#1e293b' }}>
+                <div className={styles.iconWrap} style={{ background: n.lida ? "rgba(255, 255, 255, 0.04)" : "linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.2) 100%)" }}>
                   {getIcon(n.tipo)}
                 </div>
                 <div className={styles.info}>

@@ -37,22 +37,116 @@ const router = express.Router();
 })();
 
 const MODELOS_GEMINI = [
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-latest",
-  "gemini-2.0-flash-exp",
-  "gemini-1.5-pro",
-  "gemini-1.5-pro-latest"
+  "gemini-3.8-flash",       // Recomendado pelo Google (substitui gemini-2.0-flash)
+  "gemini-2.5-flash",       // Alternativa estável
+  "gemini-2.5-flash-lite",  // Mais leve/rápido
+  "gemini-2.5-pro"          // Premium - fallback final
 ];
 
-const SYSTEM_DEV_IA = `Você é a Dev IA, uma assistente virtual de estudos focada ESTRITAMENTE em Programação, Engenharia de Software, Ciência da Computação e Tecnologia.
+const MENSAGEM_RECUSA_DEV_IA = `🤖 **Dev IA — Assistente Oficial DevHub**
 
-⛔ TRAVA E REGRAS DE CONTEÚDO (RIGOROSAMENTE OBRIGATÓRIAS):
-1. VOCÊ É EXCLUSIVAMENTE UM TUTOR ACADÊMICO DE PROGRAMAÇÃO E TECNOLOGIA DA INFORMAÇÃO.
-2. Se o usuário fizer perguntas que NÃO envolvam programação, código, tecnologia, banco de dados, lógica, infraestrutura, desenvolvimento web/mobile ou a plataforma DevHub (exemplo: fofocas, receitas culinárias, política, futebol, conselhos amorosos ou bate-papo geral não-técnico), VOCÊ DEVE RECUSAR RESPONDER DE FORMA EDUCADA E DIRETA.
-3. Resposta de Recusa Padrão: "Olá! Sou a Dev IA 🤖, sua assistente focada exclusivamente em estudos de programação e tecnologia. Não posso responder sobre este assunto, mas estou pronta para te ajudar com códigos, bugs, linguagens de programação (JS, Python, React, SQL, etc.) ou lógica de sistemas. Qual dúvida de programação vamos resolver hoje?"
-4. Para dúvidas técnicas de programação: Seja sempre didática, encorajadora, clara e forneça exemplos de código limpo com Markdown e especificação da linguagem.
-5. Fale sempre em Português do Brasil.
-6. Você também gera slides didáticos, roteiros de áudio, planos de estudo e roadmaps de aprendizado quando o aluno pedir.`;
+Desculpe! Eu sou a **Dev IA**, assistente virtual focada exclusivamente no sistema **DevHub**, **programação** e **desenvolvimento de software**.
+
+Não consigo responder a perguntas sobre outros assuntos (como culinária, esportes ou temas gerais).
+
+Por favor, faça uma pergunta sobre nossos **módulos do sistema** (*Trilhas*, *Batalha de Código*, *Provas*, *Mini Sistemas*), **código** ou **dúvidas de estudo**!`;
+
+function verificarForaDeEscopo(prompt) {
+  if (!prompt) return false;
+  const p = prompt.toLowerCase().trim();
+
+  // Termos técnicos ou do sistema liberam o atendimento
+  const termosTecnicosOuDevhub = [
+    "devhub", "dev", "codigo", "código", "programar", "programação", "programacao", "bug", "erro",
+    "estudo", "estudar", "fonte", "material", "plataforma", "curso", "conteudo", "conteúdo",
+    "duvida", "dúvida", "ajuda", "ajudar", "como", "onde", "posso", "consigo", "bom", "boa", "ter",
+    "javascript", "js", "html", "css", "react", "node", "sql", "banco", "api", "git", "python",
+    "java", "c#", "cpp", "php", "funcao", "função", "var", "const", "let", "array", "loop",
+    "trilha", "batalha", "prova", "nota", "moeda", "devcoin", "streak", "modulo", "módulo",
+    "admin", "painel", "caderno", "flashcard", "suporte", "ticket", "aula", "mentoria", "reuniao",
+    "reunião", "projeto", "sistema", "login", "senha", "perfil", "xp", "nivel", "nível", "loja"
+  ];
+
+  if (termosTecnicosOuDevhub.some(t => p.includes(t))) {
+    return false;
+  }
+
+  // Lista de tópicos claramente fora de escopo
+  const palavrasForaDeEscopo = [
+    "feijao", "feijão", "arroz", "receita", "cozinhar", "cozinha", "comida", "almoço", "almoco",
+    "jantar", "carne", "frango", "bolo", "doce", "sopa", "pao", "pão", "suco", "cerveja",
+    "futebol", "flamengo", "palmeiras", "corinthians", "jogo", "gol", "partida", "campeonato",
+    "politica", "política", "presidente", "eleicao", "eleição", "voto",
+    "namorado", "namorada", "casamento", "amor", "relacionamento",
+    "horoscopo", "horóscopo", "signo", "piada", "piadas", "musica", "música", "filme", "serie", "série",
+    "carro", "pneu", "mecanica", "mecânica", "remédio", "remedio", "saude", "saúde", "médico", "medico"
+  ];
+
+  return palavrasForaDeEscopo.some(pOff => p.includes(pOff));
+}
+
+const SYSTEM_DEV_IA = `Você é a Dev IA, a assistente virtual e GUIA OFICIAL DE NAVEGAÇÃO DA PLATAFORMA DEVHUB 🤖.
+
+Sua função principal é explicar detalhadamente tudo o que existe dentro do sistema DevHub, como funciona cada módulo, onde encontrar os recursos e como os alunos e professores podem utilizar a plataforma ao máximo! Além de tirar dúvidas de programação e tecnologia.
+
+📌 CONHECIMENTO COMPLETO DOS MÓDULOS E RECURSOS DO DEVHUB:
+
+1. 📊 Visão Geral / Dashboard:
+   - Exibe estatísticas em tempo real: Nível do aluno, XP (Pontos de Experiência), saldo de moedas DevCoins e Sequência de estudos diária (Streak).
+   - Exibe o card da "Próxima Aula", atalhos rápidos de navegação e as Provas do Dia.
+
+2. 🗺️ Trilhas de Estudo:
+   - Roteiros passo a passo de aprendizado divididos por áreas (Frontend, Backend, Fullstack, Banco de Dados, DevOps).
+   - Permite selecionar jornadas visuais de evolução.
+
+3. 🛠️ Mini Sistemas & Projetos Práticos:
+   - Módulo com projetos reais e desafios de código para praticar desenvolvimento de software na prática.
+
+4. ⚔️ Batalha de Código:
+   - Arena competitiva onde o aluno resolve desafios de programação contra o relógio ou contra outros alunos para acumular XP e subir no ranking.
+
+5. 📅 Agenda de Aulas & Reuniões:
+   - Calendário com datas e horários das mentorias ao vivo, encontros com professores e entregas de projetos.
+
+6. 📝 Caderno de Estudos (Notas):
+   - Bloco de notas integrado para o aluno criar rascunhos, salvar trechos de código e registrar suas anotações de aula.
+
+7. 🃏 Flashcards (Cartões de Memorização):
+   - Sistema de cartões para revisão rápida e fixação de conceitos, palavras-chave e comandos técnicos.
+
+8. 📈 Evolução & Timeline:
+   - Linha do tempo visual do histórico de progresso, notas de provas realizadas e conquistas desbloqueadas.
+
+9. 🛒 Loja de Gamificação & Carteira:
+   - Local onde o aluno troca suas DevCoins acumuladas por temas exclusivos da plataforma (Neon, Cyberpunk, Dark Gold) e títulos.
+
+10. 🔔 Central de Notificações:
+    - Central de avisos para acompanhar lembretes de aulas, feedbacks de provas e comunicados da equipe.
+
+11. 🎫 Suporte & Chamados (Tickets):
+    - Canal de atendimento direto para abrir chamados sobre dúvidas técnicas, financeiras ou reporte de erros no sistema.
+
+12. 👑 Super Admin (Painel de Gestão):
+    - Painel exclusivo dos administradores para gerenciar alunos, criar provas diárias, agendar reuniões e monitorar frequência.
+
+⛔ REGRAS RIGOROSAS DE ATENDIMENTO E ESCOPO EXCLUSIVO:
+1. Você responde APENAS E EXCLUSIVAMENTE sobre o sistema DevHub, funcionalidades da plataforma, programação, desenvolvimento de software, tecnologia e estudos técnicos.
+2. Se o usuário fizer QUALQUER pergunta fora desse escopo (por exemplo: receitas de comida, culinária como "como fazer feijão", esportes, política, entretenimento, conselhos da vida ou qualquer outro assunto não relacionado a software/DevHub), você DEVE RECUSAR A RESPOSTA E RESPONDER EXATAMENTE COM A SEGUINTE MENSAGEM PRONTA:
+
+"🤖 **Dev IA — Assistente Oficial DevHub**
+
+Desculpe! Eu sou a **Dev IA**, assistente virtual focada exclusivamente no sistema **DevHub**, **programação** e **desenvolvimento de software**.
+
+Não consigo responder a perguntas sobre outros assuntos (como culinária, esportes ou temas gerais).
+
+Por favor, faça uma pergunta sobre nossos **módulos do sistema** (*Trilhas*, *Batalha de Código*, *Provas*, *Mini Sistemas*), **código** ou **dúvidas de estudo**!"
+
+3. NUNCA responda a perguntas fora de escopo. Responda sempre e unicamente com a mensagem pronta de recusa acima.
+4. Responda sempre em Português do Brasil de forma extremamente clara, elegante e bem estruturada com emojis.
+5. NUNCA use linhas horizontais bruscas (como --- ou ___).
+6. Use títulos limpos com ### para criar seções destacadas em cards elegantes.
+7. Use negritos (**destaque**) para nomes de menus e botões da plataforma.
+8. Seja EXTREMAMENTE DIRETA, OBJETIVA e RÁPIDA. Responda exatamente ao que foi perguntado em poucas frases ou parágrafos claros, sem introduções desnecessariamente longas.`;
 
 function temChaveGemini() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -64,15 +158,21 @@ async function gerarComGemini(contents) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   for (const modelo of MODELOS_GEMINI) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // Aumentado para 20s
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents }),
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            maxOutputTokens: 800,
+            temperature: 0.7
+          }
+        }),
         signal: controller.signal
       });
 
@@ -81,10 +181,26 @@ async function gerarComGemini(contents) {
       if (response.ok) {
         const data = await response.json();
         const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (candidateText) return candidateText;
+        if (candidateText) {
+          console.log(`[Gemini API] ✅ Resposta obtida com o modelo: ${modelo}`);
+          return candidateText;
+        }
+      } else {
+        const errText = await response.text().catch(() => "");
+        console.warn(`[Gemini API] ⚠️ Modelo ${modelo} retornou status ${response.status}: ${errText.substring(0, 200)}`);
+
+        // Erros de autenticação/chave inválida: não adianta tentar outros modelos
+        if ([400, 401, 403].includes(response.status)) {
+          console.error(`[Gemini API] ❌ Chave de API inválida ou sem permissão (status ${response.status}). Verifique GEMINI_API_KEY no .env`);
+          break;
+        }
       }
     } catch (err) {
-      console.warn(`Tentativa com modelo ${modelo} falhou:`, err.message);
+      if (err.name === 'AbortError') {
+        console.warn(`[Gemini API] ⏱️ Timeout no modelo ${modelo} (20s). Tentando próximo...`);
+      } else {
+        console.warn(`[Gemini API] Tentativa em ${modelo}:`, err.message);
+      }
     }
   }
 
@@ -106,6 +222,10 @@ function extrairJson(texto) {
 
 // Helper para chamar a API do Gemini via REST
 async function chamarGeminiAPI(messagesHistory, userPrompt) {
+  if (verificarForaDeEscopo(userPrompt)) {
+    return MENSAGEM_RECUSA_DEV_IA;
+  }
+
   if (!temChaveGemini()) {
     return gerarRespostaFallback(userPrompt);
   }
@@ -119,7 +239,7 @@ async function chamarGeminiAPI(messagesHistory, userPrompt) {
     },
     {
       role: "model",
-      parts: [{ text: "Entendido! Sou a Dev IA, sua tutora de programação no DevHub. Como posso te ajudar a codar hoje?" }]
+      parts: [{ text: "Entendido! Sou a Dev IA, sua assistente oficial do DevHub. Como posso te ajudar com a plataforma ou programação hoje?" }]
     }
   ];
 
@@ -276,77 +396,154 @@ function resumoMarkdownFerramenta(tipo, dados) {
 
 // Gerador de respostas fallback quando offline ou sem API key
 function gerarRespostaFallback(prompt) {
+  if (verificarForaDeEscopo(prompt)) {
+    return MENSAGEM_RECUSA_DEV_IA;
+  }
+
   const pLower = prompt.toLowerCase();
 
-  if (pLower.includes("erro") || pLower.includes("bug") || pLower.includes("corrigir")) {
-    return `### 🐛 Análise de Bug / Correção pela Dev IA
+  // 0. Sugestão de por onde começar
+  if (pLower.includes("sugere") || pLower.includes("sugestao") || pLower.includes("sugestão") || pLower.includes("comece") || pLower.includes("onde ir") || pLower.includes("primeir")) {
+    return `### 💡 Sugestão da Dev IA: Onde Começar Seus Estudos!
 
-Identifiquei que você está buscando ajuda para resolver um erro!
+Para quem quer uma evolução estruturada no DevHub, a minha **recomendação oficial** é seguir esta ordem:
 
-**Dicas para debugar seu código:**
-1. **Leia a mensagem de erro do console**: Geralmente ela indica o número da linha e o tipo de erro (ex: \`TypeError: Cannot read properties of undefined\`).
-2. **Use \`console.log()\`**: Verifique o valor real das variáveis logo antes de onde o erro ocorre.
-3. **Sintaxe e Fechamento de Chaves**: Verifique se todas as aspas, parênteses \`()\`, chaves \`{}\` e colchetes \`[]\` estão alinhados.
+1. 🗺️ **1º Passo — Trilhas de Estudo (Frontend)**:
+   - Abra o menu **Trilhas de Estudo** no painel lateral e selecione **Frontend**.
+   - Comece aprendendo a estrutura de páginas com **HTML5** e os estilos com **CSS3**.
+
+2. ⚔️ **2º Passo — Batalha de Código (Prática de Lógica)**:
+   - Assim que aprender o básico de **JavaScript**, vá para a **Batalha de Código**.
+   - Resolva os exercícios de nível *Iniciante* para praticar variáveis, condicionais (\`if/else\`) e loops.
+
+3. 🛠️ **3º Passo — Mini Sistemas (Projetos Reais)**:
+   - Escolha um projeto prático do mundo real na aba **Mini Sistemas** para construir seu primeiro portfólio!
+
+4. 🃏 **4º Passo — Flashcards & Caderno de Estudos**:
+   - Registre suas anotações de aula no **Caderno de Estudos** e revise palavras-chave nos **Flashcards**.
+
+> 🚀 **Dica Rápida**: Clique em **Trilhas de Estudo** no menu lateral para iniciar agora mesmo!`;
+  }
+
+  // 1. Dúvidas sobre estudar / aprender no DevHub (ex: "consigo ter uma boa fonte de estudo aqui no dev?")
+  if (pLower.includes("fonte") || pLower.includes("estudar") || pLower.includes("aprender") || pLower.includes("programar") || pLower.includes("programação") || pLower.includes("programacao") || pLower.includes("boa") || pLower.includes("iniciante") || pLower.includes("começar") || pLower.includes("comecar")) {
+    return `### 🚀 Com certeza! O DevHub é uma excelente fonte de estudos!
+
+Sim! O **DevHub** foi projetado do zero para oferecer um ambiente de aprendizado dinâmico, prático e completo para desenvolvimento de software:
+
+- 🗺️ **Trilhas de Estudo**: Siga roteiros organizados passo a passo (HTML, CSS, JavaScript, React, Node.js).
+- 🛠️ **Laboratório de Mini Sistemas**: Desenvolva projetos práticos do mundo real com testes unitários e Code Review por IA.
+- ⚔️ **Batalha de Código**: Resolva exercícios de programação gamificados e acumule XP.
+- 📝 **Caderno de Estudos & Flashcards**: Faça anotações das aulas e revise conceitos técnicos rapidamente.
+- 📅 **Agenda de Aulas**: Assista às mentorias ao vivo e tire dúvidas com os professores.
+
+> 💡 *Dica*: Abra o menu **Trilhas de Estudo** ou **Mini Sistemas** no painel lateral para iniciar sua jornada hoje mesmo!`;
+  }
+
+  // 2. Erros e Bugs de Código
+  if (pLower.includes("erro") || pLower.includes("bug") || pLower.includes("corrigir") || pLower.includes("console")) {
+    return `### 🐛 Análise de Bug / Correção de Código
+
+Identifiquei que você está buscando ajuda para debugar um erro!
+
+**Passo a passo para resolver:**
+1. **Verifique o Console do Navegador/Terminal**: Leia a mensagem de erro exata (ex: \`TypeError: Cannot read properties of undefined\`).
+2. **Inspecione os Valores**: Use \`console.log()\` logo antes da linha onde o erro é disparado.
+3. **Valide a Sintaxe**: Confira se todas as aspas, chaves \`{}\` e parênteses \`()\` foram fechados corretamente.
 
 \`\`\`javascript
-// Exemplo de verificação defensiva de variável:
-if (usuario && usuario.nome) {
-  console.log("Nome do usuário:", usuario.nome);
-} else {
-  console.log("Usuário ainda não foi carregado.");
+// Exemplo de verificação segura:
+if (dados && dados.usuario) {
+  console.log("Usuário carregado com sucesso:", dados.usuario);
 }
 \`\`\`
 
-> 💡 *Dica DevHub*: Adicione a sua \`GEMINI_API_KEY\` no arquivo \`.env\` do backend para habilitar a inteligência gerativa completa em tempo real!`;
+> 💡 *Dica*: Se precisar de suporte da equipe, você também pode abrir um chamado no módulo **Tickets**!`;
   }
 
-  if (pLower.includes("exercicio") || pLower.includes("exercício") || pLower.includes("desafio")) {
-    return `### 🎯 Desafio Prático de Programação: Estruturas de Repetição (Loops)
+  // 3. Exercícios e Desafios
+  if (pLower.includes("exercicio") || pLower.includes("exercício") || pLower.includes("desafio") || pLower.includes("pratica") || pLower.includes("prática")) {
+    return `### 🎯 Desafio de Código: Filtrando Números Pares
 
-**Nível:** Iniciante / Intermediário  
-**Objetivo:** Escrever uma função que receba um array de números e retorne a soma de todos os números pares.
-
-#### Enunciado:
-Crie uma função chamada \`somarPares(numeros)\` que percorre o array e acumula apenas os valores pares.
+**Objetivo:** Escrever uma função em JavaScript que receba uma lista de números e retorne apenas os números pares.
 
 \`\`\`javascript
-// Exemplo de entrada:
-const lista = [1, 2, 3, 4, 5, 6];
-// Saída esperada: 12 (pois 2 + 4 + 6 = 12)
+function filtrarPares(numeros) {
+  return numeros.filter(num => num % 2 === 0);
+}
+
+// Exemplo de teste:
+console.log(filtrarPares([1, 2, 3, 4, 5, 6])); // Retorna: [2, 4, 6]
 \`\`\`
 
-<details>
-<summary>💡 Clique para ver uma dica</summary>
-
-Você pode usar o operador de resto da divisão \`%\`. Se \`numero % 2 === 0\`, o número é par!
-</details>
-
----
-> 🚀 Tente resolver este desafio no seu editor!`;
+> ⚔️ *Quer mais desafios?* Acesse o módulo **Batalha de Código** no DevHub para competir e acumular XP!`;
   }
 
-  return `### 🤖 Olá! Eu sou a Dev IA, sua assistente de estudos no DevHub!
+  // 4. Trilhas de Estudo
+  if (pLower.includes("trilha") || pLower.includes("roteiro") || pLower.includes("jornada")) {
+    return `### 🗺️ Módulo: Trilhas de Estudo
 
-Estou pronta para te ajudar no seu aprendizado de desenvolvimento de software!
+Nas **Trilhas de Estudo**, você encontra um mapa guiado de aprendizado!
 
-**O que você pode me pedir:**
-- 🔍 **Explicar trechos de código**: Cole um código que você não entendeu.
-- 🛠️ **Debugar erros**: Me envie a mensagem de erro que apareceu no seu terminal.
-- 🎯 **Gerar exercícios práticos**: Peça desafios por linguagem (JS, Python, React, SQL, etc.).
-- 💡 **Dicas de Clean Code & Boas Práticas**.
+- **Frontend**: HTML, CSS, JavaScript, React e CSS Moderno.
+- **Backend**: Node.js, Express, Bancos de Dados SQL/NoSQL e APIs RESTful.
+- **Fullstack**: A combinação completa para criar aplicações de ponta a ponta.
 
-\`\`\`javascript
-// Exemplo: Como declarar uma função limpa em JavaScript
-const calcularMedia = (notas) => {
-  if (!notas || notas.length === 0) return 0;
-  const soma = notas.reduce((acc, curr) => acc + curr, 0);
-  return (soma / notas.length).toFixed(1);
-};
-\`\`\`
+> 📌 Para acessar, clique em **Trilhas de Estudo** no menu lateral e escolha sua tecnologia de foco!`;
+  }
 
-> 📌 *Configuração*: Adicione a \`GEMINI_API_KEY\` no arquivo \`.env\` do servidor para respostas IA personalizadas ativas!
+  // 5. Provas e Notas
+  if (pLower.includes("prova") || pLower.includes("nota") || pLower.includes("certificado")) {
+    return `### 📝 Módulo: Provas & Notas de Prova
 
-Você também pode usar as ferramentas: **Criar slides**, **Explicar por áudio**, **Plano de estudos** e **Roadmap (Minha Jornada)**.`;
+Aqui você avalia seu conhecimento e acompanha seu desempenho acadêmico:
+
+- **Provas Disponíveis**: Responda aos questionários disponibilizados pelos seus professores.
+- **Notas de Prova**: Acompanhe o resultado das suas avaliações já concluídas.
+
+> 🎓 *Dica*: Acesse a aba **Provas & Notas de Prova** no painel do aluno para verificar as avaliações do dia!`;
+  }
+
+  // 6. Batalha de Código
+  if (pLower.includes("batalha") || pLower.includes("ranking") || pLower.includes("competicao") || pLower.includes("competição")) {
+    return `### ⚔️ Módulo: Batalha de Código
+
+A **Batalha de Código** é a nossa arena competitiva gamificada!
+
+- Resolva problemas de código contra o tempo.
+- Ganhe **XP** e suba de nível no ranking dos alunos.
+- Ganhe **DevCoins** para gastar na Loja de Gamificação!
+
+> 🏆 Vá em **Batalha de Código** para desafiar seu raciocínio lógico!`;
+  }
+
+  // 7. Loja e Gamificação
+  if (pLower.includes("loja") || pLower.includes("devcoin") || pLower.includes("xp") || pLower.includes("streak") || pLower.includes("moeda")) {
+    return `### 🛒 Gamificação & Loja DevHub
+
+No DevHub, seus estudos geram recompensas reais:
+
+- **XP (Pontos de Experiência)**: Acumule resolvendo provas e exercícios para subir de nível.
+- **Streak**: Mantenha sua sequência de estudos diária ativa!
+- **DevCoins**: Moedas do sistema ganhas ao estudar.
+- **Loja**: Troque suas DevCoins por temas visuais exclusivos (Neon, Cyberpunk, Gold) e avatares!`;
+  }
+
+  return `### 🤖 Olá! Eu sou a Dev IA, sua assistente e guia oficial do DevHub!
+
+Estou aqui para te ajudar a navegar e aproveitar ao máximo todas as funcionalidades da nossa plataforma!
+
+**O que você encontra no DevHub:**
+- 📊 **Visão Geral**: Estatísticas do seu perfil, XP, Nível, DevCoins e Streak.
+- 🗺️ **Trilhas de Estudo**: Roteiros e módulos organizados por tecnologia.
+- 🛠️ **Mini Sistemas**: Projetos práticos e desafios do mundo real.
+- ⚔️ **Batalha de Código**: Arena competitiva gamificada de programação.
+- 📅 **Agenda de Aulas**: Calendário de mentorias e aulas ao vivo.
+- 📝 **Caderno de Estudos**: Suas anotações pessoais de aula.
+- 🃏 **Flashcards**: Cartões de memorização para revisão rápida.
+- 🛒 **Loja & Carteira**: Troque suas DevCoins por novos temas exclusivos!
+
+Ficou com alguma dúvida sobre como usar qualquer um desses módulos? É só me perguntar! 🚀`;
 }
 
 // --- ROTAS DO DEV IA ---
@@ -447,10 +644,35 @@ router.get("/threads/:id/messages", verifyToken, async (req, res) => {
   }
 });
 
+// Rate Limiter Cooldown: mínimo de 4 segundos entre mensagens por usuário (proteção contra spam/flood)
+const ultimosEnviosDevIa = new Map();
+const COOLDOWN_MS = 4000;
+
+function verificarCooldownDevIa(userId) {
+  const agora = Date.now();
+  const ultimoEnvio = ultimosEnviosDevIa.get(userId);
+
+  if (ultimoEnvio && agora - ultimoEnvio < COOLDOWN_MS) {
+    const faltamSegundos = Math.ceil((COOLDOWN_MS - (agora - ultimoEnvio)) / 1000);
+    return {
+      bloqueado: true,
+      mensagem: `⏳ Por favor, aguarde **${faltamSegundos} segundo(s)** antes de enviar outra pergunta.`
+    };
+  }
+
+  ultimosEnviosDevIa.set(userId, agora);
+  return { bloqueado: false };
+}
+
 // 5. Enviar mensagem do usuário e obter resposta da Dev IA
 router.post("/chat", verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const cooldown = verificarCooldownDevIa(userId);
+    if (cooldown.bloqueado) {
+      return res.status(429).json({ error: cooldown.mensagem });
+    }
+
     const { thread_id, message } = req.body;
 
     if (!message || message.trim() === "") {
@@ -536,6 +758,12 @@ router.post("/chat", verifyToken, async (req, res) => {
 // 5.1 Rota isolada do Caderno de Estudos (NÃO gera threads nem histórico na Dev IA Tutor)
 router.post("/caderno-chat", verifyToken, async (req, res) => {
   try {
+    const userId = req.user.id;
+    const cooldown = verificarCooldownDevIa(userId);
+    if (cooldown.bloqueado) {
+      return res.status(429).json({ error: cooldown.mensagem });
+    }
+
     const { message } = req.body;
 
     if (!message || message.trim() === "") {
@@ -559,6 +787,11 @@ router.post("/caderno-chat", verifyToken, async (req, res) => {
 router.post("/ferramenta", verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const cooldown = verificarCooldownDevIa(userId);
+    if (cooldown.bloqueado) {
+      return res.status(429).json({ error: cooldown.mensagem });
+    }
+
     const { thread_id, tipo, tema } = req.body;
     const tiposOk = ["slides", "audio", "plano", "roadmap"];
 

@@ -2,7 +2,130 @@ import '../styles/globals.css'
 import { useAuth } from '../utils/auth'
 import setupAxiosInterceptors from '../utils/axiosInterceptor'
 import Head from 'next/head';
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+
+// ── Constellation Background ───────────────────────────────────────────────────
+function ConstellationBg() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const COUNT = 95;
+    // Rich Purple & Violet Palette: Neon Violet, Purple, Indigo, Lavender, Glowing Magenta-Violet
+    const PURPLE_PALETTE = [
+      [168, 85, 247],  // Neon Violet (#A855F7)
+      [139, 92, 246],  // Deep Purple (#8B5CF6)
+      [124, 58, 237],  // Indigo Violet (#7C3AED)
+      [192, 132, 252], // Bright Lavender (#C084FC)
+      [217, 70, 239],  // Glowing Magenta-Violet (#D946EF)
+    ];
+
+    const pts = Array.from({ length: COUNT }, () => {
+      const colorIndex = Math.floor(Math.random() * PURPLE_PALETTE.length);
+      const isBigStar = Math.random() < 0.15;
+      return {
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - .5) * .35,
+        vy: (Math.random() - .5) * .35,
+        r: isBigStar ? Math.random() * 1.5 + 3.2 : Math.random() * 1.6 + 1.2,
+        baseOpacity: isBigStar ? Math.random() * .2 + .80 : Math.random() * .4 + .55,
+        color: PURPLE_PALETTE[colorIndex],
+        twinklePhase: Math.random() * Math.PI * 2,
+        twinkleSpeed: Math.random() * .03 + .01,
+        isBigStar,
+      };
+    });
+
+    const DIST = 145;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Update positions & twinkling phase
+      pts.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.twinklePhase += p.twinkleSpeed;
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+      });
+
+      // Draw connecting lines in glowing purple
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const dx = pts[i].x - pts[j].x;
+          const dy = pts[i].y - pts[j].y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < DIST) {
+            const alpha = (1 - d / DIST) * 0.42;
+            const c1 = pts[i].color;
+            const c2 = pts[j].color;
+            const r = Math.round((c1[0] + c2[0]) / 2);
+            const g = Math.round((c1[1] + c2[1]) / 2);
+            const b = Math.round((c1[2] + c2[2]) / 2);
+
+            ctx.beginPath();
+            ctx.moveTo(pts[i].x, pts[i].y);
+            ctx.lineTo(pts[j].x, pts[j].y);
+            ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw purple particle dots with glow
+      pts.forEach(p => {
+        const twinkle = Math.sin(p.twinklePhase) * 0.2;
+        const currentOpacity = Math.min(1, Math.max(0.25, p.baseOpacity + twinkle));
+        const [r, g, b] = p.color;
+
+        ctx.save();
+        ctx.shadowColor = `rgb(${r},${g},${b})`;
+        ctx.shadowBlur = p.isBigStar ? 14 : 7;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${b},${currentOpacity})`;
+        ctx.fill();
+
+        ctx.restore();
+      });
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed', inset: 0,
+        zIndex: 1, pointerEvents: 'none',
+        opacity: 0.85,
+      }}
+    />
+  );
+}
 
 export default function App({ Component, pageProps }) {
   const auth = useAuth()
@@ -72,10 +195,13 @@ export default function App({ Component, pageProps }) {
   if (!Component) return null;
 
   return (
-    <div>
+    <div style={{ position: 'relative', minHeight: '100vh' }}>
+      <ConstellationBg />
       <Head>
-        <title>Plataforma</title>
-        <link rel="icon" href="/img/favicon-32x32.png" type="image/png" />
+        <title>DevHub — Central de Estudos & Ecossistema</title>
+        <link rel="icon" href="/favicon.png?v=5" type="image/png" />
+        <link rel="shortcut icon" href="/favicon.ico?v=5" />
+        <link rel="apple-touch-icon" href="/favicon.png?v=5" />
         <style>{`
           @keyframes slideInRight {
             from { transform: translateX(120%); opacity: 0; }

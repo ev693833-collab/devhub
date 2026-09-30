@@ -3,7 +3,8 @@ import {
   Bot, Send, Plus, Trash2, MessageSquare, Sparkles,
   Target, ChevronLeft, ChevronRight, History, X,
   Palette, Headphones, Map, Check, Copy, Play, Pause, Volume2,
-  Briefcase, Award, CheckCircle, AlertTriangle, Lightbulb
+  Briefcase, Award, CheckCircle, AlertTriangle, Lightbulb,
+  Mic, MicOff, CheckCheck
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -279,8 +280,10 @@ function InlineRoadmapWidget({ dados, onAbrirJornada }) {
   );
 }
 
-export default function DevIaModule({ user }) {
-  const [collapsed, setCollapsed] = useState(false);
+const MAX_MENSAGENS_DIA = 20;
+
+export default function DevIaModule({ user, isFloating = false, onClose = null }) {
+  const [collapsed, setCollapsed] = useState(true);
   const [threads, setThreads] = useState([]);
   const [activeThreadId, setActiveThreadId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -290,7 +293,112 @@ export default function DevIaModule({ user }) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // 🎯 Controle do Limite Diário de Mensagens / Proteção de Tokens
+  const [mensagensUsadasHoje, setMensagensUsadasHoje] = useState(0);
+
+  const getHojeKey = () => {
+    const hoje = new Date().toISOString().split("T")[0];
+    const userKey = user?.email || user?.id || "usuario";
+    return `devhub_ia_limite_${userKey}_${hoje}`;
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const count = localStorage.getItem(getHojeKey());
+        setMensagensUsadasHoje(count ? parseInt(count, 10) : 0);
+      } catch (e) {}
+    }
+  }, [user]);
+
+  const incrementarUsoDiario = () => {
+    if (typeof window !== "undefined") {
+      try {
+        const novo = mensagensUsadasHoje + 1;
+        localStorage.setItem(getHojeKey(), String(novo));
+        setMensagensUsadasHoje(novo);
+      } catch (e) {}
+    }
+  };
+
   const [modalMinhasMensagensOpen, setModalMinhasMensagensOpen] = useState(false);
+  
+  // 🎙️ Gravação de Áudio por Voz (Estilo WhatsApp)
+  const [gravandoAudio, setGravandoAudio] = useState(false);
+  const [segundosGravacao, setSegundosGravacao] = useState(0);
+  const recognitionRef = useRef(null);
+  const timerRef = useRef(null);
+
+  const iniciarGravacaoAudio = () => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Seu navegador não suporta gravação de áudio por voz diretamente. Tente utilizar o Google Chrome ou Edge.");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "pt-BR";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setGravandoAudio(true);
+        setSegundosGravacao(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+          setSegundosGravacao(prev => prev + 1);
+        }, 1000);
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setInputMessage(transcript);
+        }
+      };
+
+      recognition.onerror = (err) => {
+        console.warn("Erro na gravação por voz:", err);
+        pararGravacaoAudio();
+      };
+
+      recognition.onend = () => {
+        setGravandoAudio(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error("Falha ao iniciar gravação de áudio:", err);
+      setGravandoAudio(false);
+    }
+  };
+
+  const pararGravacaoAudio = () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) {}
+    }
+    setGravandoAudio(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+  const pararEEnviarGravacao = () => {
+    pararGravacaoAudio();
+    setTimeout(() => {
+      handleEnviarMensagem();
+    }, 400);
+  };
+
+  const cancelarGravacaoAudio = () => {
+    pararGravacaoAudio();
+    setInputMessage("");
+  };
   const [painelJornada, setPainelJornada] = useState(false);
   const [ferramenta, setFerramenta] = useState(null);
   const [temaFerramenta, setTemaFerramenta] = useState("");
@@ -454,9 +562,48 @@ export default function DevIaModule({ user }) {
     }
   };
 
+  const [ultimoEnvioTs, setUltimoEnvioTs] = useState(0);
+
   const handleEnviarMensagem = async (promptTexto) => {
     const textoFinal = promptTexto || inputMessage;
     if (!textoFinal || textoFinal.trim() === "" || sending) return;
+
+    // Trava de Cooldown (Mínimo 4 segundos entre perguntas contra spam/flood)
+    const agora = Date.now();
+    if (agora - ultimoEnvioTs < 4000) {
+      const faltam = Math.ceil((4000 - (agora - ultimoEnvioTs)) / 1000);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: "ia",
+          content: `⏳ **Aguarde ${faltam} segundo(s)** antes de enviar a próxima pergunta.`
+        }
+      ]);
+      return;
+    }
+
+    if (mensagensUsadasHoje >= MAX_MENSAGENS_DIA) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          sender: "user",
+          content: textoFinal,
+          created_at: new Date().toISOString()
+        },
+        {
+          id: Date.now() + 1,
+          sender: "ia",
+          content: "⚠️ **Limite Diário Atingido!**\n\nVocê atingiu o limite de **20 interações diárias** com a Dev IA para proteção do uso de tokens da plataforma. O seu limite será renovado amanhã às 00:00! 🌙"
+        }
+      ]);
+      if (!promptTexto) setInputMessage("");
+      return;
+    }
+
+    setUltimoEnvioTs(agora);
+    incrementarUsoDiario();
 
     const userMsgObj = {
       id: Date.now(),
@@ -796,340 +943,268 @@ export default function DevIaModule({ user }) {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ""}`}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "space-between", marginBottom: "12px", width: "100%" }}>
-          {!collapsed && <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Conversas</h3>}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className={styles.toggleBtn}
-            title={collapsed ? "Expandir histórico" : "Recolher histórico"}
-          >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
-        </div>
-
-        <button className={styles.newChatBtn} onClick={handleCriarNovaConversa}>
-          <Plus size={18} />
-          {!collapsed && <span>Nova Conversa</span>}
-        </button>
-
-        <button
-          className={`${styles.jornadaSidebarBtn} ${painelJornada ? styles.jornadaSidebarBtnOn : ""}`}
-          onClick={() => setPainelJornada((v) => !v)}
-          title="Minha Jornada"
-        >
-          <Map size={18} />
-          {!collapsed && <span>Minha Jornada</span>}
-        </button>
-
-        <div className={styles.threadList}>
-          {loadingThreads ? (
-            <div className={styles.loadingText}>Carregando...</div>
-          ) : threads.length === 0 ? (
-            <div className={styles.emptyThreads}>{!collapsed && "Nenhuma conversa iniciada"}</div>
-          ) : (
-            threads.map(thread => (
-              <div
-                key={thread.id}
-                className={`${styles.threadItem} ${activeThreadId === thread.id ? styles.activeThread : ""}`}
-                onClick={() => { setActiveThreadId(thread.id); setPainelJornada(false); }}
-                title={thread.titulo}
-              >
-                <MessageSquare size={16} className={styles.threadIcon} />
-                {!collapsed && (
-                  <>
-                    <span className={styles.threadTitle}>{thread.titulo}</span>
-                    <button
-                      className={styles.deleteBtn}
-                      onClick={(e) => handleExcluirConversa(e, thread.id)}
-                      title="Excluir conversa"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      <div className={styles.chatArea}>
-        <div className={styles.chatHeader}>
-          <div className={styles.botTitle}>
-            <div className={styles.botBadge}>
+    <div className={styles.container} style={isFloating ? { height: "100%", minHeight: 0, marginTop: 0, borderRadius: 0, border: "none", backgroundColor: "transparent" } : {}}>
+      <div className={styles.waChatArea}>
+        {/* CABEÇALHO ESTILO WHATSAPP WEB */}
+        <div className={styles.waHeader}>
+          <div className={styles.waProfileInfo}>
+            <div className={styles.waAvatar}>
               <Bot size={22} />
+              <span className={styles.waOnlineDot} title="Online agora" />
             </div>
             <div>
-              <h2>Dev IA — Tutor de Estudos ⚡</h2>
-              <p>Slides, áudio, plano de estudos e roadmap para aprender programação</p>
+              <h3 className={styles.waTitle}>
+                Dev IA — Suporte & Guia DevHub
+              </h3>
+              <p className={styles.waSubtitle}>online • tira dúvidas sobre o sistema</p>
             </div>
           </div>
 
-          <button
-            onClick={() => setModalMinhasMensagensOpen(true)}
-            className={styles.headerGhostBtn}
-            title="Ver todas as mensagens que você enviou nesta conversa"
-          >
-            <History size={16} />
-            <span>Minhas Mensagens ({minhasMensagens.length})</span>
-          </button>
-        </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: "800",
+                padding: "4px 10px",
+                borderRadius: "12px",
+                backgroundColor: mensagensUsadasHoje >= MAX_MENSAGENS_DIA ? "rgba(239, 68, 68, 0.2)" : "rgba(37, 211, 102, 0.15)",
+                border: `1px solid ${mensagensUsadasHoje >= MAX_MENSAGENS_DIA ? "#EF4444" : "#25D366"}`,
+                color: mensagensUsadasHoje >= MAX_MENSAGENS_DIA ? "#F87171" : "#25D366",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                whiteSpace: "nowrap"
+              }}
+              title="Limite diário de interações por usuário para economia de tokens"
+            >
+              ⚡ {Math.max(0, MAX_MENSAGENS_DIA - mensagensUsadasHoje)}/20 Diárias
+            </span>
 
-        {/* BARRA DE FERRAMENTAS RÁPIDAS NO TOPO (SUBIDA COM ROLAGEM SUAVE) */}
-        <div className={styles.topToolsBar}>
-          <span className={styles.topToolsLabel}>✨ Ferramentas IA:</span>
-          <button
-            type="button"
-            className={styles.scrollToolBtn}
-            onClick={() => rolarFerramentas("esquerda")}
-            title="Rolar para a esquerda"
-          >
-            <ChevronLeft size={15} />
-          </button>
-          <div className={styles.topToolsList} ref={topToolsRef}>
-            {ferramentas.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={styles.topToolPill}
-                  onClick={() => abrirFerramenta(item.id)}
-                  disabled={sending}
-                  title={item.desc}
-                >
-                  <Icon size={15} />
-                  <span>{item.titulo}</span>
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            className={styles.scrollToolBtn}
-            onClick={() => rolarFerramentas("direita")}
-            title="Rolar para a direita"
-          >
-            <ChevronRight size={15} />
-          </button>
-        </div>
-
-        {painelJornada ? (
-          <div className={styles.jornadaPanel}>
-            <div className={styles.jornadaHead}>
-              <div>
-                <h3>📖 Minha Jornada</h3>
-                <p>{jornada.objetivo}</p>
-              </div>
-              <div className={styles.jornadaActions}>
-                <span className={styles.jornadaProgress}>{feitos}/{totalEtapas} etapas</span>
-                <button type="button" onClick={copiarJornada} title="Copiar trilha">
-                  <Copy size={16} />
-                </button>
-                <button type="button" onClick={() => abrirFerramenta("roadmap")}>Gerar nova trilha</button>
-              </div>
-            </div>
-
-            <div className={styles.roadmapBox}>
-              <button type="button" className={styles.roadmapCopy} onClick={copiarJornada} title="Copiar">
-                <Copy size={14} />
+            {onClose && (
+              <button
+                onClick={onClose}
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#aebac1",
+                  cursor: "pointer",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.2s"
+                }}
+                title="Fechar Conversa (X)"
+              >
+                <X size={18} />
               </button>
-              <div className={styles.roadmapTitle}>{jornada.titulo}</div>
-              <div className={styles.roadmapTree}>
-                {(jornada.linhas || []).map((linha, idx) => (
-                  <div key={idx} className={styles.roadmapBlock}>
-                    {idx > 0 && <div className={styles.roadmapVLine} />}
-                    {linha.tipo === "bifurcacao" ? (
-                      <div className={styles.roadmapSplitWrap}>
-                        <div className={styles.roadmapTBar} />
-                        <div className={styles.roadmapSplit}>
-                          <div className={styles.roadmapBranch}>
-                            <div className={styles.roadmapVLineShort} />
-                            <NoCheck id={linha.esquerda.id} label={linha.esquerda.label} dica={linha.esquerda.dica} />
-                          </div>
-                          <div className={styles.roadmapBranch}>
-                            <div className={styles.roadmapVLineShort} />
-                            <NoCheck id={linha.direita.id} label={linha.direita.label} dica={linha.direita.dica} />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <NoCheck id={linha.id} label={linha.label} dica={linha.dica} />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className={styles.roadmapHint}>Clique no quadrado verde para marcar o que você já concluiu.</p>
-            </div>
+            )}
           </div>
-        ) : (
-          <div className={styles.messagesContainer}>
-            {messages.length === 0 && !loadingMessages ? (
-              <div className={styles.welcomeBox}>
-                <div className={styles.welcomeHeader}>
-                  <Sparkles size={36} className={styles.sparkleIcon} />
-                  <h3>Boas-vindas à Dev IA Tutor!</h3>
-                  <p className={styles.welcomeSubtitle}>Tire dúvidas de programação ou escolha uma sugestão abaixo:</p>
+        </div>
+
+        {/* CONTAINER DE MENSAGENS NO ESTILO WHATSAPP */}
+        <div className={styles.waMessagesContainer}>
+          {messages.length === 0 && !loadingMessages ? (
+            <div className={`${styles.waRow} ${styles.waIaRow}`}>
+              <div className={`${styles.waBubble} ${styles.waIaBubble}`} style={{ maxWidth: "85%" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#00a884", marginBottom: "6px" }}>
+                  Dev IA Suporte 🤖
                 </div>
-                <div className={styles.welcomeSuggestions}>
+                <div style={{ wordBreak: "break-word", lineHeight: "1.5", fontSize: "0.92rem", color: "#e9edef" }}>
+                  👋 <strong>Olá! Eu sou a Dev IA, sua assistente e guia oficial do DevHub 🟢</strong><br /><br />
+                  Estou aqui para te ajudar a entender e navegar por todas as partes da nossa plataforma! Pode me perguntar qualquer coisa sobre como funciona o sistema, incluindo:<br /><br />
+                  - 📊 <strong>Visão Geral & Provas Diárias</strong> (Como responder provas e acumular XP/Nível)<br />
+                  - ⚔️ <strong>Batalha de Código</strong> (Arena de desafios de programação e ranking)<br />
+                  - 📝 <strong>Caderno de Estudos & Flashcards</strong> (Bloco de anotações e cartões de memória)<br />
+                  - 🛒 <strong>Loja de Temas & DevCoins</strong> (Como trocar moedas por temas exclusivos)<br />
+                  - 📅 <strong>Agenda de Aulas & Mentoria</strong> (Ver horários e aulas ao vivo)<br />
+                  - 🎫 <strong>Suporte & Tickets</strong> (Como abrir chamados com nossa equipe)<br /><br />
+                  Como posso te ajudar hoje? <strong>Digite sua dúvida abaixo</strong> ou <strong>clique no microfone para enviar uma mensagem por voz! 🎙️</strong>
+                </div>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "14px" }}>
                   <button
                     type="button"
-                    className={styles.suggestionCard}
-                    onClick={() => handleEnviarMensagem("Como funciona Flexbox e CSS Grid? Me dê exemplos práticos.")}
+                    style={{ backgroundColor: "#111b21", border: "1px solid #00a884", borderRadius: "18px", padding: "6px 12px", color: "#00a884", fontSize: "0.78rem", fontWeight: "700", cursor: "pointer" }}
+                    onClick={() => handleEnviarMensagem("Quais são todos os módulos e recursos disponíveis dentro do DevHub?")}
                   >
-                    <span className={styles.suggestionIcon}>🎨</span>
-                    <div>
-                      <div className={styles.suggestionTitle}>Flexbox & CSS Grid</div>
-                      <div className={styles.suggestionDesc}>Exemplos práticos de layout no CSS</div>
-                    </div>
+                    📊 O que tem no DevHub?
                   </button>
                   <button
                     type="button"
-                    className={styles.suggestionCard}
-                    onClick={() => handleEnviarMensagem("Qual a diferença entre useState e useEffect no React?")}
+                    style={{ backgroundColor: "#111b21", border: "1px solid #00a884", borderRadius: "18px", padding: "6px 12px", color: "#00a884", fontSize: "0.78rem", fontWeight: "700", cursor: "pointer" }}
+                    onClick={() => handleEnviarMensagem("Como funciona a Batalha de Código e como ganho XP e DevCoins?")}
                   >
-                    <span className={styles.suggestionIcon}>⚡</span>
-                    <div>
-                      <div className={styles.suggestionTitle}>React Hooks</div>
-                      <div className={styles.suggestionDesc}>Entenda useState, useEffect e estado</div>
-                    </div>
+                    ⚔️ Batalha de Código
                   </button>
                   <button
                     type="button"
-                    className={styles.suggestionCard}
-                    onClick={() => handleEnviarMensagem("Monte um plano de estudos em Python para iniciantes de 30 dias.")}
+                    style={{ backgroundColor: "#111b21", border: "1px solid #00a884", borderRadius: "18px", padding: "6px 12px", color: "#00a884", fontSize: "0.78rem", fontWeight: "700", cursor: "pointer" }}
+                    onClick={() => handleEnviarMensagem("Como uso o Caderno de Estudos e os Flashcards?")}
                   >
-                    <span className={styles.suggestionIcon}>🐍</span>
-                    <div>
-                      <div className={styles.suggestionTitle}>Plano Python 30 Dias</div>
-                      <div className={styles.suggestionDesc}>Roteiro passo a passo do zero</div>
-                    </div>
+                    📝 Caderno & Flashcards
                   </button>
                   <button
                     type="button"
-                    className={styles.suggestionCard}
-                    onClick={() => handleEnviarMensagem("Quais são os primeiros passos para se tornar um Dev Fullstack?")}
+                    style={{ backgroundColor: "#111b21", border: "1px solid #00a884", borderRadius: "18px", padding: "6px 12px", color: "#00a884", fontSize: "0.78rem", fontWeight: "700", cursor: "pointer" }}
+                    onClick={() => handleEnviarMensagem("Como posso usar minhas DevCoins na Loja de Temas?")}
                   >
-                    <span className={styles.suggestionIcon}>🚀</span>
-                    <div>
-                      <div className={styles.suggestionTitle}>Trilha Fullstack</div>
-                      <div className={styles.suggestionDesc}>Tecnologias essenciais de Frontend e Backend</div>
-                    </div>
+                    🛒 Loja & DevCoins
                   </button>
+                </div>
+
+                <div className={styles.waMeta} style={{ marginTop: "8px" }}>
+                  <span>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
               </div>
-            ) : (
-              messages.map((msg) => {
-                const isUser = msg.sender === "user";
-                return (
-                  <div
-                    key={msg.id}
-                    className={`${styles.messageRow} ${isUser ? styles.userRow : styles.iaRow}`}
-                  >
-                    <div className={`${styles.avatar} ${isUser ? styles.userAvatar : styles.iaAvatar}`} style={{ overflow: "hidden" }}>
-                      {isUser ? (
-                        (user?.avatar_url || user?.avatar) ? (
-                          <img
-                            src={user.avatar_url || user.avatar}
-                            alt="Avatar"
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          user?.nome ? user.nome.charAt(0).toUpperCase() : "U"
-                        )
-                      ) : (
-                        <Bot size={18} />
+            </div>
+          ) : (
+            messages.map((msg) => {
+              const isUser = msg.sender === "user";
+              const dadosFerramenta = !isUser ? extrairDadosFerramenta(msg.content) : null;
+              const textoSemMarcador = !isUser && msg.content
+                ? msg.content.replace(/<!--FERRAMENTA_DADOS:[\s\S]*?:FERRAMENTA_DADOS-->/, "").trim()
+                : msg.content;
+
+              return (
+                <div
+                  key={msg.id}
+                  className={`${styles.waRow} ${isUser ? styles.waUserRow : styles.waIaRow}`}
+                >
+                  <div className={`${styles.waBubble} ${isUser ? styles.waUserBubble : styles.waIaBubble}`}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px", borderBottom: isUser ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(0,168,132,0.2)", paddingBottom: "4px" }}>
+                      <span style={{ fontSize: "0.76rem", fontWeight: "800", color: isUser ? "#38bdf8" : "#25d366" }}>
+                        {isUser ? (user?.nome || "Você") : "Dev IA Suporte 🤖"}
+                      </span>
+                      {!isUser && (
+                        <span style={{ fontSize: "0.65rem", backgroundColor: "rgba(0,168,132,0.15)", color: "#25d366", border: "1px solid rgba(37,211,102,0.3)", padding: "1px 6px", borderRadius: "6px", fontWeight: "800" }}>
+                          DEVHUB OFICIAL
+                        </span>
                       )}
                     </div>
 
-                    <div className={styles.messageBubble}>
-                      <div className={styles.senderName}>{isUser ? (user?.nome || "Você") : "Dev IA Tutor"}</div>
+                    <div className={styles.markdownContent} style={{ wordBreak: "break-word" }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {textoSemMarcador}
+                      </ReactMarkdown>
+                    </div>
 
-                      <div className={styles.markdownContent}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {msg.content ? msg.content.replace(/<!--FERRAMENTA_DADOS:[\s\S]*?:FERRAMENTA_DADOS-->/g, '') : ""}
-                        </ReactMarkdown>
-                      </div>
+                    {dadosFerramenta?.tipo === "slides" && (
+                      <InlineSlideWidget
+                        dados={dadosFerramenta.dados}
+                        onFullscreen={(dados) => { setSlides(dados); setSlideIndex(0); }}
+                      />
+                    )}
+                    {dadosFerramenta?.tipo === "audio" && (
+                      <InlineAudioWidget
+                        dados={dadosFerramenta.dados}
+                        tocarAudio={(roteiro) => falarTexto(roteiro, () => setAudioTocando(false))}
+                      />
+                    )}
+                    {dadosFerramenta?.tipo === "plano" && (
+                      <InlinePlanoWidget dados={dadosFerramenta.dados} />
+                    )}
+                    {dadosFerramenta?.tipo === "roadmap" && (
+                      <InlineRoadmapWidget
+                        dados={dadosFerramenta.dados}
+                        onAbrirJornada={() => aplicarResultadoFerramenta("roadmap", dadosFerramenta.dados)}
+                      />
+                    )}
 
-                      {(() => {
-                        const fObj = extrairDadosFerramenta(msg.content);
-                        if (!fObj || !fObj.dados) return null;
-
-                        if (fObj.tipo === "slides") {
-                          return <InlineSlideWidget dados={fObj.dados} onFullscreen={(d) => setSlides(d)} />;
-                        }
-                        if (fObj.tipo === "audio") {
-                          return <InlineAudioWidget dados={fObj.dados} tocarAudio={(txt) => tocarAudio(txt)} />;
-                        }
-                        if (fObj.tipo === "plano") {
-                          return <InlinePlanoWidget dados={fObj.dados} />;
-                        }
-                        if (fObj.tipo === "roadmap") {
-                          return <InlineRoadmapWidget dados={fObj.dados} onAbrirJornada={() => setPainelJornada(true)} />;
-                        }
-                        return null;
-                      })()}
-
-                      <div className={styles.msgFooter}>
-                        <span className={styles.timeLabel}>
-                          {new Date(msg.created_at || Date.now()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    <div className={styles.waMeta}>
+                      <span>
+                        {msg.created_at
+                          ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                          : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {isUser && (
+                        <span className={styles.waCheckmark} title="Entregue e Lido">
+                          <CheckCheck size={15} />
                         </span>
-                        {!isUser && (
-                          <button
-                            type="button"
-                            className={styles.speakBtn}
-                            onClick={() => tocarAudio(String(msg.content).replace(/[#*_`>-]/g, " "))}
-                            title="Ouvir esta explicação"
-                          >
-                            <Volume2 size={14} /> Ouvir
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
-                );
-              })
-            )}
-
-            {sending && (
-              <div className={`${styles.messageRow} ${styles.iaRow}`}>
-                <div className={`${styles.avatar} ${styles.iaAvatar}`}>
-                  <Bot size={18} />
                 </div>
-                <div className={styles.messageBubble}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.86rem", color: "#818cf8", fontWeight: "700" }}>
-                    <Sparkles size={16} style={{ animation: "spin 1.5s linear infinite" }} />
-                    <span>A Dev IA está gerando o seu conteúdo...</span>
-                  </div>
-                  <div className={styles.typingIndicator} style={{ marginTop: "6px" }}>
-                    <span></span><span></span><span></span>
-                  </div>
+              );
+            })
+          )}
+
+          {sending && (
+            <div className={`${styles.waRow} ${styles.waIaRow}`}>
+              <div className={`${styles.waBubble} ${styles.waIaBubble}`}>
+                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#00a884", marginBottom: "4px" }}>
+                  Dev IA Suporte 🤖
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "#8696a0" }}>
+                  <span>Digitando resposta sobre o DevHub...</span>
                 </div>
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-        <div className={styles.inputContainer}>
-          <textarea
-            className={styles.chatInput}
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Digite sua dúvida de programação ou assunto de estudos (ex.: React, Python, SQL)..."
-            rows={1}
-          />
-          <button
-            className={styles.sendBtn}
-            onClick={() => handleEnviarMensagem()}
-            disabled={sending || !inputMessage.trim()}
-            title="Enviar mensagem"
-          >
-            <Send size={18} />
-          </button>
+        {/* BARRA DE ENTRADA ESTILO WHATSAPP (COM GRAVAÇÃO DE ÁUDIO POR VOZ 🎙️) */}
+        <div className={styles.waInputBar}>
+          {gravandoAudio ? (
+            <div className={styles.waRecordingBar}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#ef4444", display: "inline-block", animation: "pulse 1s infinite" }} />
+                <span>Gravando áudio por voz... ({segundosGravacao}s)</span>
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={cancelarGravacaoAudio}
+                  style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer" }}
+                  title="Cancelar gravação"
+                >
+                  <Trash2 size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={pararEEnviarGravacao}
+                  style={{ backgroundColor: "#00a884", border: "none", color: "#FFF", padding: "6px 12px", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
+                >
+                  Enviar Áudio 🎙️
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <textarea
+                className={styles.waTextarea}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={handleKeyPress}
+                disabled={sending || mensagensUsadasHoje >= MAX_MENSAGENS_DIA}
+                placeholder={mensagensUsadasHoje >= MAX_MENSAGENS_DIA ? "🔒 Limite de 20 mensagens diárias atingido." : "Mensagem (ou clique no microfone para falar por voz)..."}
+                rows={1}
+              />
+
+              {inputMessage.trim() ? (
+                <button
+                  className={styles.waActionBtn}
+                  onClick={() => handleEnviarMensagem()}
+                  disabled={sending || mensagensUsadasHoje >= MAX_MENSAGENS_DIA}
+                  title="Enviar mensagem"
+                >
+                  <Send size={18} />
+                </button>
+              ) : (
+                <button
+                  className={`${styles.waActionBtn} ${gravandoAudio ? styles.waMicPulse : ""}`}
+                  onClick={iniciarGravacaoAudio}
+                  disabled={sending || mensagensUsadasHoje >= MAX_MENSAGENS_DIA}
+                  title="Mandar mensagem de áudio por voz (Microfone)"
+                >
+                  <Mic size={20} />
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 

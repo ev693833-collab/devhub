@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="devhubGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="50%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+  <path
+    d="M 42 10 L 16 36 L 16 64 L 42 90 L 58 74 L 36 52 L 36 48 L 58 26 Z"
+    fill="url(#devhubGrad)"
+  />
+  <path
+    d="M 64 10 L 48 26 L 68 48 L 68 52 L 48 74 L 64 90 L 86 67 L 86 33 Z"
+    fill="url(#devhubGrad)"
+  />
+</svg>

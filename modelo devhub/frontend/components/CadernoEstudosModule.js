@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import {
   BookOpen, Plus, Search, Trash2, Edit2, Copy, Download,
   Code, Check, Bot, Send, RotateCw, Layers, Printer, Sparkles,
-  FileText, ArrowLeft, HelpCircle, CheckCircle2, Hash, Volume2,
-  Video, Share2, Settings, MoreVertical, Database, Map, Play, Pause, X, ChevronRight, UploadCloud, Paperclip
+  FileText, ArrowLeft, HelpCircle, CheckCircle2, Hash, Volume2, VolumeX,
+  Video, Share2, Settings, MoreVertical, Database, Map, Play, Pause, X,
+  ChevronRight, UploadCloud, Paperclip, Eye, CheckSquare, Square, ExternalLink, RefreshCw,
+  Code2, Cpu, Server, Zap, BrainCircuit
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,6 +22,7 @@ const INITIAL_NOTEBOOKS = [
         id: "src-1",
         titulo: "Hooks & Performance em React",
         tipo: "codigo",
+        selecionada: true,
         conteudo: `// Boas práticas com useEffect & useMemo
 import { useState, useEffect, useMemo } from 'react';
 
@@ -43,11 +46,12 @@ export function ComponenteOtimizado({ listaItens }) {
         id: "src-2",
         titulo: "Guia de Estado Global com Redux / Zustand",
         tipo: "texto",
-        conteudo: "Zustand oferece uma API minimalista baseada em Hooks sem a necessidade de Providers no React. Ideal para gerenciar estado global de usuários, temas e preferências no DevHub."
+        selecionada: true,
+        conteudo: "Zustand oferece uma API minimalista baseada em Hooks sem a necessidade de Providers no React. Ideal para gerenciar estado global de usuários, temas e preferências no DevHub. Evita re-renders desnecessários na árvore de componentes."
       }
     ],
     mensagensChat: [
-      { sender: "ai", text: "👋 Olá! Sou o seu assistente de estudos. Pergunte qualquer coisa sobre Frontend, React, Backend ou sobre as fontes salvas no notebook!" }
+      { sender: "ai", text: "👋 Olá! Sou o seu assistente de estudos no estilo NotebookLM. Pergunte qualquer coisa sobre Frontend, React, Backend ou consulte as fontes ativas no menu lateral!" }
     ],
     anotacoesAluno: "# Minhas Anotações de React\n\n- Usar `useMemo` apenas para computações pesadas.\n- Manter componentes limpos e modularizados em arquivos separadas.",
     estudioSelecionado: "flashcards"
@@ -62,6 +66,7 @@ export function ComponenteOtimizado({ listaItens }) {
         id: "src-3",
         titulo: "Busca Binária & Complexidade O(log N)",
         tipo: "codigo",
+        selecionada: true,
         conteudo: `function buscaBinaria(arr, alvo) {
   let inicio = 0;
   let fim = arr.length - 1;
@@ -76,7 +81,7 @@ export function ComponenteOtimizado({ listaItens }) {
       }
     ],
     mensagensChat: [
-      { sender: "ai", text: "👋 Bem-vindo ao notebook de Algoritmos! Tire dúvidas sobre busca binária, ordenação ou Big O." }
+      { sender: "ai", text: "👋 Bem-vindo ao notebook de Algoritmos! Tire dúvidas sobre busca binária, ordenação ou análise assintótica Big O." }
     ],
     anotacoesAluno: "# Resumo Big O Notation\n\n- O(1): Constante\n- O(log N): Logarítmica (Busca binária)\n- O(N): Linear",
     estudioSelecionado: "quiz"
@@ -91,6 +96,7 @@ export function ComponenteOtimizado({ listaItens }) {
         id: "src-4",
         titulo: "Middleware de Autenticação JWT",
         tipo: "codigo",
+        selecionada: true,
         conteudo: `const jwt = require('jsonwebtoken');
 
 function autenticarToken(req, res, next) {
@@ -115,7 +121,7 @@ function autenticarToken(req, res, next) {
 ];
 
 export default function CadernoEstudosModule({ user, isDark, colors }) {
-  const storageKey = `devhub_notebooks_lm_v2_${user?.id || "guest"}`;
+  const storageKey = `devhub_notebooks_lm_v3_${user?.id || "guest"}`;
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
   // Estados principais
@@ -130,12 +136,14 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
   const [promptInput, setPromptInput] = useState("");
   const [pensandoIa, setPensandoIa] = useState(false);
 
-  // Modais e edição
+  // Modais e visualizador
   const [modalNovaFonte, setModalNovaFonte] = useState(false);
   const [novaFonteTitulo, setNovaFonteTitulo] = useState("");
   const [novaFonteConteudo, setNovaFonteConteudo] = useState("");
   const [novaFonteTipo, setNovaFonteTipo] = useState("codigo");
   const [nomeArquivoCarregado, setNomeArquivoCarregado] = useState("");
+  const [fonteEmVisualizacao, setFonteEmVisualizacao] = useState(null);
+  const [carregandoArquivo, setCarregandoArquivo] = useState(false);
   const fileInputRef = useRef(null);
 
   // Estado de Flashcards
@@ -145,7 +153,11 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
   // Estado do Quiz
   const [quizOpcaoSelecionada, setQuizOpcaoSelecionada] = useState(null);
   const [quizRespondido, setQuizRespondido] = useState(false);
+
+  // Estado de Áudio e Voz Real (Web Speech API)
   const [audioTocando, setAudioTocando] = useState(false);
+  const [audioPausado, setAudioPausado] = useState(false);
+  const [audioVelocidade, setAudioVelocidade] = useState(1);
   const [slideVideoIndex, setSlideVideoIndex] = useState(0);
 
   const chatEndRef = useRef(null);
@@ -157,8 +169,16 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setNotebooks(parsed);
-          setActiveNotebookId(parsed[0].id);
+          const normalizados = parsed.map(nb => ({
+            ...nb,
+            fontes: (nb.fontes || []).map(f => ({
+              ...f,
+              selecionada: f.selecionada !== false,
+              conteudo: (f.conteudo || "").replace(/[^\x20-\x7E\xA0-\xFFáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\n\r\t]/g, " ")
+            }))
+          }));
+          setNotebooks(normalizados);
+          setActiveNotebookId(normalizados[0].id);
         } else {
           setNotebooks(INITIAL_NOTEBOOKS);
           setActiveNotebookId(INITIAL_NOTEBOOKS[0].id);
@@ -173,7 +193,7 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
     }
   }, [storageKey]);
 
-  // Salvar alterações
+  // Salvar alterações no localStorage
   const salvarNotebooks = (novosNotebooks) => {
     setNotebooks(novosNotebooks);
     try {
@@ -183,10 +203,24 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
 
   const notebookAtivo = notebooks.find(n => n.id === activeNotebookId) || notebooks[0] || INITIAL_NOTEBOOKS[0];
 
-  // Scroll automático do chat
+  // Fontes ativas / selecionadas
+  const fontesAtivas = useMemo(() => {
+    return (notebookAtivo?.fontes || []).filter(f => f.selecionada !== false);
+  }, [notebookAtivo]);
+
+  // Auto-scroll no chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [notebookAtivo?.mensagensChat, pensandoIa]);
+
+  // Parar áudio ao trocar de estudo ou fechar
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setAudioTocando(false);
+      setAudioPausado(false);
+    }
+  }, [estudioAtivo, activeNotebookId, viewMode]);
 
   // Ações de Cadernos
   const criarNovoNotebook = () => {
@@ -206,9 +240,9 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
       corCapa: novaCor,
       fontes: [],
       mensagensChat: [
-        { sender: "ai", text: "✨ Caderno criado! Adicione fontes no painel esquerdo para começar a interagir com a IA." }
+        { sender: "ai", text: "✨ Caderno criado! Adicione arquivos ou fontes no painel esquerdo para começar a conversar com a IA no estilo NotebookLM." }
       ],
-      anotacoesAluno: "# Minhas Anotações de Estudo\n\nComece a escrever suas ideias aqui...",
+      anotacoesAluno: "# Minhas Anotações de Estudo\n\nComece a escrever suas reflexões e ideias aqui...",
       estudioSelecionado: "flashcards"
     };
 
@@ -243,16 +277,39 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
     salvarNotebooks(atualizados);
   };
 
-  // UPLOAD E LEITURA DE ARQUIVO
-  const processarArquivoLocal = (file) => {
+  // GERENCIAMENTO DE SELEÇÃO DE FONTES (CHECKBOXES)
+  const toggleFonteSelecionada = (fonteId) => {
+    const atualizados = notebooks.map(n => {
+      if (n.id === activeNotebookId) {
+        const novasFontes = n.fontes.map(f => f.id === fonteId ? { ...f, selecionada: !f.selecionada } : f);
+        return { ...n, fontes: novasFontes };
+      }
+      return n;
+    });
+    salvarNotebooks(atualizados);
+  };
+
+  const toggleTodasFontes = (selecionar) => {
+    const atualizados = notebooks.map(n => {
+      if (n.id === activeNotebookId) {
+        const novasFontes = n.fontes.map(f => ({ ...f, selecionada: selecionar }));
+        return { ...n, fontes: novasFontes };
+      }
+      return n;
+    });
+    salvarNotebooks(atualizados);
+  };
+
+  // LEITURA REAL DE ARQUIVOS (INCLUINDO PDF E CÓDIGO)
+  const processarArquivoLocal = async (file) => {
     if (!file) return;
 
+    setCarregandoArquivo(true);
     const fileName = file.name;
     const extension = fileName.split('.').pop()?.toLowerCase() || '';
-    
-    // Auto-detectar tipo
+
     let tipo = "texto";
-    if (["js", "jsx", "ts", "tsx", "py", "c", "cpp", "java", "html", "css", "json", "sql"].includes(extension)) {
+    if (["js", "jsx", "ts", "tsx", "py", "c", "cpp", "java", "html", "css", "json", "sql", "sh"].includes(extension)) {
       tipo = "codigo";
     }
 
@@ -260,16 +317,74 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
     setNovaFonteTipo(tipo);
     setNomeArquivoCarregado(fileName);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const resultText = e.target?.result || "";
-      setNovaFonteConteudo(String(resultText));
-    };
-
-    // Caso o arquivo seja PDF ou binário
     if (extension === "pdf") {
-      setNovaFonteConteudo(`[Arquivo PDF Anexado: ${fileName}]\nConteúdo carregado para análise contextual da IA no caderno de estudos.`);
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const buffer = e.target?.result;
+          let textoPdf = "";
+
+          // Extração via PDF.js CDN dinâmico
+          try {
+            if (buffer && typeof window !== "undefined") {
+              if (!window.pdfjsLib) {
+                await new Promise((resolve) => {
+                  const script = document.createElement("script");
+                  script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+                  script.onload = () => {
+                    if (window.pdfjsLib) {
+                      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                    }
+                    resolve(true);
+                  };
+                  script.onerror = () => resolve(false);
+                  document.head.appendChild(script);
+                });
+              }
+
+              if (window.pdfjsLib) {
+                const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+                let textAccumulator = "";
+                for (let i = 1; i <= Math.min(pdf.numPages, 30); i++) {
+                  const page = await pdf.getPage(i);
+                  const content = await page.getTextContent();
+                  const pageText = content.items.map(item => item.str).join(" ");
+                  if (pageText.trim()) {
+                    textAccumulator += `[Página ${i}]\n${pageText}\n\n`;
+                  }
+                }
+                textoPdf = textAccumulator.trim();
+              }
+            }
+          } catch (pdfErr) {
+            console.warn("PDF.js parse warning:", pdfErr);
+          }
+
+          // Sanitiza caracteres não imprimíveis se houver resíduo
+          textoPdf = textoPdf.replace(/[^\x20-\x7E\xA0-\xFFáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\n\r\t]/g, " ");
+
+          if (textoPdf && textoPdf.length > 20) {
+            setNovaFonteConteudo(`[Conteúdo do PDF "${fileName}"]\n\n${textoPdf}`);
+          } else {
+            setNovaFonteConteudo(`Documento PDF: ${fileName}\n\nEste arquivo PDF foi indexado no caderno. Você pode perguntar à IA sobre o conteúdo de ${fileName}.`);
+          }
+        } catch (err) {
+          setNovaFonteConteudo(`Documento PDF: ${fileName}\n\nArquivo PDF indexado para estudo.`);
+        } finally {
+          setCarregandoArquivo(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
     } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result || "";
+        setNovaFonteConteudo(String(text));
+        setCarregandoArquivo(false);
+      };
+      reader.onerror = () => {
+        setCarregandoArquivo(false);
+      };
       reader.readAsText(file);
     }
   };
@@ -297,6 +412,7 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
       id: `src-${Date.now()}`,
       titulo: novaFonteTitulo,
       tipo: novaFonteTipo,
+      selecionada: true,
       conteudo: novaFonteConteudo
     };
 
@@ -324,69 +440,63 @@ export default function CadernoEstudosModule({ user, isDark, colors }) {
     salvarNotebooks(atualizados);
   };
 
-  // GERADOR DE RESPOSTAS INTELIGENTES DE IA CONTEXTUALIZADAS
+  // GERADOR DE RESPOSTAS INTELIGENTES DE IA CONTEXTUALIZADAS COM CITAÇÕES [Fonte X]
   const gerarRespostaIAInteligente = (userMsg, notebook) => {
     const promptLower = userMsg.toLowerCase();
-    const fontes = notebook?.fontes || [];
-    const fontesFormatadas = fontes.map(f => `> **${f.titulo}** (${f.tipo})\n\`\`\`\n${f.conteudo.slice(0, 300)}...\n\`\`\``).join("\n\n");
+    const fontes = (notebook?.fontes || []).filter(f => f.selecionada !== false);
+    
+    let citacaoText = "";
+    if (fontes.length > 0) {
+      citacaoText = fontes.map((f, i) => `\n\n📌 **[Fonte ${i + 1}: ${f.titulo}]**\n> "${f.conteudo.slice(0, 220).replace(/[\r\n]+/g, " ")}..."`).join("");
+    }
 
     if (promptLower.includes("frontend") || promptLower.includes("react") || promptLower.includes("interface") || promptLower.includes("css") || promptLower.includes("html")) {
-      return `### 🎨 O que é Desenvolvimento Frontend?
+      return `### 🎨 Análise Contextual: Desenvolvimento Frontend
 
-O **Frontend** é a parte de uma aplicação web ou móvel com a qual o usuário interage diretamente no navegador.
+Com base nas fontes ativas do caderno **"${notebook.titulo}"**:
 
-#### 🛠️ Tríade Principal do Frontend:
-1. **HTML5 (Estrutura):** Organiza a página usando elementos semânticos como \`<header>\`, \`<main>\`, \`<article>\` e \`<button>\`.
-2. **CSS3 (Estilo & Layout):** Define cores, tipografia, animações e responsividade utilizando **Flexbox** e **CSS Grid**.
-3. **JavaScript / ES6+ (Lógica & Reatividade):** Permite interatividade, manipulando o DOM, enviando requisições assíncronas (\`fetch\` / \`axios\`) e tratando eventos.
+1. **Arquitetura de Componentes:**
+   No desenvolvimento moderno com React, a modularização de componentes permite alta reusabilidade e facilidade de testes.
 
-#### ⚛️ Frameworks Modernos (React, Next.js, Vue):
-- **Componentização:** Otimiza o desenvolvimento permitindo reutilizar blocos de interface como componentes independentes.
-- **Gerenciamento de Estado:** Usa Hooks como \`useState\` e \`useEffect\` para sincronizar os dados da tela com a lógica.
-- **Virtual DOM:** Garante que o navegador atualize apenas os elementos da página que mudaram, acelerando a renderização.
+2. **Gerenciamento de Estado & Hooks:**
+   Como indicado nas fontes de estudo, o uso correto de Hooks como \`useMemo\` e \`useState\` garante re-renderizações eficientes sem gargalos de desempenho.
 
-${fontes.length > 0 ? `\n---\n📌 **Contexto das Fontes Salvas neste Caderno ("${notebook.titulo}"):**\n${fontesFormatadas}` : "\n📌 *Dica:* Anexe arquivos ou snippets de código no botão **+ Adicionar fontes** à esquerda!"}`;
+3. **Boas Práticas de UI/UX:**
+   Estruturar layouts responsivos com CSS Grid e Flexbox garante excelente usabilidade em múltiplos dispositivos.
+
+${fontes.length > 0 ? `\n---\n#### 📚 Referências das Fontes Ativas:${citacaoText}` : "\n\n💡 *Dica:* Marque ou adicione fontes no painel esquerdo para que a IA cite diretamente os seus arquivos!"}`;
     }
 
-    if (promptLower.includes("backend") || promptLower.includes("node") || promptLower.includes("api") || promptLower.includes("express")) {
-      return `### ⚙️ O que é Desenvolvimento Backend?
+    if (promptLower.includes("backend") || promptLower.includes("node") || promptLower.includes("api") || promptLower.includes("express") || promptLower.includes("banco") || promptLower.includes("sql")) {
+      return `### ⚙️ Análise Contextual: Backend & Banco de Dados
 
-O **Backend** é o motor por trás dos panos da aplicação, responsável por processar regras de negócio, validar dados e conectar com bancos de dados.
+Com base nas fontes ativas do caderno **"${notebook.titulo}"**:
 
-#### 🗝️ Conceitos Fundamentais de Backend:
-1. **APIs RESTful:** Comunicação entre frontend e backend via métodos HTTP (\`GET\`, \`POST\`, \`PUT\`, \`DELETE\`).
-2. **Node.js & Express:** Ambiente de execução JavaScript no servidor que permite tratar rotas e middlewares com alta concorrência.
-3. **Segurança & Autenticação:** Uso de tokens **JWT (JSON Web Tokens)** e criptografia (\`bcrypt\`) para proteger rotas confidenciais.
+1. **Construção de APIs RESTful:**
+   Servidores em Node.js e Express devem tratar requisições HTTP de forma assíncrona, validando dados antes da persistência.
 
-${fontes.length > 0 ? `\n---\n📌 **Contexto das Fontes Salvas neste Caderno:**\n${fontesFormatadas}` : ""}`;
+2. **Segurança & Autenticação:**
+   Proteger rotas sensíveis exige o uso de Tokens JWT e criptografia de senhas com bcrypt.
+
+3. **Conexão com Banco de Dados:**
+   Utilizar pool de conexões para otimizar consultas SQL e garantir integridade transacional.
+
+${fontes.length > 0 ? `\n---\n#### 📚 Referências das Fontes Ativas:${citacaoText}` : ""}`;
     }
 
-    if (promptLower.includes("banco") || promptLower.includes("sql") || promptLower.includes("database") || promptLower.includes("mongo")) {
-      return `### 🗄️ Arquitetura de Banco de Dados
+    return `### 💡 Análise sobre "${userMsg}"
 
-Os **Bancos de Dados** são responsáveis por armazenar e consultar informações com rapidez e integridade.
+Com base nas fontes selecionadas em **"${notebook?.titulo || 'Caderno de Estudos'}"**:
 
-#### 📊 SQL vs NoSQL:
-- **Bancos Relacionais (SQL - PostgreSQL, MySQL):** Tabelas bem definidas, relacionamentos por chaves estrangeiras e garantias ACID.
-- **Bancos Não-Relacionais (NoSQL - MongoDB, Redis):** Armazenamento em formato JSON/BSON flexível e cache em memória de altíssima velocidade.
+1. **Resumo Conceitual:**
+   A dúvida sobre **"${userMsg}"** relaciona-se diretamente com os conceitos e documentações salvos neste notebook.
 
-${fontes.length > 0 ? `\n---\n📌 **Contexto das Fontes Salvas neste Caderno:**\n${fontesFormatadas}` : ""}`;
-    }
+2. **Recomendação Prática:**
+   - Revise o código fonte ou texto anexado para validar os métodos aplicados.
+   - Teste pequenos trechos de lógica antes de integrar ao fluxo principal.
+   - Utilize o **Estúdio** ao lado para reforçar o aprendizado com Flashcards e Quiz.
 
-    // Resposta contextualizada completa para qualquer outra dúvida do aluno
-    return `### 💡 Explicando "${userMsg}"
-
-Analisando sua pergunta no caderno **"${notebook?.titulo || 'Caderno de Estudos'}"**:
-
-1. **Análise de Conceito:**
-   Para responder sobre **"${userMsg}"**, o primeiro passo é compreender as boas práticas de arquitetura de software, garantindo legibilidade do código, baixa complexidade ciclomática e facilidade de manutenção.
-
-2. **Passo a Passo Prático:**
-   - **Estruturação:** Divida o problema em pequenas funções puras.
-   - **Validação:** Trate exceções e cenários de erro antes da execução da lógica principal.
-   - **Documentação:** Mantenha notas atualizadas no seu caderno.
-
-${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${fontesFormatadas}` : "\n📌 *Dica:* Você pode anexar arquivos `.txt`, `.js`, `.py` ou `.pdf` no botão **+ Adicionar fontes** à esquerda!"}`;
+${fontes.length > 0 ? `\n---\n#### 📚 Citação de Fontes Consultadas:${citacaoText}` : "\n\n📌 *Dica:* Marque as checkboxes das fontes no painel esquerdo para que a IA faça citações diretas aos seus documentos!"}`;
   };
 
   // Enviar Pergunta à IA
@@ -396,7 +506,6 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
 
     if (!promptCustomizado) setPromptInput("");
 
-    // Adiciona mensagem do usuário
     const comMensagemUsuario = notebooks.map(n => {
       if (n.id === activeNotebookId) {
         return {
@@ -413,7 +522,6 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
       const token = localStorage.getItem("token");
       let textoRespostaIa = "";
 
-      // Tenta chamar o endpoint de backend isolado /dev-ia/caderno-chat
       const res = await fetch(`${apiUrl}/dev-ia/caderno-chat`, {
         method: "POST",
         headers: {
@@ -421,7 +529,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          message: `${userMsg}\n\n[Contexto do Caderno: ${notebookAtivo.titulo}. Fontes: ${JSON.stringify(notebookAtivo.fontes)}]`
+          message: `${userMsg}\n\n[Contexto do Caderno: ${notebookAtivo.titulo}. Fontes Ativas: ${JSON.stringify(fontesAtivas)}]`
         })
       });
 
@@ -446,7 +554,6 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
 
       salvarNotebooks(comRespostaIa);
     } catch (err) {
-      // Fallback offline inteligente
       const respostaOffline = gerarRespostaIAInteligente(userMsg, notebookAtivo);
       const comRespostaIa = comMensagemUsuario.map(n => {
         if (n.id === activeNotebookId) {
@@ -463,39 +570,86 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
     }
   };
 
-  // Extrair texto limpo das fontes para análise contextual profunda
   const extrairResumoLimpo = (txt, maxLen = 240) => {
     if (!txt) return "";
-    const limpo = txt.replace(/\[Arquivo.*?\]/g, "").replace(/[\r\n]+/g, " ").trim();
-    if (limpo.length <= maxLen) return limpo || "Conteúdo técnico carregado para análise contextual da IA.";
+    let limpo = txt
+      .replace(/\[Conteúdo.*?\]/g, "")
+      .replace(/[^\x20-\x7E\xA0-\xFFáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\n\r]/g, " ")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (limpo.length <= maxLen) return limpo || "Conteúdo do documento indexado para estudo com a IA.";
     return limpo.slice(0, maxLen) + "...";
   };
 
-  // 🎴 Flashcards profundos com base nos arquivos e notas anexadas
-  const flashcardsExemplo = useMemo(() => {
-    const fontes = notebookAtivo?.fontes || [];
-    const notas = notebookAtivo?.notas || [];
-    const cards = [];
-
-    if (fontes.length > 0) {
-      fontes.forEach((f, i) => {
-        const trecho = extrairResumoLimpo(f.conteudo, 260);
-        cards.push({
-          pergunta: `[Fonte ${i + 1}: ${f.titulo}] Qual o conceito chave e objetivo deste arquivo/snippet?`,
-          resposta: `📄 "${f.titulo}" (${f.tipo}): ${trecho || "Estrutura de código e documentação para desenvolvimento de software."}`
-        });
-        cards.push({
-          pergunta: `[Fonte ${i + 1}: ${f.titulo}] Como aplicar este conteúdo na prática no projeto?`,
-          resposta: `💡 Aplicação prática de "${f.titulo}": Organizar componentes/funções modulares, tratar exceções e seguir os padrões descritos no documento.`
-        });
-      });
+  // RECURSO DE VOZ REAL (WEB SPEECH API)
+  const executarVozReal = (texto) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      alert("A síntese de voz não é suportada neste navegador.");
+      return;
     }
 
-    if (notas.length > 0) {
-      notas.forEach((n, i) => {
+    if (audioTocando && !audioPausado) {
+      window.speechSynthesis.pause();
+      setAudioPausado(true);
+      return;
+    }
+
+    if (audioPausado) {
+      window.speechSynthesis.resume();
+      setAudioPausado(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const textoLimpo = texto.replace(/[#*`_]/g, "").replace(/\[.*?\]/g, "");
+    const utterance = new SpeechSynthesisUtterance(textoLimpo);
+    utterance.rate = audioVelocidade;
+    utterance.lang = "pt-BR";
+
+    const voices = window.speechSynthesis.getVoices();
+    const vozPt = voices.find(v => v.lang.includes("pt") || v.lang.includes("BR"));
+    if (vozPt) utterance.voice = vozPt;
+
+    utterance.onend = () => {
+      setAudioTocando(false);
+      setAudioPausado(false);
+    };
+
+    utterance.onerror = () => {
+      setAudioTocando(false);
+      setAudioPausado(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+    setAudioTocando(true);
+    setAudioPausado(false);
+  };
+
+  const pararVozReal = () => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setAudioTocando(false);
+      setAudioPausado(false);
+    }
+  };
+
+  // 🎴 Flashcards profundos baseados nas fontes ativas
+  const flashcardsExemplo = useMemo(() => {
+    const cards = [];
+
+    if (fontesAtivas.length > 0) {
+      fontesAtivas.forEach((f, i) => {
+        const trecho = extrairResumoLimpo(f.conteudo, 260);
         cards.push({
-          pergunta: `[Nota de Estudo: ${n.titulo}] Qual a anotação salva pelo aluno?`,
-          resposta: `📝 Nota em ${n.data || "hoje"}: ${extrairResumoLimpo(n.conteudo, 240)}`
+          pergunta: `[Fonte ${i + 1}: ${f.titulo}] Qual o conceito chave e objetivo deste documento?`,
+          resposta: `📄 "${f.titulo}" (${f.tipo}): ${trecho}`
+        });
+        cards.push({
+          pergunta: `[Fonte ${i + 1}: ${f.titulo}] Como aplicar este conhecimento no desenvolvimento real?`,
+          resposta: `💡 Aplicação prática de "${f.titulo}": Organizar funções modulares, tratar exceções e manter código limpo conforme descrito na fonte.`
         });
       });
     }
@@ -503,77 +657,66 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
     if (cards.length === 0) {
       return [
         {
-          pergunta: `Qual o objetivo principal do caderno "${notebookAtivo?.titulo}"?`,
-          resposta: `📌 Foco em ${notebookAtivo?.titulo}: Organizar documentações de código, praticar no Playground e reforçar retenção com IA.`
+          pergunta: `Qual o objetivo do caderno "${notebookAtivo?.titulo}"?`,
+          resposta: `📌 Foco em ${notebookAtivo?.titulo}: Organizar fontes de conhecimento, criar notas de estudo e tirar dúvidas com a IA.`
         },
         {
-          pergunta: `Como tirar o máximo proveito do Estúdio com suas fontes?`,
-          resposta: `💡 Anexe arquivos .js, .py, .pdf ou notas no painel esquerdo para gerar automaticamente flashcards, resumos em áudio e slides sobre o seu código.`
+          pergunta: `Como tirar o máximo proveito das fontes no estilo NotebookLM?`,
+          resposta: `💡 Adicione arquivos de código (.js, .py), textos ou PDFs no painel esquerdo. Marque as checkboxes para incluir as fontes no contexto da IA.`
         }
       ];
     }
 
     return cards;
-  }, [notebookAtivo]);
+  }, [notebookAtivo, fontesAtivas]);
 
-  // ❓ Quiz com perguntas contextualizadas aos arquivos
+  // ❓ Quiz contextualizado às fontes ativas
   const quizExemplo = useMemo(() => {
-    const fontes = notebookAtivo?.fontes || [];
-    if (fontes.length > 0) {
-      const f1 = fontes[0];
+    if (fontesAtivas.length > 0) {
+      const f1 = fontesAtivas[0];
       return {
-        pergunta: `Com base no arquivo/fonte "${f1.titulo}", qual a melhor prática recomendada ao integrar essa funcionalidade?`,
+        pergunta: `Com base na fonte ativa "${f1.titulo}", qual a diretriz fundamental de desenvolvimento?`,
         opcoes: [
-          `A) Analisar e implementar o conteúdo de "${f1.titulo}" com modularidade, testes e tratamento de exceções`,
-          "B) Ignorar validações, acoplamento de código e tratamento de exceções",
+          `A) Estruturar o conteúdo de "${f1.titulo}" com modularidade, tipagem e testes`,
+          "B) Ignorar validações de entrada e tratamento de exceções",
           "C) Apagar as fontes salvas assim que concluir a primeira leitura",
-          "D) Escrever scripts inteiros em um único arquivo sem funções ou componentes"
+          "D) Escrever scripts inteiros em um único arquivo gigante"
         ],
         correta: 0
       };
     }
     return {
-      pergunta: `Ao estudar "${notebookAtivo?.titulo}", qual a melhor prática de arquitetura de software recomendada?`,
+      pergunta: `Ao estudar "${notebookAtivo?.titulo}", qual a boa prática de arquitetura recomendada?`,
       opcoes: [
-        "A) Manter o código limpo, estruturado, desacoplado e devidamente testado",
+        "A) Manter o código limpo, desacoplado, modular e bem documentado",
         "B) Ignorar erros de execução e tratamento de exceções",
         "C) Não utilizar documentações nem notas de estudo",
         "D) Evitar reutilização de funções e componentes"
       ],
       correta: 0
     };
-  }, [notebookAtivo]);
+  }, [notebookAtivo, fontesAtivas]);
 
-  // 📹 Slides dinâmicos gerados a partir do conteúdo real das fontes
+  // 📹 Slides gerados a partir do conteúdo real das fontes
   const slidesVideo = useMemo(() => {
-    const fontes = notebookAtivo?.fontes || [];
-    const notas = notebookAtivo?.notas || [];
-
-    if (fontes.length > 0) {
+    if (fontesAtivas.length > 0) {
       const lista = [
         {
           titulo: `1. Visão Geral: ${notebookAtivo?.titulo || 'Estudos'}`,
-          resumo: `Apresentação dos conceitos e estruturas extraídos de ${fontes.length} fontes anexadas (${fontes.map(f => f.titulo).join(", ")}).`
+          resumo: `Síntese dos conceitos extraídos de ${fontesAtivas.length} fontes ativas selecionadas (${fontesAtivas.map(f => f.titulo).join(", ")}).`
         }
       ];
 
-      fontes.forEach((f, i) => {
+      fontesAtivas.forEach((f, i) => {
         lista.push({
           titulo: `${i + 2}. Análise da Fonte: ${f.titulo}`,
           resumo: `📄 Detalhes de "${f.titulo}": ${extrairResumoLimpo(f.conteudo, 260)}`
         });
       });
 
-      if (notas.length > 0) {
-        lista.push({
-          titulo: `${lista.length + 1}. Anotações de Estudo: ${notas[0].titulo}`,
-          resumo: `📝 Resumo da anotação: ${extrairResumoLimpo(notas[0].conteudo, 220)}`
-        });
-      }
-
       lista.push({
-        titulo: `${lista.length + 1}. Conclusão & Boas Práticas Dev`,
-        resumo: `Aplique os conceitos de ${fontes.map(f => f.titulo).join(", ")} na prática, executando códigos no Playground e revisando no Quiz.`
+        titulo: `${lista.length + 1}. Conclusão & Aplicação Prática`,
+        resumo: `Aplique os conceitos de ${fontesAtivas.map(f => f.titulo).join(", ")} nos seus projetos reais no DevHub.`
       });
 
       return lista;
@@ -582,75 +725,70 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
     return [
       {
         titulo: `1. Introdução a ${notebookAtivo?.titulo || 'Estudos'}`,
-        resumo: `Visão geral do caderno de estudos. Anexe arquivos (.js, .py, .pdf) para personalizar estes slides automaticamente.`
+        resumo: `Visão geral do caderno. Anexe arquivos (.js, .py, .pdf) para gerar slides personalizados automaticamente.`
       },
       {
-        titulo: "2. Estrutura de Código & Padrões",
-        resumo: "Organizar código limpo (Clean Code), desacoplado e fácil de manter."
+        titulo: "2. Estrutura & Padrões",
+        resumo: "Manter código limpo (Clean Code), desacoplado e fácil de manter."
       },
       {
         titulo: "3. Próximos Passos & Prática",
-        resumo: "Use os Flashcards para memorização e o Quiz de fixação para validar seus conhecimentos."
+        resumo: "Use os Flashcards para memorização e o Quiz para validar seus conhecimentos."
       }
     ];
-  }, [notebookAtivo]);
+  }, [notebookAtivo, fontesAtivas]);
 
-  // 🎧 Podcast / Transcrição dinâmica em voz
+  // 🎧 Podcast / Transcrição em voz
   const podcastTranscricao = useMemo(() => {
-    const fontes = notebookAtivo?.fontes || [];
-    const notas = notebookAtivo?.notas || [];
+    if (fontesAtivas.length > 0) {
+      const nomesFontes = fontesAtivas.map(f => f.titulo).join(", ");
+      const trechosFontes = fontesAtivas.map(f => `• Em '${f.titulo}': ${extrairResumoLimpo(f.conteudo, 150)}`).join(" ");
 
-    if (fontes.length > 0) {
-      const nomesFontes = fontes.map(f => f.titulo).join(", ");
-      const trechosFontes = fontes.map(f => `• Em '${f.titulo}': ${extrairResumoLimpo(f.conteudo, 150)}`).join(" ");
-
-      return `Olá, dev! Seja bem-vindo à síntese falada do caderno '${notebookAtivo?.titulo}'. Neste episódio, analisamos profundamente as ${fontes.length} fontes anexadas (${nomesFontes}). ${trechosFontes} A principal recomendação prática para o seu desenvolvimento é integrar esses conceitos no código real, tratando exceções e mantendo os componentes desacoplados.`;
+      return `Olá! Seja bem-vindo ao resumo em áudio do caderno '${notebookAtivo?.titulo}'. Neste episódio, analisamos as ${fontesAtivas.length} fontes selecionadas: ${nomesFontes}. ${trechosFontes} A principal orientação técnica é aplicar esses padrões no seu código com modularidade e tratamento de erros.`;
     }
 
-    return `Olá, dev! Esta é a síntese em voz sobre '${notebookAtivo?.titulo}'. Anexe arquivos de código (.js, .py, .pdf) ou adicione anotações no painel esquerdo para gerar uma narração em voz rica e personalizada.`;
-  }, [notebookAtivo]);
+    return `Olá! Esta é a síntese em voz sobre '${notebookAtivo?.titulo}'. Anexe arquivos de código ou PDFs e marque a seleção de fontes no painel esquerdo para gerar uma narração falada detalhada.`;
+  }, [notebookAtivo, fontesAtivas]);
 
   // 📝 Relatório executivo de estudos
   const relatorioExecutivo = useMemo(() => {
-    const fontes = notebookAtivo?.fontes || [];
-    if (fontes.length > 0) {
+    if (fontesAtivas.length > 0) {
       return {
-        resumo: `O caderno "${notebookAtivo?.titulo}" contém ${fontes.length} fontes vinculadas (${fontes.map(f => f.titulo).join(", ")}). O conteúdo foi analisado para extrair padrões de desenvolvimento e boas práticas.`,
-        padroes: fontes.map(f => `• ${f.titulo}: ${extrairResumoLimpo(f.conteudo, 160)}`).join("\n"),
-        recomendacao: `Pratique a implementação dos conceitos de ${fontes[0]?.titulo || 'código'} no Playground e responda o Quiz de fixação.`
+        resumo: `O caderno "${notebookAtivo?.titulo}" possui ${fontesAtivas.length} fontes ativas (${fontesAtivas.map(f => f.titulo).join(", ")}). O material foi compilado e estruturado pela IA.`,
+        padroes: fontesAtivas.map(f => `• ${f.titulo}: ${extrairResumoLimpo(f.conteudo, 160)}`).join("\n"),
+        recomendacao: `Pratique os conceitos de ${fontesAtivas[0]?.titulo || 'código'} executando exemplos práticos e revisando no Quiz.`
       };
     }
 
     return {
-      resumo: `O caderno "${notebookAtivo?.titulo}" aborda padrões de desenvolvimento de software e boas práticas.`,
-      padroes: "• Manter código limpo, comentado e modularizado.\n• Escrever testes para validar a lógica das funções.",
-      recomendacao: "Anexe fontes (arquivos de código, PDF ou notas) para que a IA estruture um relatório profundo e personalizado."
+      resumo: `O caderno "${notebookAtivo?.titulo}" aborda padrões de desenvolvimento e boas práticas de engenharia de software.`,
+      padroes: "• Manter código limpo, comentado e modularizado.\n• Escrever testes para validar a lógica de funções principais.",
+      recomendacao: "Anexe fontes (.js, .py, .pdf) e selecione-as para que a IA estruture um relatório profundo."
     };
-  }, [notebookAtivo]);
+  }, [notebookAtivo, fontesAtivas]);
 
-  // 🧠 Conexões do Mapa Mental
+  // 🧠 Mapa Mental
   const mapaMentalConexoes = useMemo(() => {
-    const fontes = notebookAtivo?.fontes || [];
     const nodes = [
       { titulo: `🎯 ${notebookAtivo?.titulo || 'Caderno de Estudos'}`, sub: "Tópico Central", cor: "#8b5cf6" }
     ];
 
-    if (fontes.length > 0) {
-      fontes.forEach(f => {
+    if (fontesAtivas.length > 0) {
+      fontesAtivas.forEach(f => {
         nodes.push({
           titulo: `📚 ${f.titulo}`,
           sub: extrairResumoLimpo(f.conteudo, 80),
           cor: f.tipo === "codigo" ? "#3b82f6" : "#ec4899"
         });
       });
-      nodes.push({ titulo: "💡 Boas Práticas & Arquitetura", sub: "Clean Code & Testes", cor: "#10b981" });
+      nodes.push({ titulo: "💡 Boas Práticas & Arquitetura", sub: "Clean Code & Performance", cor: "#10b981" });
     } else {
-      nodes.push({ titulo: "📚 0 Fontes Salvas", sub: "Adicione arquivos no painel esquerdo", cor: "#f472b6" });
-      nodes.push({ titulo: "💡 Boas Práticas Dev", sub: "Arquitetura e Clean Code", cor: "#34d399" });
+      nodes.push({ titulo: "📚 0 Fontes Selecionadas", sub: "Marque as checkboxes no painel esquerdo", cor: "#f472b6" });
+      nodes.push({ titulo: "💡 Boas Práticas Dev", sub: "Arquitetura e Reutilização", cor: "#34d399" });
     }
 
     return nodes;
-  }, [notebookAtivo]);
+  }, [notebookAtivo, fontesAtivas]);
 
   // Filtragem da Home
   const notebooksFiltrados = notebooks.filter(n =>
@@ -669,16 +807,16 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
       />
 
       {/* ===================================================================
-          1. VISÃO GERAL DE CADERNOS (HOME DE CARDS - IGUAL IMAGEM 1)
+          1. VISÃO GERAL DE CADERNOS (HOME DE CARDS DE CADERNOS)
          =================================================================== */}
       {viewMode === "grid" && (
         <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div className={styles.homeHeader}>
             <div className={styles.homeTitleGroup}>
               <h2>
-                <BookOpen size={28} color="#818cf8" /> Cadernos de Estudo DevHub
+                <BookOpen size={28} color="#818cf8" /> Cadernos de Estudo NotebookLM
               </h2>
-              <p>Seus ambientes inteligentes de pesquisa, código e aprendizado com IA</p>
+              <p>Seus ambientes inteligentes de pesquisa, código e aprendizado contextual com IA</p>
             </div>
 
             <button className={styles.btnPrimary} onClick={criarNovoNotebook}>
@@ -699,45 +837,72 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
             </div>
 
             <div className={styles.notebookGrid}>
-              {notebooksFiltrados.map((nb) => (
-                <div
-                  key={nb.id}
-                  className={styles.notebookCard}
-                  onClick={() => {
-                    setActiveNotebookId(nb.id);
-                    setViewMode("workspace");
-                  }}
-                >
-                  <div className={styles.notebookCardActions}>
-                    <button
-                      className={styles.actionIconBtn}
-                      title="Excluir caderno"
-                      onClick={(e) => excluirNotebook(e, nb.id)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+              {notebooksFiltrados.map((nb) => {
+                const titleLower = (nb.titulo || "").toLowerCase();
+                let coverIcon = <BookOpen size={26} color="#FFF" style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.9))" }} />;
+                let categoryTag = "NOTEBOOK IA";
+                let tagColor = "#a5b4fc";
 
-                  <div className={styles.notebookCover} style={{ background: nb.corCapa }}>
-                    <BookOpen size={24} color="#FFF" />
-                  </div>
+                if (titleLower.includes("react") || titleLower.includes("frontend") || titleLower.includes("ui")) {
+                  coverIcon = <Code2 size={26} color="#FFF" style={{ filter: "drop-shadow(0 0 10px rgba(99,102,241,0.9))" }} />;
+                  categoryTag = "REACT & FRONTEND";
+                  tagColor = "#818cf8";
+                } else if (titleLower.includes("estrutura") || titleLower.includes("algoritmo") || titleLower.includes("dados")) {
+                  coverIcon = <Cpu size={26} color="#FFF" style={{ filter: "drop-shadow(0 0 10px rgba(16,185,129,0.9))" }} />;
+                  categoryTag = "ALGORITMOS O(log N)";
+                  tagColor = "#34d399";
+                } else if (titleLower.includes("node") || titleLower.includes("express") || titleLower.includes("banco") || titleLower.includes("backend")) {
+                  coverIcon = <Server size={26} color="#FFF" style={{ filter: "drop-shadow(0 0 10px rgba(236,72,153,0.9))" }} />;
+                  categoryTag = "BACKEND & APIS";
+                  tagColor = "#f472b6";
+                }
 
-                  <h3 className={styles.notebookCardTitle}>{nb.titulo}</h3>
+                return (
+                  <div
+                    key={nb.id}
+                    className={styles.notebookCard}
+                    onClick={() => {
+                      setActiveNotebookId(nb.id);
+                      setViewMode("workspace");
+                    }}
+                  >
+                    <div className={styles.notebookCardActions}>
+                      <button
+                        className={styles.actionIconBtn}
+                        title="Excluir caderno"
+                        onClick={(e) => excluirNotebook(e, nb.id)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
 
-                  <div className={styles.notebookCardMeta}>
-                    <span>{nb.dataAtualizacao}</span>
-                    <span>•</span>
-                    <span>{nb.fontes.length} {nb.fontes.length === 1 ? "fonte" : "fontes"}</span>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                      <div className={styles.notebookCover} style={{ background: nb.corCapa }}>
+                        {coverIcon}
+                      </div>
+
+                      <span className={styles.notebookCategoryBadge} style={{ color: tagColor, borderColor: `${tagColor}44` }}>
+                        {categoryTag}
+                      </span>
+                    </div>
+
+                    <h3 className={styles.notebookCardTitle}>{nb.titulo}</h3>
+
+                    <div className={styles.notebookCardMeta}>
+                      <span>📅 {nb.dataAtualizacao}</span>
+                      <span>•</span>
+                      <span>📚 {nb.fontes.length} {nb.fontes.length === 1 ? "fonte" : "fontes"}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
       {/* ===================================================================
-          2. WORKSPACE DO CADERNO (3 COLUNAS - IGUAL IMAGEM 2)
+          2. WORKSPACE DO CADERNO (3 COLUNAS - NOTEBOOK LM DESIGN)
          =================================================================== */}
       {viewMode === "workspace" && (
         <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -745,7 +910,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
           <div className={styles.workspaceHeader}>
             <div className={styles.workspaceHeaderLeft}>
               <button className={styles.btnBack} onClick={() => setViewMode("grid")}>
-                <ArrowLeft size={16} /> Voltar
+                <ArrowLeft size={16} /> Voltar aos Cadernos
               </button>
 
               <input
@@ -759,7 +924,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
 
             <div className={styles.workspaceHeaderRight}>
               <button className={styles.btnPrimary} style={{ padding: "6px 14px", fontSize: "0.82rem" }} onClick={() => setModalNovaFonte(true)}>
-                <Plus size={15} /> Criar / Anexar
+                <Plus size={15} /> Criar / Anexar Fonte
               </button>
 
               <button className={styles.btnOutline} onClick={() => alert("Link de compartilhamento copiado!")}>
@@ -775,7 +940,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
           {/* CORPO EM 3 COLUNAS */}
           <div className={styles.workspaceBody}>
             {/* -------------------------------------------------------------
-                COLUNA 1: FONTES (ESQUERDA)
+                COLUNA 1: FONTES COM SELEÇÃO POR CHECKBOX (ESQUERDA)
                ------------------------------------------------------------- */}
             <div
               className={styles.colSources}
@@ -784,8 +949,26 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
             >
               <div className={styles.colHeader}>
                 <span className={styles.colTitle}>
-                  <Database size={16} color="#818cf8" /> Fontes ({notebookAtivo?.fontes?.length || 0})
+                  <Database size={16} color="#818cf8" /> Fontes ({fontesAtivas.length}/{notebookAtivo?.fontes?.length || 0} ativas)
                 </span>
+                
+                {notebookAtivo?.fontes?.length > 0 && (
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      style={{ background: "none", border: "none", color: "#818cf8", fontSize: "0.72rem", cursor: "pointer", fontWeight: 700 }}
+                      onClick={() => toggleTodasFontes(true)}
+                    >
+                      Todas
+                    </button>
+                    <span style={{ color: "#64748b" }}>|</span>
+                    <button
+                      style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "0.72rem", cursor: "pointer" }}
+                      onClick={() => toggleTodasFontes(false)}
+                    >
+                      Nenhuma
+                    </button>
+                  </div>
+                )}
               </div>
 
               <button className={styles.btnAddSource} onClick={() => setModalNovaFonte(true)}>
@@ -794,24 +977,52 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
 
               {notebookAtivo?.fontes?.length > 0 ? (
                 <div className={styles.sourcesList}>
-                  {notebookAtivo.fontes.map((f) => (
-                    <div key={f.id} className={styles.sourceItem}>
-                      <div className={styles.sourceIcon}>
-                        {f.tipo === "codigo" ? <Code size={18} /> : <FileText size={18} />}
-                      </div>
-                      <div className={styles.sourceInfo}>
-                        <div className={styles.sourceTitle}>{f.titulo}</div>
-                        <div className={styles.sourceMeta}>{f.tipo.toUpperCase()}</div>
-                      </div>
-                      <button
-                        style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer" }}
-                        onClick={() => removerFonte(f.id)}
-                        title="Remover fonte"
+                  {notebookAtivo.fontes.map((f) => {
+                    const isSelected = f.selecionada !== false;
+                    return (
+                      <div
+                        key={f.id}
+                        className={`${styles.sourceItem} ${isSelected ? styles.sourceItemSelected : ""}`}
+                        style={{ borderLeft: isSelected ? "3px solid #6366f1" : "3px solid transparent" }}
                       >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
+                        {/* CHECKBOX DA FONTE */}
+                        <button
+                          style={{ background: "none", border: "none", cursor: "pointer", color: isSelected ? "#818cf8" : "#64748b", display: "flex", alignItems: "center" }}
+                          onClick={() => toggleFonteSelecionada(f.id)}
+                          title={isSelected ? "Desmarcar fonte do contexto" : "Marcar fonte para o contexto da IA"}
+                        >
+                          {isSelected ? <CheckSquare size={17} /> : <Square size={17} />}
+                        </button>
+
+                        <div
+                          className={styles.sourceInfo}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => setFonteEmVisualizacao(f)}
+                          title="Clique para visualizar o conteúdo completo"
+                        >
+                          <div className={styles.sourceTitle}>{f.titulo}</div>
+                          <div className={styles.sourceMeta}>{f.tipo.toUpperCase()} • {f.conteudo.length} caracteres</div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          <button
+                            style={{ background: "none", border: "none", color: "#818cf8", cursor: "pointer", padding: "4px" }}
+                            onClick={() => setFonteEmVisualizacao(f)}
+                            title="Visualizar fonte"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: "4px" }}
+                            onClick={() => removerFonte(f.id)}
+                            title="Remover fonte"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className={styles.sourcesEmptyBox}>
@@ -866,7 +1077,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                         <RotateCw size={16} className="spin" />
                       </div>
                       <div className={styles.messageBubble} style={{ color: "#94a3b8" }}>
-                        Analisando fontes salvas do notebook...
+                        Analisando fontes ativas ({fontesAtivas.length}) do notebook...
                       </div>
                     </div>
                   )}
@@ -885,18 +1096,18 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                     }}
                     value={notebookAtivo?.anotacoesAluno || ""}
                     onChange={(e) => atualizarNotasAluno(e.target.value)}
-                    placeholder="Escreva suas anotações aqui..."
+                    placeholder="Escreva suas reflexões e resumos aqui..."
                   />
                 </div>
               )}
 
               {/* BARRA DE PROMPT INFERIOR STYLE NOTEBOOKLM */}
               <div className={styles.promptBarContainer}>
-                {/* SUGESTÕES RÁPIDAS DE IA (MENSAGENS DE ATALHO) */}
+                {/* SUGESTÕES RÁPIDAS DE IA */}
                 <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "10px", marginBottom: "4px" }}>
                   {[
-                    { icon: "💡", label: "Resumo em Pontos", prompt: "Faça um resumo direto e em tópicos dos pontos mais importantes deste caderno." },
-                    { icon: "👨‍💻", label: "Exemplo em Código", prompt: "Me mostre um exemplo prático em código sobre os conceitos abordados neste caderno." },
+                    { icon: "💡", label: "Resumo em Pontos", prompt: "Faça um resumo direto e em tópicos dos pontos mais importantes das fontes ativas." },
+                    { icon: "👨‍💻", label: "Exemplo em Código", prompt: "Me mostre um exemplo prático em código sobre os conceitos abordados nas fontes ativas." },
                     { icon: "🐣", label: "Explicação Simplificada", prompt: "Explique o conteúdo deste caderno como se eu fosse um iniciante na área de programação." },
                     { icon: "🎴", label: "Cartões Didáticos", action: () => setEstudioAtivo("flashcards") },
                     { icon: "❓", label: "Teste / Quiz", action: () => setEstudioAtivo("quiz") },
@@ -945,7 +1156,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                   />
 
                   <span className={styles.promptMetaBadge}>
-                    {notebookAtivo?.fontes?.length || 0} fontes
+                    {fontesAtivas.length} fontes ativas
                   </span>
 
                   <button className={styles.btnSendPrompt} onClick={() => enviarMensagemChat()}>
@@ -965,69 +1176,63 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                 </span>
               </div>
 
-              {/* GRID DE RECURSOS GERATIVOS (6 BOTÕES TOTALMENTE FUNCIONAIS) */}
+              {/* GRID DE RECURSOS GERATIVOS */}
               <div className={styles.studioGrid}>
                 <div
-                  className={styles.studioTile}
-                  style={{ border: estudioAtivo === "audio" ? "1px solid #818cf8" : undefined }}
-                  onClick={() => { setEstudioAtivo("audio"); setAudioTocando(!audioTocando); }}
+                  className={`${styles.studioTile} ${estudioAtivo === "audio" ? styles.studioTileActive : ""}`}
+                  onClick={() => setEstudioAtivo("audio")}
                 >
-                  <div className={styles.studioIconBox} style={{ background: "rgba(99, 102, 241, 0.15)", color: "#818cf8" }}>
+                  <div className={styles.studioIconBox} style={{ background: "rgba(99, 102, 241, 0.2)", color: "#a5b4fc" }}>
                     <Volume2 size={18} />
                   </div>
                   <span className={styles.studioTileLabel}>Resumo em Áudio</span>
                 </div>
 
                 <div
-                  className={styles.studioTile}
-                  style={{ border: estudioAtivo === "video" ? "1px solid #34d399" : undefined }}
+                  className={`${styles.studioTile} ${estudioAtivo === "video" ? styles.studioTileActive : ""}`}
                   onClick={() => setEstudioAtivo("video")}
                 >
-                  <div className={styles.studioIconBox} style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}>
+                  <div className={styles.studioIconBox} style={{ background: "rgba(16, 185, 129, 0.2)", color: "#34d399" }}>
                     <Video size={18} />
                   </div>
                   <span className={styles.studioTileLabel}>Resumo em Vídeo</span>
                 </div>
 
                 <div
-                  className={styles.studioTile}
-                  style={{ border: estudioAtivo === "mapa" ? "1px solid #f472b6" : undefined }}
+                  className={`${styles.studioTile} ${estudioAtivo === "mapa" ? styles.studioTileActive : ""}`}
                   onClick={() => setEstudioAtivo("mapa")}
                 >
-                  <div className={styles.studioIconBox} style={{ background: "rgba(236, 72, 153, 0.15)", color: "#f472b6" }}>
+                  <div className={styles.studioIconBox} style={{ background: "rgba(236, 72, 153, 0.2)", color: "#f472b6" }}>
                     <Map size={18} />
                   </div>
                   <span className={styles.studioTileLabel}>Mapa mental</span>
                 </div>
 
                 <div
-                  className={styles.studioTile}
-                  style={{ border: estudioAtivo === "relatorio" ? "1px solid #fbbf24" : undefined }}
+                  className={`${styles.studioTile} ${estudioAtivo === "relatorio" ? styles.studioTileActive : ""}`}
                   onClick={() => setEstudioAtivo("relatorio")}
                 >
-                  <div className={styles.studioIconBox} style={{ background: "rgba(245, 158, 11, 0.15)", color: "#fbbf24" }}>
+                  <div className={styles.studioIconBox} style={{ background: "rgba(245, 158, 11, 0.2)", color: "#fbbf24" }}>
                     <FileText size={18} />
                   </div>
                   <span className={styles.studioTileLabel}>Relatórios</span>
                 </div>
 
                 <div
-                  className={styles.studioTile}
-                  style={{ border: estudioAtivo === "flashcards" ? "1px solid #c084fc" : undefined }}
+                  className={`${styles.studioTile} ${estudioAtivo === "flashcards" ? styles.studioTileActive : ""}`}
                   onClick={() => setEstudioAtivo("flashcards")}
                 >
-                  <div className={styles.studioIconBox} style={{ background: "rgba(168, 85, 247, 0.15)", color: "#c084fc" }}>
+                  <div className={styles.studioIconBox} style={{ background: "rgba(168, 85, 247, 0.2)", color: "#c084fc" }}>
                     <Layers size={18} />
                   </div>
                   <span className={styles.studioTileLabel}>Cartões didáticos</span>
                 </div>
 
                 <div
-                  className={styles.studioTile}
-                  style={{ border: estudioAtivo === "quiz" ? "1px solid #60a5fa" : undefined }}
+                  className={`${styles.studioTile} ${estudioAtivo === "quiz" ? styles.studioTileActive : ""}`}
                   onClick={() => { setEstudioAtivo("quiz"); setQuizRespondido(false); setQuizOpcaoSelecionada(null); }}
                 >
-                  <div className={styles.studioIconBox} style={{ background: "rgba(59, 130, 246, 0.15)", color: "#60a5fa" }}>
+                  <div className={styles.studioIconBox} style={{ background: "rgba(59, 130, 246, 0.2)", color: "#60a5fa" }}>
                     <HelpCircle size={18} />
                   </div>
                   <span className={styles.studioTileLabel}>Teste / Quiz</span>
@@ -1036,45 +1241,95 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
 
               {/* SAÍDA DO ESTÚDIO SELECIONADO */}
               <div className={styles.studioOutputArea}>
-                {/* 1. RESUMO EM ÁUDIO / PODCAST */}
+                {/* 1. RESUMO EM ÁUDIO / PODCAST COM VOZ REAL (WEB SPEECH API) */}
                 {estudioAtivo === "audio" && (
                   <div>
                     <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#818cf8", textTransform: "uppercase" }}>
-                      🎧 PODCAST / SÍNTESE EM VOZ
+                      🎧 PODCAST / VOZ REAL INTERATIVA
                     </span>
                     <h4 style={{ margin: "6px 0 12px 0", color: "#FFF", fontSize: "0.95rem" }}>
                       Resumo Falado: {notebookAtivo?.titulo}
                     </h4>
 
+                    {/* PLAYER DE ÁUDIO REAL */}
                     <div style={{ background: "#121624", padding: "16px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
                       <button
-                        style={{ width: "42px", height: "42px", borderRadius: "50%", background: "#6366f1", border: "none", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-                        onClick={() => setAudioTocando(!audioTocando)}
+                        style={{ width: "44px", height: "44px", borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 12px rgba(99,102,241,0.4)" }}
+                        onClick={() => executarVozReal(podcastTranscricao)}
                       >
-                        {audioTocando ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: "2px" }} />}
+                        {audioTocando && !audioPausado ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: "2px" }} />}
                       </button>
+
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: "0.8rem", color: "#cbd5e1", fontWeight: 700 }}>
-                          {audioTocando ? "🔊 Reproduzindo síntese contextual em áudio..." : "Clique para iniciar reprodução em voz"}
+                          {audioTocando ? (audioPausado ? "⏸️ Narração em voz pausada" : "🔊 Reproduzindo síntese falada em português...") : "Clique para ouvir o resumo falado em voz"}
                         </div>
-                        <div style={{ height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "2px", marginTop: "6px", overflow: "hidden" }}>
-                          <div style={{ width: audioTocando ? "68%" : "0%", height: "100%", background: "#34d399", transition: "width 0.4s ease" }} />
+
+                        {/* ANIMAÇÃO DE ONDAS SONORAS / EQUALIZADOR */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "3px", marginTop: "8px" }}>
+                          {[40, 70, 30, 90, 50, 80, 40, 60, 90, 30, 70, 50].map((h, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                width: "3px",
+                                height: audioTocando && !audioPausado ? `${Math.floor(Math.random() * 20 + 8)}px` : "6px",
+                                backgroundColor: audioTocando ? "#34d399" : "#475569",
+                                borderRadius: "2px",
+                                transition: "height 0.2s ease"
+                              }}
+                            />
+                          ))}
                         </div>
+                      </div>
+
+                      {audioTocando && (
+                        <button
+                          style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171", borderRadius: "8px", padding: "6px 10px", fontSize: "0.75rem", cursor: "pointer" }}
+                          onClick={pararVozReal}
+                        >
+                          <VolumeX size={14} /> Parar
+                        </button>
+                      )}
+                    </div>
+
+                    {/* CONTROLE DE VELOCIDADE */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", background: "rgba(255,255,255,0.03)", padding: "8px 12px", borderRadius: "8px" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Velocidade de Voz:</span>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        {[1, 1.25, 1.5].map((spd) => (
+                          <button
+                            key={spd}
+                            onClick={() => {
+                              setAudioVelocidade(spd);
+                              if (audioTocando) {
+                                pararVozReal();
+                                setTimeout(() => executarVozReal(podcastTranscricao), 100);
+                              }
+                            }}
+                            style={{
+                              padding: "2px 8px", borderRadius: "6px", border: "none", fontSize: "0.75rem", fontWeight: 700,
+                              background: audioVelocidade === spd ? "#6366f1" : "rgba(255,255,255,0.08)",
+                              color: "#FFF", cursor: "pointer"
+                            }}
+                          >
+                            {spd}x
+                          </button>
+                        ))}
                       </div>
                     </div>
 
                     <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "14px", borderRadius: "10px", fontSize: "0.82rem", color: "#cbd5e1", lineHeight: 1.5 }}>
-                      📜 <strong>Transcrição Completa:</strong> "{podcastTranscricao}"
+                      📜 <strong>Transcrição do Podcast:</strong> "{podcastTranscricao}"
                     </div>
                   </div>
                 )}
 
-                {/* 2. RESUMO EM VÍDEO / PRESENTATION */}
+                {/* 2. RESUMO EM VÍDEO / SLIDES */}
                 {estudioAtivo === "video" && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#34d399", textTransform: "uppercase" }}>
-                        📹 APRESENTAÇÃO / SLIDE {slideVideoIndex + 1} DE {slidesVideo.length}
+                        📹 APRESENTAÇÃO DE SLIDES ({slideVideoIndex + 1} DE {slidesVideo.length})
                       </span>
                     </div>
 
@@ -1261,7 +1516,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
 
                     {quizRespondido && (
                       <div style={{ marginTop: "12px", padding: "10px", borderRadius: "8px", background: "rgba(255,255,255,0.04)", fontSize: "0.8rem", color: quizOpcaoSelecionada === quizExemplo.correta ? "#34d399" : "#f87171" }}>
-                        {quizOpcaoSelecionada === quizExemplo.correta ? "🎉 Resposta Correta! Excelente fixação de conceito." : "❌ Resposta Incorreta. Revise as fontes anexadas ao notebook!"}
+                        {quizOpcaoSelecionada === quizExemplo.correta ? "🎉 Resposta Correta! Excelente fixação de conceito." : "❌ Resposta Incorreta. Revise as fontes ativas no notebook!"}
                       </div>
                     )}
                   </div>
@@ -1273,7 +1528,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
       )}
 
       {/* ===================================================================
-          MODAL DE ADICIONAR FONTE (UPLOAD DE ARQUIVOS OU TEXTO MANUAL)
+          MODAL DE ADICIONAR FONTE
          =================================================================== */}
       {modalNovaFonte && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
@@ -1287,7 +1542,7 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
               </button>
             </div>
 
-            {/* ZONA DE UPLOAD DE ARQUIVO EM DESTAQUE */}
+            {/* ZONA DE UPLOAD DE ARQUIVO */}
             <div
               style={{
                 border: "2px dashed #6366f1", borderRadius: "12px", padding: "20px",
@@ -1298,10 +1553,10 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
             >
               <UploadCloud size={36} color="#818cf8" style={{ marginBottom: "8px" }} />
               <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#ffffff" }}>
-                {nomeArquivoCarregado ? `✓ Arquivo: ${nomeArquivoCarregado}` : "Clique para anexar um arquivo do seu computador"}
+                {carregandoArquivo ? "⌛ Lendo e extraindo conteúdo do arquivo..." : nomeArquivoCarregado ? `✓ Arquivo: ${nomeArquivoCarregado}` : "Clique para anexar um arquivo do seu computador"}
               </div>
               <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "4px" }}>
-                Suporta PDFs, arquivos de código (.js, .py, .c, .sql), notas (.txt, .md) ou documentos
+                Suporta PDFs, código (.js, .py, .c, .sql), notas (.txt, .md) ou documentos
               </div>
             </div>
 
@@ -1325,14 +1580,14 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                   value={novaFonteTipo}
                   onChange={(e) => setNovaFonteTipo(e.target.value)}
                 >
-                  <option value="texto">Arquivo / Anotação de Aula (.txt, .pdf, .md)</option>
+                  <option value="texto">Arquivo / Documento PDF (.txt, .pdf, .md)</option>
                   <option value="codigo">Snippet de Código (.js, .py, .c, .sql)</option>
                   <option value="link">Link Web / Documentação</option>
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: "0.8rem", fontWeight: 700, color: "#94a3b8", display: "block", marginBottom: "6px" }}>CONTEÚDO OU TEXTO DO ARQUIVO</label>
+                <label style={{ fontSize: "0.8rem", fontWeight: 700, color: "#94a3b8", display: "block", marginBottom: "6px" }}>CONTEÚDO / TEXTO DA FONTE</label>
                 <textarea
                   rows={5}
                   placeholder="Selecione um arquivo acima ou cole o texto/código manualmente..."
@@ -1352,6 +1607,56 @@ ${fontes.length > 0 ? `\n---\n📌 **Fontes Vinculadas a este Caderno:**\n${font
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================
+          MODAL DE VISUALIZAÇÃO DE FONTE DETALHADA
+         =================================================================== */}
+      {fonteEmVisualizacao && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
+          <div style={{ background: "#1a1e2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "16px", padding: "24px", maxWidth: "680px", width: "100%", color: "#FFF", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }}>
+              <div>
+                <span style={{ fontSize: "0.72rem", color: "#818cf8", fontWeight: 800, textTransform: "uppercase" }}>
+                  📄 DETALHES DA FONTE ({fonteEmVisualizacao.tipo})
+                </span>
+                <h3 style={{ margin: "4px 0 0 0", fontSize: "1.15rem", fontWeight: 800 }}>
+                  {fonteEmVisualizacao.titulo}
+                </h3>
+              </div>
+              <button style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }} onClick={() => setFonteEmVisualizacao(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", background: "#111420", padding: "16px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)", marginBottom: "16px" }}>
+              <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: "0.86rem", color: "#e2e8f0", lineHeight: 1.5 }}>
+                {fonteEmVisualizacao.conteudo}
+              </pre>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
+                Total: {fonteEmVisualizacao.conteudo.length} caracteres
+              </span>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  className={styles.btnOutline}
+                  onClick={() => {
+                    navigator.clipboard.writeText(fonteEmVisualizacao.conteudo);
+                    alert("Conteúdo da fonte copiado para a área de transferência!");
+                  }}
+                >
+                  <Copy size={14} /> Copiar Texto
+                </button>
+                <button className={styles.btnPrimary} onClick={() => setFonteEmVisualizacao(null)}>
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

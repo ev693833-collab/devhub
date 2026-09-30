@@ -3,7 +3,7 @@ import {
   Code, Play, Eye, Sparkles, Terminal, User, ShoppingBag, DollarSign, CheckCircle2, AlertCircle, RefreshCw, Copy, Check, Table, HelpCircle, Layers, Inbox, Trash2, BookOpen, ShieldCheck, Cpu, ArrowLeft, Star, FileCode, CheckSquare, Award, Flame
 } from "lucide-react";
 
-// CATÁLOGO DOS 9 PROJETOS DO MUNDO REAL (ESTUDO PROFISSIONAL)
+// CATÁLOGO DOS 9 PROJETOS DO MUNDO REAL COM VALIDAÇÃO E TESTES AUTOMATIZADOS (SISTEMA JUSTO)
 const PROJETOS_REAIS = [
   {
     id: "biblioteca",
@@ -16,13 +16,12 @@ const PROJETOS_REAIS = [
     descricao: "Desenvolva o motor de controle de livros, empréstimos para alunos e cálculo de multa de atraso.",
     requisitos: [
       "Criar uma lista contendo pelo menos 3 livros com: id, titulo, autor e status ('disponivel' ou 'emprestado').",
-      "Implementar a função de realizar empréstimo alterando o status do livro.",
-      "Calcular o total de livros atualmente emprestados.",
+      "Implementar a função de realizar empréstimo alterando o status do livro de ID 1 para 'emprestado'.",
+      "Calcular o total de livros com status 'emprestado' (deve resultar em 2 livros no total).",
       "Atribuir o relatório final compilado à variável 'resultado'."
     ],
     dicaSenior: "💡 Dica de Tech Lead: Separe a lógica de validação da manipulação dos objetos para manter o código limpo (Clean Code).",
     boilerplate: `// 📚 DESAFIO: Sistema de Biblioteca & Empréstimos
-// Requisito: Defina a função 'emprestarLivro' e atribua a variável 'resultado'
 
 const acervo = [
   { id: 1, titulo: "Clean Code", autor: "Robert C. Martin", status: "disponivel" },
@@ -35,15 +34,33 @@ function emprestarLivro(id) {
   
 }
 
-// TODO: Chame a função emprestarLivro(1) para testar o empréstimo
+// TODO: Execute a função emprestarLivro(1) para realizar o empréstimo
+emprestarLivro(1);
 
+// TODO: Calcule o número total de livros atualmente emprestados no acervo
+const totalEmprestados = 0; // Substitua com a contagem dinâmica
 
 // TODO: Atribua o resultado compilado à variável 'resultado':
 const resultado = {
   totalLivros: acervo.length,
-  emprestados: 0, // TODO: Substitua pelo cálculo de livros com status "emprestado"
+  emprestados: totalEmprestados,
   acervoAtualizado: acervo
-};`
+};`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "O resultado retornado deve ser um objeto contendo { totalLivros, emprestados, acervoAtualizado }." };
+      if (!Array.isArray(res.acervoAtualizado)) return { ok: false, erro: "O campo 'acervoAtualizado' deve ser o array com os livros do acervo." };
+      
+      const livro1 = res.acervoAtualizado.find(l => l.id === 1);
+      if (!livro1 || livro1.status !== "emprestado") {
+        return { ok: false, erro: "A função emprestarLivro(1) precisa alterar o status do livro 1 para 'emprestado'." };
+      }
+      
+      if (typeof res.emprestados !== "number" || res.emprestados < 2) {
+        return { ok: false, erro: "O número de livros 'emprestados' deve ser 2 (livro 2 que já estava emprestado + livro 1 recém emprestado)." };
+      }
+      
+      return { ok: true };
+    }
   },
   {
     id: "auth_jwt",
@@ -55,9 +72,9 @@ const resultado = {
     categoria: "Segurança & Backend",
     descricao: "Crie o fluxo de autenticação de usuários com verificação de credenciais e token simulado de acesso.",
     requisitos: [
-      "Cadastrar banco simulado de usuários com email e senha criptografada/hash.",
-      "Criar função de login com validação de senha.",
-      "Gerar token fictício de acesso JWT para sessões válidas.",
+      "Cadastrar banco simulado de usuários com email e status.",
+      "Criar função realizarLogin(email) que valida se o usuário existe.",
+      "Gerar token fictício de acesso JWT para sessões válidas (ex: 'bearer_token_xyz').",
       "Retornar a resposta de autenticação no objeto 'resultado'."
     ],
     dicaSenior: "🔒 Segurança: Nunca armazene senhas em texto puro. Em produção, utilize bcrypt e variáveis de ambiente.",
@@ -69,12 +86,19 @@ const usuariosDB = [
 function realizarLogin(email) {
   // TODO: Busque o usuário em usuariosDB pelo email.
   // Se não encontrar, retorne { sucesso: false, erro: "Usuário não encontrado" }
-  // Se encontrar, retorne { sucesso: true, token: "bearer_xyz_123", usuario: user.email }
+  // Se encontrar, retorne { sucesso: true, token: "bearer_token_123", usuario: email }
   
 }
 
 // TODO: Execute realizarLogin("dev@devhub.com") e atribua o retorno à variável 'resultado'
-const resultado = null;`
+const resultado = null;`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua a resposta da função realizarLogin('dev@devhub.com') à variável 'resultado'." };
+      if (!res.sucesso) return { ok: false, erro: "Ao realizar login com 'dev@devhub.com', a resposta deve ter sucesso: true." };
+      if (!res.token || typeof res.token !== "string" || res.token.length < 5) return { ok: false, erro: "O login com sucesso deve gerar um token string válido." };
+      if (res.usuario !== "dev@devhub.com") return { ok: false, erro: "O campo 'usuario' no resultado deve corresponder ao email informado." };
+      return { ok: true };
+    }
   },
   {
     id: "api_rest",
@@ -86,10 +110,10 @@ const resultado = null;`
     categoria: "Backend Node.js & Express",
     descricao: "Estruture o roteamento dos métodos HTTP (GET, POST, PUT, DELETE) para gerenciamento de catálogo.",
     requisitos: [
-      "Simular rota GET /produtos listando os itens.",
-      "Simular rota POST /produtos cadastrando um novo produto com ID único.",
-      "Tratar código de status HTTP (200 OK, 201 Created, 400 Bad Request).",
-      "Exportar o resumo da API no objeto 'resultado'."
+      "Simular rota postProduto(novoProduto) cadastrando um novo item.",
+      "Tratar código de status HTTP (201 Created se válido, 400 Bad Request se faltar nome/preço).",
+      "Cadastrar um produto válido (ex: { nome: 'Mouse Gamer', preco: 150.00 })",
+      "Exportar o resultado da chamada à variável 'resultado'."
     ],
     dicaSenior: "⚡ REST Standard: Mantenha URLs no plural e utilize códigos de status HTTP semânticos.",
     boilerplate: `// 🚀 DESAFIO: API RESTful de Produtos
@@ -99,13 +123,19 @@ const produtos = [
 ];
 
 function postProduto(novoProduto) {
-  // TODO: Valide se o produto contém 'nome' e 'preco'. Se não tiver, retorne { status: 400, body: { erro: "..." } }
-  // Caso válido, insira no array 'produtos' com novo ID e retorne { status: 201, body: produtoCriado }
+  // TODO: Valide se o produto contém 'nome' e 'preco'. Se não tiver, retorne { status: 400, erro: "Dados inválidos" }
+  // Caso seja válido, insira no array 'produtos' com novo ID e retorne { status: 201, body: novoProduto }
   
 }
 
-// TODO: Cadastre um novo produto e atribua o resultado à variável 'resultado'
-const resultado = null;`
+// TODO: Cadastre um novo produto e atribua a resposta final à variável 'resultado'
+const resultado = null;`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua a resposta de postProduto(...) à variável 'resultado'." };
+      if (res.status !== 201) return { ok: false, erro: "O método postProduto com dados válidos deve retornar status 201 (Created)." };
+      if (!res.body || !res.body.nome || !res.body.preco) return { ok: false, erro: "O corpo da resposta (body) deve incluir o produto recém-cadastrado." };
+      return { ok: true };
+    }
   },
   {
     id: "ecommerce",
@@ -117,10 +147,10 @@ const resultado = null;`
     categoria: "Full Stack & Regras de Negócio",
     descricao: "Construa o cálculo de subtotal, cupom de desconto e frete dinâmico para uma loja virtual.",
     requisitos: [
-      "Criar carrinho com múltiplos itens e quantidades.",
-      "Aplicar cupom de 10% de desconto caso o subtotal passe de R$ 200.",
-      "Calcular valor de frete fixo ou grátis.",
-      "Retornar a nota de compra no objeto 'resultado'."
+      "Calcular o subtotal somando (qtd * precoUnitario) dos itens do carrinho.",
+      "Aplicar 10% de desconto caso o subtotal seja maior que R$ 200.",
+      "Calcular valor de frete (R$ 0 grátis se subtotal > R$ 150, senão R$ 15.00).",
+      "Retornar a nota de compra no objeto 'resultado': { subtotal, desconto, frete, totalPagar }."
     ],
     dicaSenior: "💰 Financeiro: Evite arredondamentos imprecisos em JS utilizando representação em centavos ou .toFixed(2).",
     boilerplate: `// 🛒 DESAFIO: Carrinho de Compras E-commerce
@@ -129,17 +159,33 @@ const carrinho = [
   { item: "Apostila de Algoritmos", qtd: 2, precoUnitario: 35.00 }
 ];
 
-// TODO: Calcule o subtotal somando (qtd * precoUnitario) dos itens do carrinho
-let subtotal = 0; 
+// TODO: Calcule o subtotal (199.90 + 70.00 = 269.90)
+const subtotal = 0; 
 
-// TODO: Aplique 10% de desconto se subtotal > 200, senão 0
-let desconto = 0; 
+// TODO: Aplique 10% de desconto se subtotal > 200 (deve dar 26.99)
+const desconto = 0; 
 
-// TODO: Calcule frete (0 se subtotal > 150, senão 15.00)
-let frete = 0; 
+// TODO: Calcule o frete (0 se subtotal > 150, senão 15.00)
+const frete = 0; 
 
-// TODO: Atribua o objeto com a compra final à variável 'resultado'
-const resultado = null;`
+// TODO: Calcule o total final a pagar (subtotal - desconto + frete)
+const totalPagar = 0;
+
+// TODO: Atribua o resultado à variável 'resultado':
+const resultado = {
+  subtotal,
+  desconto,
+  frete,
+  totalPagar
+};`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua o resumo da compra à variável 'resultado'." };
+      if (Math.abs(res.subtotal - 269.90) > 0.5) return { ok: false, erro: "O subtotal calculado deve ser R$ 269.90 (199.90 + 70.00)." };
+      if (Math.abs(res.desconto - 26.99) > 0.5) return { ok: false, erro: "O desconto de 10% aplicado para compras acima de R$ 200 deve ser R$ 26.99." };
+      if (res.frete !== 0) return { ok: false, erro: "O frete para compras acima de R$ 150 deve ser R$ 0.00 (Grátis)." };
+      if (Math.abs(res.totalPagar - 242.91) > 0.5) return { ok: false, erro: "O total a pagar (subtotal - desconto + frete) deve ser R$ 242.91." };
+      return { ok: true };
+    }
   },
   {
     id: "dashboard",
@@ -151,10 +197,10 @@ const resultado = null;`
     categoria: "Frontend & Métricas",
     descricao: "Processe um conjunto de transações e gere indicadores de Receita Total, Despesas e Margem de Lucro.",
     requisitos: [
-      "Filtrar transações por tipo ('receita' ou 'despesa').",
-      "Calcular o saldo líquido consolidado.",
-      "Identificar a maior receita e maior despesa.",
-      "Atribuir os indicadores à variável 'resultado'."
+      "Somar todas as transações do tipo 'receita'.",
+      "Somar todas as transações do tipo 'despesa'.",
+      "Calcular o saldo líquido consolidado (receitas - despesas).",
+      "Atribuir os indicadores no objeto 'resultado': { totalReceitas, totalDespesas, saldoLiquido }."
     ],
     dicaSenior: "📊 BI Analytics: Organize as métricas em formato de KPI para alimentar dashboards visuais.",
     boilerplate: `// 📊 DESAFIO: Dashboard Analítico
@@ -164,15 +210,28 @@ const transacoes = [
   { id: 3, descricao: "Consultoria Dev", valor: 800.00, tipo: "receita" }
 ];
 
-// TODO: Calcule o total de receitas e o total de despesas
+// TODO: Calcule totalReceitas (1500 + 800 = 2300)
 const totalReceitas = 0;
+
+// TODO: Calcule totalDespesas (320)
 const totalDespesas = 0;
 
-// TODO: Calcule o saldo líquido (receitas - despesas)
+// TODO: Calcule saldoLiquido (2300 - 320 = 1980)
 const saldoLiquido = 0;
 
-// TODO: Atribua o resumo dos KPIs à variável 'resultado'
-const resultado = null;`
+// TODO: Atribua o resumo à variável 'resultado':
+const resultado = {
+  totalReceitas,
+  totalDespesas,
+  saldoLiquido
+};`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua os indicadores do dashboard à variável 'resultado'." };
+      if (res.totalReceitas !== 2300) return { ok: false, erro: "O total de receitas calculado deve ser R$ 2300.00." };
+      if (res.totalDespesas !== 320) return { ok: false, erro: "O total de despesas calculado deve ser R$ 320.00." };
+      if (res.saldoLiquido !== 1980) return { ok: false, erro: "O saldo líquido deve ser R$ 1980.00 (receitas - despesas)." };
+      return { ok: true };
+    }
   },
   {
     id: "helpdesk",
@@ -184,9 +243,9 @@ const resultado = null;`
     categoria: "Gestão de Estado & Prioridades",
     descricao: "Crie o controle de tickets de suporte com prioridade (Baixa, Média, Alta) e troca de status.",
     requisitos: [
-      "Estruturar lista de chamados com título, cliente, prioridade e status ('aberto', 'em_atendimento', 'resolvido').",
-      "Criar função para resolver o chamado de maior prioridade.",
-      "Retornar a fila tratada no objeto 'resultado'."
+      "Criar função atenderTicketCritico() que localiza o ticket de prioridade 'ALTA' e status 'aberto'.",
+      "Alterar o status desse ticket para 'em_atendimento'.",
+      "Retornar a lista de tickets atualizados no objeto 'resultado'."
     ],
     dicaSenior: "🎟️ Queues: Utilize filas de prioridade para garantir atendimento aos chamados críticos primeiro.",
     boilerplate: `// 🎟️ DESAFIO: Sistema de Chamados Helpdesk
@@ -201,10 +260,23 @@ function atenderTicketCritico() {
 }
 
 // TODO: Execute a função atenderTicketCritico()
+atenderTicketCritico();
 
-
-// TODO: Atribua o objeto final dos chamados à variável 'resultado'
-const resultado = null;`
+// TODO: Atribua os tickets à variável 'resultado':
+const resultado = {
+  tickets
+};`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua o estado dos tickets à variável 'resultado'." };
+      const lista = Array.isArray(res.tickets) ? res.tickets : (Array.isArray(res) ? res : null);
+      if (!lista) return { ok: false, erro: "O resultado deve conter o campo 'tickets' com o array de chamados." };
+      
+      const ticketCritico = lista.find(t => t.id === 101);
+      if (!ticketCritico || ticketCritico.status !== "em_atendimento") {
+        return { ok: false, erro: "A função atenderTicketCritico deve mudar o status do ticket 101 (ALTA) de 'aberto' para 'em_atendimento'." };
+      }
+      return { ok: true };
+    }
   },
   {
     id: "financeiro",
@@ -216,14 +288,15 @@ const resultado = null;`
     categoria: "Cálculos & Validações",
     descricao: "Desenvolva a validação de orçamento com bloqueio de compras quando não houver saldo suficiente.",
     requisitos: [
-      "Definir saldo inicial da conta.",
-      "Criar função de débito que recusa transações com saldo insuficiente.",
-      "Exportar o extrato de operações no objeto 'resultado'."
+      "Criar função efetuarPagamento(descricao, valor).",
+      "Se valor > saldoConta, registrar extrato com status 'RECUSADO' e retornar false.",
+      "Se saldo for suficiente, descontar do saldoConta, registrar extrato com status 'APROVADO' e retornar true.",
+      "Exportar extrato e saldoFinal na variável 'resultado'."
     ],
     dicaSenior: "🛡️ Defensivo: Sempre cheque o saldo antes de debitar para evitar inconsistências de concorrência.",
     boilerplate: `// 💰 DESAFIO: Sistema Financeiro
 let saldoConta = 500.00;
-const historicoExtrato = [];
+const extrato = [];
 
 function efetuarPagamento(descricao, valor) {
   // TODO: Se valor > saldoConta, registre no extrato { descricao, valor, status: "RECUSADO" } e retorne false.
@@ -231,11 +304,23 @@ function efetuarPagamento(descricao, valor) {
   
 }
 
-// TODO: Teste pagamentos (ex: efetuarPagamento("Servidor VPS", 120.00))
+// TODO: Teste um pagamento aprovado (ex: 120.00) e um recusado (ex: 1000.00)
+efetuarPagamento("Servidor VPS", 120.00);
+efetuarPagamento("Notebook Novo", 1000.00);
 
-
-// TODO: Atribua o extrato e saldo final à variável 'resultado'
-const resultado = null;`
+// TODO: Atribua o resultado à variável 'resultado':
+const resultado = {
+  saldoFinal: saldoConta,
+  extrato
+};`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua o extrato e saldoFinal à variável 'resultado'." };
+      if (res.saldoFinal !== 380.00) return { ok: false, erro: "O saldo final deve ser R$ 380.00 após o pagamento aprovado de R$ 120.00." };
+      if (!Array.isArray(res.extrato) || res.extrato.length < 2) return { ok: false, erro: "O extrato deve conter pelo menos 2 registros (um aprovado e um recusado)." };
+      const recusado = res.extrato.find(e => e.status === "RECUSADO");
+      if (!recusado) return { ok: false, erro: "Transações com valor maior que o saldo disponível devem ter status 'RECUSADO' no extrato." };
+      return { ok: true };
+    }
   },
   {
     id: "chat_realtime",
@@ -247,24 +332,39 @@ const resultado = null;`
     categoria: "Eventos & Data Streams",
     descricao: "Simule a troca de mensagens em tempo real entre usuários com timestamps e leituras pendentes.",
     requisitos: [
-      "Armazenar log de mensagens com remetente, mensagem, horário e lido (boolean).",
-      "Criar função para marcar mensagens como lidas.",
-      "Contar total de mensagens não lidas no objeto 'resultado'."
+      "Criar função marcarTodasComoLidas() para alterar o atributo 'lido' de todas as conversas para true.",
+      "Calcular o total de mensagens não lidas restantes (deve ser 0).",
+      "Exportar conversas no objeto 'resultado'."
     ],
     dicaSenior: "💬 Real-time: Em produção com WebSockets/Socket.io, envie apenas difusões de pacotes leves.",
     boilerplate: `// 💬 DESAFIO: Chat em Tempo Real
 const conversas = [
-  { id: 1, de: "DevHub Bot", texto: "Bem-vindo ao chat!", lido: true, hora: "10:00" },
-  { id: 2, de: "Lucas Dev", texto: "Conseguiu revisar o PR?", lido: false, hora: "10:15" }
+  { id: 1, de: "DevHub Bot", texto: "Bem-vindo ao chat!", lido: true },
+  { id: 2, de: "Lucas Dev", texto: "Conseguiu revisar o PR?", lido: false },
+  { id: 3, de: "Ana Tech Lead", texto: "Reunião em 5 minutos", lido: false }
 ];
 
-function marcarComoLido() {
-  // TODO: Altere o atributo 'lido' de todas as mensagens para true
+function marcarTodasComoLidas() {
+  // TODO: Altere o atributo 'lido' de todas as mensagens em conversas para true
   
 }
 
-// TODO: Atribua a lista de mensagens e o total lidos/não lidos à variável 'resultado'
-const resultado = null;`
+// TODO: Execute marcarTodasComoLidas()
+marcarTodasComoLidas();
+
+// TODO: Atribua as conversas à variável 'resultado':
+const resultado = {
+  conversas,
+  naoLidas: 0 // substitua por conversas.filter(c => !c.lido).length
+};`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua as conversas à variável 'resultado'." };
+      const lista = Array.isArray(res.conversas) ? res.conversas : (Array.isArray(res) ? res : null);
+      if (!lista) return { ok: false, erro: "O campo 'conversas' deve conter o array com as mensagens." };
+      const pendentes = lista.filter(c => c.lido === false);
+      if (pendentes.length > 0) return { ok: false, erro: "A função marcarTodasComoLidas deve alterar todas as mensagens não lidas para lido: true." };
+      return { ok: true };
+    }
   },
   {
     id: "fullstack_app",
@@ -276,8 +376,9 @@ const resultado = null;`
     categoria: "Arquitetura & Engenharia",
     descricao: "Integre Frontend, Regras de Negócio e Banco de Dados em uma arquitetura completa de produção.",
     requisitos: [
-      "Simular camada de Banco de Dados, Controller e Visão de Saída.",
-      "Retornar a aplicação pronta no objeto 'resultado'."
+      "Criar função cadastrarProjeto(nome, progresso) que insere um novo item no banco simulado.",
+      "Cadastrar um novo projeto ('App Mobile DevHub', progresso: 80).",
+      "Exportar o estado final do banco de dados na variável 'resultado'."
     ],
     dicaSenior: "👑 Master Architecture: Separe em camadas (Controller, Service, Repository) para desacoplamento.",
     boilerplate: `// ⚡ DESAFIO: Aplicação Full Stack Completa
@@ -286,12 +387,23 @@ const Database = {
 };
 
 function cadastrarProjeto(nome, progresso) {
-  // TODO: Adicione o projeto no Database.projetos com ID novo
+  // TODO: Crie um novo objeto de projeto com ID incremental e insira no array Database.projetos
   
 }
 
-// TODO: Atribua o estado final da aplicação à variável 'resultado'
-const resultado = null;`
+// TODO: Execute cadastrarProjeto("App Mobile DevHub", 80)
+cadastrarProjeto("App Mobile DevHub", 80);
+
+// TODO: Atribua os projetos à variável 'resultado':
+const resultado = {
+  projetos: Database.projetos
+};`,
+    validar: (res) => {
+      if (!res || typeof res !== "object") return { ok: false, erro: "Atribua os projetos à variável 'resultado'." };
+      const lista = Array.isArray(res.projetos) ? res.projetos : (Array.isArray(res) ? res : null);
+      if (!lista || lista.length < 2) return { ok: false, erro: "Você deve executar a função cadastrarProjeto para adicionar um novo item ao banco!" };
+      return { ok: true };
+    }
   }
 ];
 
@@ -345,7 +457,18 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
     setCodeReviewIa(null);
   };
 
-  // Executar Código e Gerar Code Review Inteligente de Tech Lead IA
+  // Resetar o código para o modelo inicial
+  const handleResetarCodigo = () => {
+    if (!projetoAtivo) return;
+    if (codigoText && codigoText.trim() !== projetoAtivo.boilerplate.trim()) {
+      if (!confirm("Tem certeza que deseja resetar o código? Suas alterações atuais no editor serão substituídas pelo modelo inicial.")) {
+        return;
+      }
+    }
+    setCodigoText(projetoAtivo.boilerplate);
+  };
+
+  // Executar Código e Gerar Code Review Inteligente de Tech Lead IA com Validação Rígida
   const executarEAnalisarComIA = () => {
     setLogsConsole([]);
     setCodeReviewIa(null);
@@ -358,7 +481,7 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
       return;
     }
 
-    setAnaliseStatus({ tipo: "analisando", mensagem: "🔍 Compilando código e gerando Code Review de IA..." });
+    setAnaliseStatus({ tipo: "analisando", mensagem: "🔍 Compilando código e executando testes de validação..." });
 
     try {
       let customLogs = [];
@@ -374,22 +497,36 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
         throw new Error("O seu código precisa atribuir o resultado final à variável 'resultado' (ex: const resultado = { ... }) para que a IA possa validar!");
       }
 
+      // Validação Estrita dos Requisitos Específicos do Desafio
+      if (projetoAtivo && projetoAtivo.validar) {
+        const testResult = projetoAtivo.validar(output);
+        if (!testResult.ok) {
+          setDadosResultado(null);
+          setLogsConsole(customLogs.length > 0 ? customLogs : [`❌ Falha no Teste Unitário: ${testResult.erro}`]);
+          setAnaliseStatus({
+            tipo: "erro",
+            mensagem: `❌ Requisitos Não Atendidos: ${testResult.erro}`
+          });
+          return; // Interrompe a aprovação! Não marca como concluído e não dá XP!
+        }
+      }
+
       setDadosResultado(output);
-      setLogsConsole(customLogs.length > 0 ? customLogs : ["✅ Executado com sucesso!"]);
+      setLogsConsole(customLogs.length > 0 ? customLogs : ["✅ Código compilado e aprovado em todos os testes unitários!"]);
       setAnaliseStatus({
         tipo: "sucesso",
-        mensagem: "✅ Projeto executado e analisado pelo Tech Lead IA!"
+        mensagem: "✅ Desafio APROVADO! Todos os requisitos técnicos foram cumpridos e analisados pelo Tech Lead IA."
       });
 
-      // Gerar Code Review por IA
-      const notaCalculada = (9.0 + Math.random() * 1.0).toFixed(1);
+      // Gerar Code Review por IA para código aprovado
+      const notaCalculada = (9.2 + Math.random() * 0.8).toFixed(1);
       const reviewObj = {
         nota: notaCalculada,
         aprovado: true,
         pontosFortes: [
-          "Excelente estruturação da variável 'resultado' para validação automatizada.",
-          "Nomenclatura semântica das funções e boa legibilidade de código.",
-          "Tratamento adequado das estruturas de dados."
+          "Todos os testes unitários e requisitos funcionais foram atendidos com sucesso.",
+          "Estruturação limpa e correta da variável 'resultado' para validação.",
+          "Manipulação adequada das estruturas de dados do desafio."
         ],
         sugestaoSenior: `Para evoluir este projeto no seu portfólio real, adicione validações de exceção com try/catch e documente os tipos usando JSDoc ou TypeScript.`,
         xpGanha: 250
@@ -410,7 +547,7 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
       setLogsConsole([`❌ Erro na compilação: ${err.message}`]);
       setAnaliseStatus({
         tipo: "erro",
-        mensagem: `❌ Erro na solução: ${err.message}`
+        mensagem: `❌ Erro na compilação: ${err.message}`
       });
     }
   };
@@ -428,72 +565,69 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
       {/* HEADER DESTAQUE DO MÓDULO */}
       <div style={{
         background: isDark
-          ? "linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(59, 130, 246, 0.14) 100%)"
-          : "linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 100%)",
-        border: `1.5px solid ${isDark ? "rgba(16, 185, 129, 0.35)" : "#A7F3D0"}`,
-        borderRadius: "24px",
-        padding: "24px 28px",
+          ? "rgba(16, 185, 129, 0.08)"
+          : "#ECFDF5",
+        border: `1px solid ${isDark ? "rgba(16, 185, 129, 0.25)" : "#A7F3D0"}`,
+        borderRadius: "16px",
+        padding: "16px 20px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         flexWrap: "wrap",
-        gap: "16px"
+        gap: "12px"
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1, minWidth: "280px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: "260px" }}>
           <div style={{
-            width: "56px", height: "56px", borderRadius: "16px", flexShrink: 0,
+            width: "42px", height: "42px", borderRadius: "12px", flexShrink: 0,
             background: "linear-gradient(135deg, #10B981 0%, #3B82F6 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "26px",
-            boxShadow: "0 8px 24px rgba(16, 185, 129, 0.35)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px",
           }}>
             💼
           </div>
           <div>
-            <h2 style={{ fontSize: "22px", fontWeight: "900", margin: "0 0 4px 0", color: isDark ? "#F1F5F9" : "#0F172A" }}>
-              Laboratório de Projetos Reais & Portfólio
+            <h2 style={{ fontSize: "18px", fontWeight: "800", margin: "0 0 2px 0", color: isDark ? "#F1F5F9" : "#0F172A" }}>
+              Laboratório de Mini-Sistemas
             </h2>
-            <p style={{ color: isDark ? "#CBD5E1" : "#475569", fontSize: "14px", margin: 0, lineHeight: "1.5" }}>
-              Construa <strong>9 sistemas completos do mundo real</strong> baseados em especificações de empresas. Escreva o código, passe nos requisitos e receba <strong>Code Review automatizado por IA</strong>!
+            <p style={{ color: isDark ? "#94A3B8" : "#475569", fontSize: "13px", margin: 0 }}>
+              Construa 9 sistemas do mundo real com especificações técnicas e Code Review por IA.
             </p>
           </div>
         </div>
 
         {/* Badge de Progresso dos Projetos */}
         <div style={{
-          padding: "10px 18px", borderRadius: "14px",
-          background: isDark ? "rgba(16, 185, 129, 0.2)" : "#D1FAE5",
-          border: "1px solid #10B981", color: "#10B981",
-          fontSize: "13.5px", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px"
+          padding: "8px 14px", borderRadius: "10px",
+          background: isDark ? "rgba(16, 185, 129, 0.15)" : "#D1FAE5",
+          border: "1px solid rgba(16,185,129,0.3)", color: "#10B981",
+          fontSize: "12.5px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px"
         }}>
-          <Award size={18} />
-          <span>{projetosConcluidosIds.length} de {PROJETOS_REAIS.length} Projetos Concluídos</span>
+          <Award size={16} />
+          <span>{projetosConcluidosIds.length} de {PROJETOS_REAIS.length} Concluídos</span>
         </div>
       </div>
 
-      {/* ===================================================================
-          VISTA 1: CATÁLOGO DE PROJETOS REAIS (SELETOR DE DESAFIOS)
-         =================================================================== */}
+      {/* VISTA 1: CATÁLOGO DE PROJETOS REAIS */}
       {!projetoSelecionadoId && (
         <div>
           {/* Filtros de Nível */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", flexWrap: "wrap", gap: "12px" }}>
-            <span style={{ fontSize: "15px", fontWeight: "800", color: isDark ? "#F8FAFC" : "#0F172A", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Layers size={18} color="#10B981" /> Escolha um Projeto para Desenvolver:
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+            <span style={{ fontSize: "14px", fontWeight: "700", color: isDark ? "#F8FAFC" : "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Layers size={16} color="#10B981" /> Catálogo de Projetos:
             </span>
 
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "6px" }}>
               {["Todos", "Iniciante", "Intermediário", "Avançado"].map((nivel) => (
                 <button
                   key={nivel}
                   onClick={() => setFiltroNivel(nivel)}
                   style={{
-                    padding: "6px 14px",
-                    borderRadius: "20px",
-                    border: filtroNivel === nivel ? "1.5px solid #10B981" : "1px solid rgba(255,255,255,0.1)",
-                    background: filtroNivel === nivel ? "rgba(16, 185, 129, 0.2)" : (isDark ? "rgba(255,255,255,0.03)" : "#F1F5F9"),
+                    padding: "5px 12px",
+                    borderRadius: "16px",
+                    border: filtroNivel === nivel ? "1px solid #10B981" : `1px solid ${isDark ? "#334155" : "#E2E8F0"}`,
+                    background: filtroNivel === nivel ? "rgba(16, 185, 129, 0.15)" : (isDark ? "#1E293B" : "#F1F5F9"),
                     color: filtroNivel === nivel ? "#10B981" : (isDark ? "#94A3B8" : "#475569"),
-                    fontSize: "12.5px",
-                    fontWeight: "800",
+                    fontSize: "12px",
+                    fontWeight: "700",
                     cursor: "pointer",
                     transition: "all 0.2s ease"
                   }}
@@ -505,7 +639,7 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
           </div>
 
           {/* Grid dos Cards dos 9 Projetos */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
             {projetosFiltrados.map((proj) => {
               const estaConcluido = projetosConcluidosIds.includes(proj.id);
               return (
@@ -514,66 +648,67 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
                   onClick={() => abrirProjeto(proj)}
                   style={{
                     background: isDark ? "#0F172A" : "#FFFFFF",
-                    border: `1.5px solid ${estaConcluido ? "#10B981" : (isDark ? "rgba(255,255,255,0.1)" : "#E2E8F0")}`,
-                    borderRadius: "20px",
-                    padding: "20px",
+                    border: `1px solid ${estaConcluido ? "#10B981" : (isDark ? "#1E293B" : "#E2E8F0")}`,
+                    borderRadius: "14px",
+                    padding: "16px",
                     display: "flex",
                     flexDirection: "column",
-                    justifyContent: "space-between",
-                    gap: "16px",
+                    justifySpaceBetween: "space-between",
+                    gap: "12px",
                     cursor: "pointer",
-                    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                    boxShadow: isDark ? "0 8px 24px rgba(0,0,0,0.3)" : "0 4px 16px rgba(0,0,0,0.05)"
+                    transition: "all 0.2s ease",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
                     e.currentTarget.style.borderColor = "#10B981";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.borderColor = estaConcluido ? "#10B981" : (isDark ? "rgba(255,255,255,0.1)" : "#E2E8F0");
+                    e.currentTarget.style.borderColor = estaConcluido ? "#10B981" : (isDark ? "#1E293B" : "#E2E8F0");
                   }}
                 >
                   <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                      <span style={{ fontSize: "28px" }}>{proj.icone}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "22px" }}>{proj.icone}</span>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#6366F1" }}>
+                          {proj.categoria}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         {estaConcluido && (
-                          <span style={{ fontSize: "11px", fontWeight: "800", background: "rgba(16,185,129,0.2)", color: "#10B981", padding: "3px 8px", borderRadius: "8px", border: "1px solid #10B981" }}>
-                            ✅ Concluído
+                          <span style={{ fontSize: "10px", fontWeight: "800", background: "rgba(16,185,129,0.15)", color: "#10B981", padding: "2px 6px", borderRadius: "6px", border: "1px solid rgba(16,185,129,0.3)" }}>
+                            Concluído
                           </span>
                         )}
-                        <span style={{ fontSize: "11px", fontWeight: "800", backgroundColor: `${proj.corNivel}22`, color: proj.corNivel, border: `1px solid ${proj.corNivel}44`, padding: "3px 8px", borderRadius: "8px" }}>
+                        <span style={{ fontSize: "10px", fontWeight: "700", backgroundColor: `${proj.corNivel}18`, color: proj.corNivel, border: `1px solid ${proj.corNivel}33`, padding: "2px 6px", borderRadius: "6px" }}>
                           {proj.nivelTag}
                         </span>
                       </div>
                     </div>
 
-                    <h3 style={{ fontSize: "16.5px", fontWeight: "900", margin: "0 0 6px 0", color: isDark ? "#F8FAFC" : "#0F172A" }}>
+                    <h3 style={{ fontSize: "15px", fontWeight: "800", margin: "0 0 4px 0", color: isDark ? "#F8FAFC" : "#0F172A" }}>
                       {proj.titulo}
                     </h3>
-                    
-                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#6366F1", display: "block", marginBottom: "8px" }}>
-                      📁 {proj.categoria}
-                    </span>
 
-                    <p style={{ fontSize: "13px", color: isDark ? "#94A3B8" : "#64748B", margin: 0, lineHeight: 1.5 }}>
+                    <p style={{
+                      fontSize: "12.5px", color: isDark ? "#94A3B8" : "#64748B", margin: 0, lineHeight: 1.4,
+                      display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden"
+                    }}>
                       {proj.descricao}
                     </p>
                   </div>
 
-                  <div style={{ paddingTop: "12px", borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "12px", fontWeight: "700", color: isDark ? "#64748B" : "#94A3B8" }}>
+                  <div style={{ paddingTop: "10px", borderTop: `1px solid ${isDark ? "#1E293B" : "#F1F5F9"}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "11.5px", color: isDark ? "#64748B" : "#94A3B8" }}>
                       {proj.requisitos.length} Requisitos
                     </span>
 
                     <button style={{
-                      padding: "8px 14px", borderRadius: "10px", border: "none",
+                      padding: "6px 12px", borderRadius: "8px", border: "none",
                       background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-                      color: "#FFF", fontSize: "12.5px", fontWeight: "800", cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: "6px"
+                      color: "#FFF", fontSize: "12px", fontWeight: "700", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: "4px"
                     }}>
-                      <span>Abrir Projeto</span> →
+                      Abrir Desafio →
                     </button>
                   </div>
                 </div>
@@ -583,13 +718,11 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
         </div>
       )}
 
-      {/* ===================================================================
-          VISTA 2: ESPAÇO DE TRABALHO DO PROJETO SELECIONADO (IDE + CODE REVIEW)
-         =================================================================== */}
+      {/* VISTA 2: ESPAÇO DE TRABALHO DO PROJETO SELECIONADO (IDE + CODE REVIEW) */}
       {projetoAtivo && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           
-          {/* Barra Superior do Projeto com Botão Voltar */}
+          {/* Barra Superior do Projeto */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
             <button
               onClick={voltarAoCatalogo}
@@ -616,10 +749,10 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
             </div>
           </div>
 
-          {/* Grid Principal em 2 Colunas: Requisitos à Esquerda | IDE à Direita */}
+          {/* Grid Principal em 2 Colunas */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px" }}>
             
-            {/* PAINEL ESQUERDO: ESPECIFICAÇÕES TÉCNICAS & REQUISITOS */}
+            {/* PAINEL ESQUERDO: ESPECIFICAÇÕES TÉCNICAS */}
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               
               <div style={{
@@ -681,23 +814,23 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
                   {projetoAtivo.dicaSenior}
                 </div>
 
-                {/* Botão de Restaurar Código Inicial */}
+                {/* Botão de Resetar Código para Modelo Inicial */}
                 <button
-                  onClick={() => setCodigoText(projetoAtivo.boilerplate)}
+                  onClick={handleResetarCodigo}
                   style={{
-                    padding: "8px 14px", borderRadius: "10px",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: "transparent", color: isDark ? "#94A3B8" : "#64748B",
+                    padding: "9px 14px", borderRadius: "10px",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.03)", color: isDark ? "#94A3B8" : "#64748B",
                     fontSize: "12px", fontWeight: "700", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "6px"
                   }}
                 >
-                  <RefreshCw size={14} /> Inserir Código Inicial Recomendado
+                  <RefreshCw size={14} /> Resetar para o Template Inicial
                 </button>
               </div>
             </div>
 
-            {/* PAINEL DIREITO: IDE DE CÓDIGO + CONSOLE + CODE REVIEW POR IA */}
+            {/* PAINEL DIREITO: IDE DE CÓDIGO + CONSOLE + CODE REVIEW */}
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               
               {/* Box da IDE */}
@@ -769,7 +902,7 @@ export default function MiniSistemasModule({ user, isDark, colors, initialProjet
               {/* Console Logs */}
               {logsConsole.length > 0 && (
                 <div style={{ background: "#090D16", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "12px 16px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: "800", color: "#94A3B8", textTransform: "uppercase" }}>💻 Console Logs:</span>
+                  <span style={{ fontSize: "11px", fontWeight: "800", color: "#94A3B8", textTransform: "uppercase" }}>💻 Console Logs & Feedback de Validação:</span>
                   <div style={{ marginTop: "6px", fontFamily: "monospace", fontSize: "12.5px", color: "#E2E8F0", display: "flex", flexDirection: "column", gap: "4px" }}>
                     {logsConsole.map((l, i) => <div key={i}>{l}</div>)}
                   </div>
